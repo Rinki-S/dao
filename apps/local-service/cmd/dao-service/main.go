@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -15,6 +17,10 @@ import (
 )
 
 func main() {
+	port := flag.String("port", "3766", "local service port")
+	token := flag.String("token", "", "local session token")
+	flag.Parse()
+
 	db, err := openDatabase()
 	if err != nil {
 		log.Fatal(err)
@@ -25,12 +31,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	mux := http.NewServeMux()
+	apiMux := http.NewServeMux()
 
 	workspaceRepo := workspaces.NewRepository(db)
 	workspaceHandler := workspaces.NewHandler(workspaceRepo)
-	workspaceHandler.RegisterRoutes(mux)
+	workspaceHandler.RegisterRoutes(apiMux)
 
+	mux := http.NewServeMux()
+	mux.Handle("/api/", requireToken(*token, apiMux))
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -41,7 +49,7 @@ func main() {
 		})
 	})
 
-	addr := "127.0.0.1:3766"
+	addr := fmt.Sprintf("127.0.0.1:%s", *port)
 
 	log.Printf("dao local service listening on http://%s", addr)
 
@@ -68,4 +76,21 @@ func runMigrations(db *sql.DB) error {
 	}
 
 	return goose.Up(db, "migrations")
+}
+
+func requireToken(token string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if token == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		expected := "Bearer " + token
+		if r.Header.Get("Authorization") != expected {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
