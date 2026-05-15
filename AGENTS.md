@@ -226,6 +226,20 @@ internal/modules/tasks/
 
 Use standard Go formatting.
 
+Start the local HTTP API with the Go standard library `net/http`.
+
+Use small internal helpers for common HTTP behavior, such as JSON responses and error responses.
+
+Consider switching to `chi` when:
+
+- route groups become repetitive
+- path parameters are needed across multiple modules
+- authentication middleware is introduced
+- request logging or recovery middleware is needed
+- handlers start doing too much manual routing work
+
+Prefer `chi` over heavier frameworks such as Gin, Echo, or Fiber for the local service.
+
 Run:
 
 ```bash
@@ -472,6 +486,21 @@ Suggested ADR path:
 ```txt
 docs/adr/
 ```
+
+## 15.1 Collaboration Rules
+
+When the user is learning or explicitly asks for guidance, explain the next implementation steps and let the user edit code manually.
+
+When project documentation needs to be updated because of architecture decisions, workflow rules, or collaboration agreements, update the relevant documentation directly.
+
+Provide version-control guidance during development:
+
+- suggest when to create a feature branch
+- suggest when to commit
+- suggest commit messages
+- suggest when a branch is ready to merge
+- recommend checks to run before merging
+- call out when a change should be split into a separate branch or commit
 
 ## 16. Git Commit Style
 
