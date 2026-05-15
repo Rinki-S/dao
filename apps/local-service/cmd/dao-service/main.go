@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/pressly/goose/v3"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/workspaces"
 
 	_ "modernc.org/sqlite"
 )
@@ -25,6 +26,10 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+
+	workspaceRepo := workspaces.NewRepository(db)
+	workspaceHandler := workspaces.NewHandler(workspaceRepo)
+	workspaceHandler.RegisterRoutes(mux)
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
