@@ -1,11 +1,44 @@
+import { createWorkspace, listWorkspaces } from './features/workspaces/api'
 import { useEffect, useState } from 'react'
 import './App.css'
-import { listWorkspaces } from './features/workspaces/api'
 
 function App() {
   const [workspaces, setWorkspaces] = useState([])
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
+  const [workspaceName, setWorkspaceName] = useState('')
+  const [workspaceDescription, setWorkspaceDescription] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+
+  async function loadWorkspaces() {
+    setStatus('loading');
+    const nextWorkspaces = await listWorkspaces();
+    setWorkspaces(nextWorkspaces);
+    setStatus('ready');
+  }
+
+  async function handleCreateWorkspace(event) {
+    event.preventDefault();
+
+    try {
+      setIsCreating(true);
+      setError('');
+
+      await createWorkspace({
+        name: workspaceName,
+        description: workspaceDescription,
+      });
+
+      setWorkspaceName('');
+      setWorkspaceDescription('');
+      await loadWorkspaces();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create workspace');
+      setStatus('error');
+    } finally {
+      setIsCreating(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -53,6 +86,22 @@ function App() {
         <p className='lede'>
           A calm workspace for projects, tasks, notes, and long-term developer growth.
         </p>
+
+        <form className="workspace-form" onSubmit={handleCreateWorkspace}>
+          <input
+            value={workspaceName}
+            onChange={(event) => setWorkspaceName(event.target.value)}
+            placeholder="Workspace name"
+          />
+          <input
+            value={workspaceDescription}
+            onChange={(event) => setWorkspaceDescription(event.target.value)}
+            placeholder="Description"
+          />
+          <button type="submit" disabled={isCreating}>
+            {isCreating ? 'Creating...' : 'Create workspace'}
+          </button>
+        </form>
 
         <section className='panel'>
           <h2>Workspaces</h2>
