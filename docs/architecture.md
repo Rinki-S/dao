@@ -140,6 +140,22 @@ Local HTTP is preferred for the first version because:
 - it lets Go own business logic cleanly
 - it makes testing easier
 
+### Go HTTP Routing
+
+Start with the Go standard library `net/http`.
+
+Use internal helper packages for repeated HTTP concerns, such as JSON responses and error responses.
+
+Consider switching to `chi` when the local API grows enough that the standard library starts creating friction:
+
+- route groups become repetitive
+- path parameters are needed across multiple modules
+- authentication middleware is introduced
+- request logging or recovery middleware is needed
+- handlers start doing too much manual routing work
+
+Prefer `chi` over heavier frameworks such as Gin, Echo, or Fiber for the local service. Dao's local service should stay close to `net/http` unless the API surface clearly needs routing and middleware help.
+
 ## 5. Local Service Startup
 
 Startup flow:

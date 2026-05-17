@@ -141,3 +141,9 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Local SQLite database files
+apps/local-service/data/
+*.db
+*.db-shm
+*.db-wal
