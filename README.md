@@ -52,7 +52,7 @@ Dao brings these fragments into one calm, local-first workspace.
 
 Dao is currently in early development.
 
-The first milestone is to build the smallest working loop:
+The first technical milestone is complete:
 
 ```txt
 Electron app starts
@@ -60,6 +60,16 @@ React renders the UI
 Go local service runs
 SQLite stores workspace data
 React displays that data
+```
+
+Current working loop:
+
+```txt
+Electron starts the Go local service
+Go runs SQLite migrations
+React lists workspaces
+React creates workspaces
+SQLite persists workspace data locally
 ```
 
 ## MVP Scope
@@ -89,11 +99,11 @@ These features are planned for later stages:
 
 ## Roadmap
 
-- [ ] Initialize desktop app
-- [ ] Initialize React renderer
-- [ ] Initialize Go local service
-- [ ] Add SQLite migrations
-- [ ] Build workspace module
+- [x] Initialize desktop app
+- [x] Initialize React renderer
+- [x] Initialize Go local service
+- [x] Add SQLite migrations
+- [x] Build workspace module
 - [ ] Build project module
 - [ ] Build task module
 - [ ] Build note module
@@ -165,6 +175,7 @@ For details, see [`DESIGN.md`](./DESIGN.md).
 - [`docs/vision.md`](./docs/vision.md)
 - [`docs/product-plan.md`](./docs/product-plan.md)
 - [`docs/architecture.md`](./docs/architecture.md)
+- [`docs/development-log.md`](./docs/development-log.md)
 
 ## Development
 
