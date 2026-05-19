@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useState } from 'react';
-import { listWorkspaces } from '../../workspaces/api';
-import { createProject, listProjects } from '../api';
+import { listWorkspaces } from '../../workspaces/api.js';
+import { createProject, listProjects } from '../api.js';
 import { useEffect } from 'react';
 
 export function ProjectPanel() {
@@ -82,7 +82,7 @@ export function ProjectPanel() {
     };
   }, []);
 
-  async function handleCreateProject() {
+  async function handleCreateProject(event) {
     event.preventDefault();
 
     if (!selectedWorkspaceId) {
