@@ -191,6 +191,12 @@ Use modern ESM syntax:
 import { something } from './something.js'
 ```
 
+Use Prettier for JavaScript and JSX formatting.
+
+JSX should be formatted with four-space indentation.
+
+JavaScript and JSX statements should use semicolons.
+
 Use JSDoc for important shared data structures.
 
 Use Zod for runtime validation at boundaries.
@@ -267,6 +273,18 @@ Use soft delete with `deleted_at` where appropriate.
 Use ULID for IDs.
 
 Use explicit status values.
+
+Use `snake_case` for SQLite table and column names.
+
+Use `camelCase` for HTTP JSON request and response fields.
+
+Example mapping:
+
+```txt
+SQLite: workspace_id
+JSON:   workspaceId
+Go:     WorkspaceID
+```
 
 Example task status:
 
