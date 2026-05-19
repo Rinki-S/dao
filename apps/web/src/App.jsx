@@ -1,4 +1,5 @@
-import { WorkspacePanel } from './features/workspaces/components/WorkspacePanel.jsx'
+import { ProjectPanel } from './features/projects/components/ProjectPanel.jsx';
+import { WorkspacePanel } from './features/workspaces/components/WorkspacePanel.jsx';
 
 function App() {
   return (
@@ -28,19 +29,18 @@ function App() {
             <p className="mb-2 text-xs font-medium uppercase text-[#00A86B]">
               Local-first developer workspace
             </p>
-            <h1 className="text-3xl font-semibold tracking-normal text-[#111827]">
-              Dao
-            </h1>
+            <h1 className="text-3xl font-semibold tracking-normal text-[#111827]">Dao</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-[#6B7280]">
               A calm workspace for projects, tasks, notes, and long-term developer growth.
             </p>
           </div>
 
           <WorkspacePanel />
+          <ProjectPanel />
         </section>
       </div>
     </main>
-  )
+  );
 }
 
-export default App
+export default App;
