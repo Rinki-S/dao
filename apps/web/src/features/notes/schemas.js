@@ -1,0 +1,27 @@
+import { z } from 'zod';
+
+export const NoteSchema = z.object({
+  id: z.string(),
+  workspaceId: z.string(),
+  projectId: z.string().nullable(),
+  title: z.string(),
+  content: z.string(),
+  contentType: z.enum(['markdown']),
+  noteType: z.enum(['general', 'project', 'learning', 'daily', 'interview']),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  deletedAt: z.string().nullable(),
+  version: z.number(),
+  syncStatus: z.string(),
+});
+
+export const NoteListSchema = z.array(NoteSchema);
+
+export const CreateNoteInputSchema = z.object({
+  workspaceId: z.string().trim().min(1, 'Workspace is required'),
+  projectId: z.string().trim().nullable(),
+  title: z.string().trim().min(1, 'Note title is required'),
+  content: z.string(),
+  contentType: z.enum(['markdown']).default('markdown'),
+  noteType: z.enum(['general', 'project', 'learning', 'daily', 'interview']).default('general'),
+});
