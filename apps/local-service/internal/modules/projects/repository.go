@@ -39,6 +39,7 @@ func (r *Repository) List() ([]Project, error) {
 			&project.Name,
 			&project.Description,
 			&project.Status,
+			&project.StartedAt,
 			&project.EndedAt,
 			&project.CreatedAt,
 			&project.UpdatedAt,
