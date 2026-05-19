@@ -81,9 +81,11 @@ Notes:
 - Project JSON uses `workspaceId`, while SQLite uses `workspace_id`.
 - Project list and creation currently use the selected workspace in the React UI.
 
-## Next Milestone: Task Loop
+## Milestone 2: Task Loop
 
-Recommended branch:
+Status: complete
+
+Branch:
 
 ```txt
 feat/task-api-ui
@@ -95,7 +97,7 @@ Goal:
 Tasks can be created, persisted in SQLite, listed through the Go API, and displayed in React.
 ```
 
-Planned scope:
+Completed scope:
 
 - create `tasks` migration
 - add task repository
@@ -131,4 +133,62 @@ Keep deferred:
 - recurring tasks
 - reminders
 - search indexing
+- command palette integration
+
+Notes:
+
+- Task JSON uses `workspaceId`, `projectId`, and `dueDate`.
+- SQLite uses `workspace_id`, `project_id`, and `due_date`.
+- Task `status` starts as `todo`.
+- Task `priority` defaults to `medium`.
+- The React UI supports creating tasks in a workspace with an optional project association.
+
+## Next Milestone: Note Loop
+
+Recommended branch:
+
+```txt
+feat/note-api-ui
+```
+
+Goal:
+
+```txt
+Notes can be created, persisted in SQLite, listed through the Go API, and displayed in React.
+```
+
+Planned scope:
+
+- create `notes` migration
+- add note repository
+- add `GET /api/notes`
+- add `POST /api/notes`
+- validate note API responses in React with Zod
+- add note list and creation UI
+- associate notes with a workspace through `workspace_id`
+- optionally associate notes with a project through `project_id`
+
+Initial note fields:
+
+```txt
+id
+workspace_id
+project_id
+title
+content
+content_type
+note_type
+created_at
+updated_at
+deleted_at
+version
+sync_status
+```
+
+Keep deferred:
+
+- full note editor
+- markdown preview
+- note detail page
+- note search indexing
 - command palette integration

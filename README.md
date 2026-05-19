@@ -71,6 +71,8 @@ React lists workspaces
 React creates workspaces
 React lists projects
 React creates projects
+React lists tasks
+React creates tasks
 SQLite persists workspace data locally
 ```
 
@@ -107,7 +109,7 @@ These features are planned for later stages:
 - [x] Add SQLite migrations
 - [x] Build workspace module
 - [x] Build project module
-- [ ] Build task module
+- [x] Build task module
 - [ ] Build note module
 - [ ] Add search
 - [ ] Add command palette
