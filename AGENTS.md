@@ -195,6 +195,8 @@ Use Prettier for JavaScript and JSX formatting.
 
 JSX should be formatted with four-space indentation.
 
+JavaScript and JSX statements should use semicolons.
+
 Use JSDoc for important shared data structures.
 
 Use Zod for runtime validation at boundaries.
