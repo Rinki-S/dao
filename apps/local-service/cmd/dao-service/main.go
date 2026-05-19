@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/pressly/goose/v3"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/projects"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/workspaces"
 
 	_ "modernc.org/sqlite"
@@ -36,6 +37,10 @@ func main() {
 	workspaceRepo := workspaces.NewRepository(db)
 	workspaceHandler := workspaces.NewHandler(workspaceRepo)
 	workspaceHandler.RegisterRoutes(apiMux)
+
+	projectRepo := projects.NewRepository(db)
+	projectHandler := projects.NewHandler(projectRepo)
+	projectHandler.RegisterRoutes(apiMux)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", requireToken(*token, apiMux))
