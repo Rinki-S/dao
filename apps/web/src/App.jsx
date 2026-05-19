@@ -1,4 +1,5 @@
 import { ProjectPanel } from './features/projects/components/ProjectPanel.jsx';
+import { TaskPanel } from './features/tasks/components/TaskPanel.jsx';
 import { WorkspacePanel } from './features/workspaces/components/WorkspacePanel.jsx';
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
 
           <WorkspacePanel />
           <ProjectPanel />
+          <TaskPanel />
         </section>
       </div>
     </main>

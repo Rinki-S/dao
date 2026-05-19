@@ -12,6 +12,7 @@ import (
 
 	"github.com/pressly/goose/v3"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/projects"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/tasks"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/workspaces"
 
 	_ "modernc.org/sqlite"
@@ -41,6 +42,10 @@ func main() {
 	projectRepo := projects.NewRepository(db)
 	projectHandler := projects.NewHandler(projectRepo)
 	projectHandler.RegisterRoutes(apiMux)
+
+	taskRepo := tasks.NewRepository(db)
+	taskHandler := tasks.NewHandler(taskRepo)
+	taskHandler.RegisterRoutes(apiMux)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", requireToken(*token, apiMux))

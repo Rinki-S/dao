@@ -193,7 +193,7 @@ import { something } from './something.js'
 
 Use Prettier for JavaScript and JSX formatting.
 
-JSX should be formatted with four-space indentation.
+JavaScript and JSX should be formatted with two-space indentation.
 
 JavaScript and JSX statements should use semicolons.
 
@@ -507,7 +507,14 @@ docs/adr/
 
 ## 15.1 Collaboration Rules
 
-When the user is learning or explicitly asks for guidance, explain the next implementation steps and let the user edit code manually.
+Default development mode:
+
+- The assistant should make code changes directly.
+- Before making code changes, the assistant must explain the reason for the change, the planned implementation, and the underlying principle in enough detail for the user to learn from it.
+- After explaining the change, the assistant must ask the user for permission before editing code.
+- The assistant should not edit code until the user grants permission.
+
+When the user explicitly asks to implement manually, explain the next implementation steps and let the user edit code manually.
 
 When project documentation needs to be updated because of architecture decisions, workflow rules, or collaboration agreements, update the relevant documentation directly.
 
