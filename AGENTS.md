@@ -193,7 +193,7 @@ import { something } from './something.js'
 
 Use Prettier for JavaScript and JSX formatting.
 
-JSX should be formatted with four-space indentation.
+JavaScript and JSX should be formatted with two-space indentation.
 
 JavaScript and JSX statements should use semicolons.
 
