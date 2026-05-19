@@ -1,41 +1,5 @@
 import { CreateWorkspaceInputSchema, WorkspaceListSchema, WorkspaceSchema } from "./schemas.js";
-
-function getApiConfig() {
-    return window.dao?.api ?? {
-        baseUrl: '',
-        sessionToken: '',
-    }
-}
-
-function getApiBaseUrl() {
-    const { baseUrl } = getApiConfig();
-
-    const isViteDev =
-        window.location.origin === 'http://localhost:5173' ||
-        window.location.origin === 'http://127.0.0.1:5173';
-
-    return isViteDev ? '' : baseUrl;
-}
-
-async function apiFetch(path, options = {}) {
-    const { sessionToken } = getApiConfig();
-    const baseUrl = getApiBaseUrl();
-
-    const response = await fetch(`${baseUrl}${path}`, {
-        ...options,
-        headers: {
-            ...(options.headers ?? {}),
-            ...(sessionToken
-                ? {
-                    Authorization: `Bearer ${sessionToken}`,
-                }
-                : {}
-            ),
-        }
-    })
-
-    return response;
-}
+import { apiFetch } from "../../lib/api-client.js";
 
 export async function listWorkspaces() {
     const response = await apiFetch('/api/workspaces');
