@@ -40,9 +40,11 @@ Important decisions:
 - Use Tailwind CSS for styling.
 - Introduce Base UI later when accessible interactive primitives are needed.
 
-## Next Milestone: Project Loop
+## Milestone 1: Project Loop
 
-Recommended branch:
+Status: complete
+
+Branch:
 
 ```txt
 feat/project-api-ui
@@ -54,7 +56,7 @@ Goal:
 Projects can be created, persisted in SQLite, listed through the Go API, and displayed in React.
 ```
 
-Planned scope:
+Completed scope:
 
 - create `projects` migration
 - add project repository
@@ -71,3 +73,62 @@ Keep deferred:
 - search indexing
 - command palette integration
 - AI features
+
+Notes:
+
+- SQLite uses `snake_case` column names.
+- HTTP JSON uses `camelCase` field names.
+- Project JSON uses `workspaceId`, while SQLite uses `workspace_id`.
+- Project list and creation currently use the selected workspace in the React UI.
+
+## Next Milestone: Task Loop
+
+Recommended branch:
+
+```txt
+feat/task-api-ui
+```
+
+Goal:
+
+```txt
+Tasks can be created, persisted in SQLite, listed through the Go API, and displayed in React.
+```
+
+Planned scope:
+
+- create `tasks` migration
+- add task repository
+- add `GET /api/tasks`
+- add `POST /api/tasks`
+- validate task API responses in React with Zod
+- add task list and creation UI
+- associate tasks with a workspace through `workspace_id`
+- optionally associate tasks with a project through `project_id`
+
+Initial task fields:
+
+```txt
+id
+workspace_id
+project_id
+title
+description
+status
+priority
+due_date
+created_at
+updated_at
+deleted_at
+version
+sync_status
+```
+
+Keep deferred:
+
+- task detail page
+- drag-and-drop task board
+- recurring tasks
+- reminders
+- search indexing
+- command palette integration

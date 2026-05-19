@@ -69,6 +69,8 @@ Electron starts the Go local service
 Go runs SQLite migrations
 React lists workspaces
 React creates workspaces
+React lists projects
+React creates projects
 SQLite persists workspace data locally
 ```
 
@@ -104,7 +106,7 @@ These features are planned for later stages:
 - [x] Initialize Go local service
 - [x] Add SQLite migrations
 - [x] Build workspace module
-- [ ] Build project module
+- [x] Build project module
 - [ ] Build task module
 - [ ] Build note module
 - [ ] Add search
