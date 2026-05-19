@@ -190,5 +190,14 @@ Keep deferred:
 - full note editor
 - markdown preview
 - note detail page
+- note tags
 - note search indexing
 - command palette integration
+
+Tag decision:
+
+- Tags are a valid future organization feature for notes.
+- Do not implement tags in the basic Note Loop.
+- Prefer a normalized tag model over storing plain tag text directly on notes.
+- Future options include `tags` + `note_tags`, or a more general tagging model that can also support tasks, projects, learning records, snippets, and extension data.
+- Revisit tags during a later search, filtering, or organization milestone.
