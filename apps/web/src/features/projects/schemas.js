@@ -1,11 +1,11 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const ProjectSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
   name: z.string(),
   description: z.string(),
-  status: z.enum(["active", "paused", "completed", "archived"]),
+  status: z.enum(['active', 'paused', 'completed', 'archived']),
   startedAt: z.string().nullable(),
   endedAt: z.string().nullable(),
   createdAt: z.string(),
@@ -17,8 +17,8 @@ export const ProjectSchema = z.object({
 
 export const ProjectListSchema = z.array(ProjectSchema);
 
-export const CreateProjectSchema = z.object({
-  workspaceId: z.string().trim().min(1, "Workspace is required"),
-  name: z.string().trim().min(1, "Project name is required"),
+export const CreateProjectInputSchema = z.object({
+  workspaceId: z.string().trim().min(1, 'Workspace is required'),
+  name: z.string().trim().min(1, 'Project name is required'),
   description: z.string().trim(),
 });
