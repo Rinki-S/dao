@@ -395,6 +395,28 @@ updated_at
 
 React should access Go through a local REST API.
 
+### Naming Convention
+
+Use `snake_case` for SQLite table and column names.
+
+Use `camelCase` for HTTP JSON request and response fields.
+
+Use Go struct field names that follow Go naming conventions and map them explicitly with JSON tags.
+
+Example:
+
+```go
+type Project struct {
+	WorkspaceID string `json:"workspaceId"`
+}
+```
+
+```sql
+workspace_id TEXT NOT NULL
+```
+
+This keeps database schema idiomatic for SQL while keeping frontend API payloads idiomatic for JavaScript.
+
 ### Workspace API
 
 ```txt
