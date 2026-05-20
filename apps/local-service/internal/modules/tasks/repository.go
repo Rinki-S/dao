@@ -2,19 +2,22 @@ package tasks
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
 
 type Repository struct {
-	db      *sql.DB
-	indexer search.Indexer
+	db       *sql.DB
+	indexer  search.Indexer
+	activity *activities.Repository
 }
 
-func NewRepository(db *sql.DB, indexer search.Indexer) *Repository {
-	return &Repository{db: db, indexer: indexer}
+func NewRepository(db *sql.DB, indexer search.Indexer, activity *activities.Repository) *Repository {
+	return &Repository{db: db, indexer: indexer, activity: activity}
 }
 
 func (r *Repository) List() ([]Task, error) {
@@ -125,6 +128,25 @@ func (r *Repository) Create(req CreateTaskRequest) (Task, error) {
 		Body:        task.Description,
 		CreatedAt:   task.CreatedAt,
 		UpdatedAt:   task.UpdatedAt,
+	}); err != nil {
+		return Task{}, err
+	}
+
+	metadata, err := json.Marshal(map[string]string{
+		"title":    task.Title,
+		"priority": task.Priority,
+	})
+	if err != nil {
+		return Task{}, err
+	}
+
+	if _, err := r.activity.CreateTx(tx, activities.CreateActivityRequest{
+		WorkspaceID:  task.WorkspaceID,
+		ProjectID:    task.ProjectID,
+		EntityType:   "task",
+		EntityID:     task.ID,
+		Action:       "created",
+		MetadataJSON: string(metadata),
 	}); err != nil {
 		return Task{}, err
 	}

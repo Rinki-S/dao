@@ -44,19 +44,19 @@ func main() {
 
 	searchRepo := search.NewRepository(db)
 
-	workspaceRepo := workspaces.NewRepository(db)
+	workspaceRepo := workspaces.NewRepository(db, activityRepo)
 	workspaceHandler := workspaces.NewHandler(workspaceRepo)
 	workspaceHandler.RegisterRoutes(apiMux)
 
-	projectRepo := projects.NewRepository(db, searchRepo)
+	projectRepo := projects.NewRepository(db, searchRepo, activityRepo)
 	projectHandler := projects.NewHandler(projectRepo)
 	projectHandler.RegisterRoutes(apiMux)
 
-	taskRepo := tasks.NewRepository(db, searchRepo)
+	taskRepo := tasks.NewRepository(db, searchRepo, activityRepo)
 	taskHandler := tasks.NewHandler(taskRepo)
 	taskHandler.RegisterRoutes(apiMux)
 
-	noteRepo := notes.NewRepository(db, searchRepo)
+	noteRepo := notes.NewRepository(db, searchRepo, activityRepo)
 	noteHandler := notes.NewHandler(noteRepo)
 	noteHandler.RegisterRoutes(apiMux)
 

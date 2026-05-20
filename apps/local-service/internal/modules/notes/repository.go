@@ -2,19 +2,22 @@ package notes
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
 
 type Repository struct {
-	db      *sql.DB
-	indexer search.Indexer
+	db       *sql.DB
+	indexer  search.Indexer
+	activity *activities.Repository
 }
 
-func NewRepository(db *sql.DB, indexer search.Indexer) *Repository {
-	return &Repository{db: db, indexer: indexer}
+func NewRepository(db *sql.DB, indexer search.Indexer, activity *activities.Repository) *Repository {
+	return &Repository{db: db, indexer: indexer, activity: activity}
 }
 
 func (r *Repository) List() ([]Note, error) {
@@ -127,6 +130,25 @@ func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 		Body:        note.Content,
 		CreatedAt:   note.CreatedAt,
 		UpdatedAt:   note.UpdatedAt,
+	}); err != nil {
+		return Note{}, err
+	}
+
+	metadata, err := json.Marshal(map[string]string{
+		"title":    note.Title,
+		"noteType": note.NoteType,
+	})
+	if err != nil {
+		return Note{}, err
+	}
+
+	if _, err := r.activity.CreateTx(tx, activities.CreateActivityRequest{
+		WorkspaceID:  note.WorkspaceID,
+		ProjectID:    note.ProjectID,
+		EntityType:   "note",
+		EntityID:     note.ID,
+		Action:       "created",
+		MetadataJSON: string(metadata),
 	}); err != nil {
 		return Note{}, err
 	}
