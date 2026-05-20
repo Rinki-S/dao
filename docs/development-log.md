@@ -212,9 +212,11 @@ Notes:
 - Note `noteType` defaults to `general`.
 - The React UI supports creating notes in a workspace with an optional project association.
 
-## Next Milestone: Search Loop
+## Milestone 4: Search Loop
 
-Recommended branch:
+Status: complete
+
+Branch:
 
 ```txt
 feat/search-api-ui
@@ -226,7 +228,7 @@ Goal:
 Users can search across projects, tasks, and notes through SQLite-backed local search.
 ```
 
-Planned scope:
+Completed scope:
 
 - add SQLite FTS5 search schema
 - index project name and description
@@ -253,3 +255,42 @@ Keep deferred:
 - advanced filters
 - ranking customization
 - command palette integration
+
+Notes:
+
+- Search uses SQLite FTS5 through the shared `search_index` table.
+- Project, task, and note create flows explicitly write search index rows.
+- Entity creation and search indexing run in the same transaction.
+- Search query input is sanitized before reaching FTS5 `MATCH`.
+- Existing data created before the search index was introduced is not automatically backfilled yet.
+
+## Next Milestone: Command Palette Loop
+
+Recommended branch:
+
+```txt
+feat/command-palette
+```
+
+Goal:
+
+```txt
+Users can open a command palette and quickly trigger core workspace actions.
+```
+
+Planned scope:
+
+- add command palette UI
+- support `Cmd/Ctrl + K`
+- register core commands
+- support quick navigation to workspace sections
+- support create workspace/project/task/note commands at a basic level
+- keep command registration simple until the extension registry exists
+
+Keep deferred:
+
+- fuzzy command ranking
+- extension command registration
+- AI commands
+- command history
+- global desktop shortcut
