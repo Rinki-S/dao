@@ -143,9 +143,11 @@ Notes:
 - Task `priority` defaults to `medium`.
 - The React UI supports creating tasks in a workspace with an optional project association.
 
-## Next Milestone: Note Loop
+## Milestone 3: Note Loop
 
-Recommended branch:
+Status: complete
+
+Branch:
 
 ```txt
 feat/note-api-ui
@@ -157,7 +159,7 @@ Goal:
 Notes can be created, persisted in SQLite, listed through the Go API, and displayed in React.
 ```
 
-Planned scope:
+Completed scope:
 
 - create `notes` migration
 - add note repository
@@ -201,3 +203,45 @@ Tag decision:
 - Prefer a normalized tag model over storing plain tag text directly on notes.
 - Future options include `tags` + `note_tags`, or a more general tagging model that can also support tasks, projects, learning records, snippets, and extension data.
 - Revisit tags during a later search, filtering, or organization milestone.
+
+Notes:
+
+- Note JSON uses `workspaceId`, `projectId`, `contentType`, and `noteType`.
+- SQLite uses `workspace_id`, `project_id`, `content_type`, and `note_type`.
+- Note `contentType` starts as `markdown`.
+- Note `noteType` defaults to `general`.
+- The React UI supports creating notes in a workspace with an optional project association.
+
+## Next Milestone: Search Loop
+
+Recommended branch:
+
+```txt
+feat/search-api-ui
+```
+
+Goal:
+
+```txt
+Users can search across projects, tasks, and notes through SQLite-backed local search.
+```
+
+Planned scope:
+
+- add SQLite FTS5 search schema
+- index project name and description
+- index task title and description
+- index note title and content
+- add `GET /api/search?q=`
+- validate search API responses in React with Zod
+- add a basic search UI
+- keep search scoped to local data
+
+Keep deferred:
+
+- semantic search
+- embeddings
+- AI retrieval
+- advanced filters
+- ranking customization
+- command palette integration
