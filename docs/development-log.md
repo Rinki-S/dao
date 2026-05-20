@@ -264,9 +264,11 @@ Notes:
 - Search query input is sanitized before reaching FTS5 `MATCH`.
 - Existing data created before the search index was introduced is not automatically backfilled yet.
 
-## Next Milestone: Command Palette Loop
+## Milestone 5: Command Palette Loop
 
-Recommended branch:
+Status: complete
+
+Branch:
 
 ```txt
 feat/command-palette
@@ -278,7 +280,7 @@ Goal:
 Users can open a command palette and quickly trigger core workspace actions.
 ```
 
-Planned scope:
+Completed scope:
 
 - add command palette UI
 - support `Command/Ctrl + Shift + P`
@@ -286,6 +288,9 @@ Planned scope:
 - support quick navigation to workspace sections
 - support create workspace/project/task/note commands at a basic level
 - keep command registration simple until the extension registry exists
+- add `Switch Workspace` as a first-class MVP command
+- split command definitions and filtering logic from the React component
+- add Vitest and Testing Library coverage for command filtering and keyboard interaction
 
 Keep deferred:
 
@@ -294,3 +299,42 @@ Keep deferred:
 - AI commands
 - command history
 - global desktop shortcut
+
+Notes:
+
+- Command execution currently stays in the React renderer and focuses existing UI surfaces.
+- Create commands intentionally focus the relevant form instead of duplicating create API logic inside the palette.
+- Command registration remains static until the extension registry milestone introduces a broader registration contract.
+- Command palette tests currently cover filtering, open/close behavior, keyboard selection, command execution, hash updates, and focus targets.
+
+## Next Milestone: Activity Log Loop
+
+Recommended branch:
+
+```txt
+feat/activity-log
+```
+
+Goal:
+
+```txt
+Dao records important local user actions so future review and AI summaries have reliable activity context.
+```
+
+Planned scope:
+
+- add `activities` SQLite migration
+- add activity model and repository in the Go local service
+- write activity rows from create workspace/project/task/note flows
+- add `GET /api/activities`
+- validate activity API responses in React with Zod
+- add a basic recent activity UI
+- keep activity logging explicit and small for the MVP
+
+Keep deferred:
+
+- activity filters
+- timeline grouping
+- activity editing
+- analytics
+- AI summaries

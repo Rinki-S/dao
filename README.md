@@ -115,7 +115,7 @@ These features are planned for later stages:
 - [x] Build task module
 - [x] Build note module
 - [x] Add search
-- [ ] Add command palette
+- [x] Add command palette
 - [ ] Add activity log
 - [ ] Add extension system
 - [ ] Add AI summary features
