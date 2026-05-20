@@ -3,6 +3,7 @@ package search
 import (
 	"database/sql"
 	"strings"
+	"unicode"
 )
 
 type Repository struct {
@@ -43,8 +44,8 @@ func (r *Repository) IndexTx(tx *sql.Tx, entry IndexEntry) error {
 }
 
 func (r *Repository) Search(query string) ([]Result, error) {
-	query = strings.TrimSpace(query)
-	if query == "" {
+	matchQuery := buildMatchQuery(query)
+	if matchQuery == "" {
 		return []Result{}, nil
 	}
 
@@ -60,7 +61,7 @@ func (r *Repository) Search(query string) ([]Result, error) {
 		WHERE search_index MATCH ?
 		ORDER BY rank
 		LIMIT 50
-	`, query)
+	`, matchQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -86,4 +87,22 @@ func (r *Repository) Search(query string) ([]Result, error) {
 	}
 
 	return results, rows.Err()
+}
+
+func buildMatchQuery(query string) string {
+	tokens := strings.FieldsFunc(strings.TrimSpace(query), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+	})
+
+	quotedTokens := make([]string, 0, len(tokens))
+	for _, token := range tokens {
+		token = strings.TrimSpace(token)
+		if token == "" {
+			continue
+		}
+
+		quotedTokens = append(quotedTokens, `"`+strings.ReplaceAll(token, `"`, `""`)+`"`)
+	}
+
+	return strings.Join(quotedTokens, " ")
 }

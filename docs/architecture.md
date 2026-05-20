@@ -664,6 +664,30 @@ When update/delete behavior grows, revisit one of these options:
 - a rebuild-index command
 - a combination of explicit writes and periodic rebuild
 
+### Initial Query Strategy
+
+The first search implementation should sanitize user input before passing it to FTS5 `MATCH`.
+
+Use a conservative tokenization strategy that treats non-letter and non-number characters as separators, then constructs a safe FTS5 query from the remaining tokens.
+
+This is an MVP safety strategy, not the final search experience.
+
+Known limitations:
+
+- technical terms can lose useful symbols, such as `C++`, `React.js`, or `node_modules`
+- URLs and file paths are split into separate tokens
+- CJK search may be rough because safe tokenization is not the same as language-aware segmentation
+- multi-token search behavior may feel stricter than users expect
+
+Future improvements may include:
+
+- better technical-token handling
+- prefix search
+- query parser tests
+- CJK-aware search behavior
+- fallback search strategies
+- tokenizer tuning
+
 Future version:
 
 ```txt

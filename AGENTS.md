@@ -357,6 +357,8 @@ Future vector search must be treated as a derived index, not the source of truth
 
 SQLite remains the durable local source of truth for core data.
 
+Treat the first FTS5 query sanitizer as an MVP safety strategy. Improve technical-token and CJK search behavior later based on tests and real usage.
+
 For search and vector details, see `docs/architecture.md`.
 
 ## 9.2 Tag Rules
