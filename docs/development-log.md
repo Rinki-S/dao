@@ -321,6 +321,14 @@ Goal:
 Dao records important local user actions so future review and AI summaries have reliable activity context.
 ```
 
+Product direction:
+
+```txt
+Activity Log is an internal event layer, not a detailed user-facing feed.
+```
+
+User-facing activity should appear later as lightweight aggregate metrics, review signals, or AI-generated summaries.
+
 Planned scope:
 
 - add `activities` SQLite migration
@@ -328,11 +336,12 @@ Planned scope:
 - write activity rows from create workspace/project/task/note flows
 - add `GET /api/activities`
 - validate activity API responses in React with Zod
-- add a basic recent activity UI
 - keep activity logging explicit and small for the MVP
 
 Keep deferred:
 
+- detailed activity feed UI
+- dashboard activity metrics
 - activity filters
 - timeline grouping
 - activity editing

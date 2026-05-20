@@ -369,6 +369,10 @@ sync_status
 
 ### activities
 
+Activities are an internal event log for product review, aggregate metrics, and future AI context.
+
+They should not be treated as the main user-facing activity UI in the MVP.
+
 ```txt
 id
 workspace_id
