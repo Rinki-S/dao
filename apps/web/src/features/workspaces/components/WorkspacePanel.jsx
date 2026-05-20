@@ -72,7 +72,7 @@ export function WorkspacePanel() {
   }
 
   return (
-    <section className="max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5">
+    <section id="workspaces" className="max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5">
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold text-[#111827]">Workspaces</h2>
@@ -86,6 +86,7 @@ export function WorkspacePanel() {
           value={workspaceName}
           onChange={(event) => setWorkspaceName(event.target.value)}
           placeholder="Workspace name"
+          data-command-target="workspace-name"
         />
         <input
           className="rounded-md border border-[#E5E7EB] px-3 py-2 text-sm outline-none focus:border-[#00A86B] focus:ring-3 focus:ring-[rgba(0,168,107,0.18)]"
