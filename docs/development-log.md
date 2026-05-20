@@ -281,7 +281,7 @@ Users can open a command palette and quickly trigger core workspace actions.
 Planned scope:
 
 - add command palette UI
-- support `Cmd/Ctrl + K`
+- support `Command/Ctrl + Shift + P`
 - register core commands
 - support quick navigation to workspace sections
 - support create workspace/project/task/note commands at a basic level

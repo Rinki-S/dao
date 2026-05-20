@@ -264,7 +264,7 @@ The command palette is one of the most important UX features.
 Shortcut:
 
 ```txt
-Cmd/Ctrl + K
+Command/Ctrl + Shift + P
 ```
 
 ### MVP commands
