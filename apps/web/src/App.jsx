@@ -1,3 +1,4 @@
+import { CommandPalette } from './features/command-palette/components/CommandPalette.jsx';
 import { NotePanel } from './features/notes/components/NotePanel.jsx';
 import { ProjectPanel } from './features/projects/components/ProjectPanel.jsx';
 import { SearchPanel } from './features/search/components/SearchPanel.jsx';
@@ -7,6 +8,7 @@ import { WorkspacePanel } from './features/workspaces/components/WorkspacePanel.
 function App() {
   return (
     <main className="min-h-screen bg-[#F7F4ED] text-[#2B2F36]">
+      <CommandPalette />
       <div className="grid min-h-screen grid-cols-[240px_1fr]">
         <aside className="border-r border-[#E5E7EB] bg-white px-5 py-6">
           <div className="mb-8 text-xl font-semibold tracking-normal">
@@ -43,6 +45,16 @@ function App() {
           <TaskPanel />
           <NotePanel />
           <SearchPanel />
+
+          <section
+            id="settings"
+            className="mt-6 max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5"
+          >
+            <h2 className="text-base font-semibold text-[#111827]">Settings</h2>
+            <p className="mt-1 text-sm text-[#6B7280]">
+              Settings will hold local workspace preferences as the MVP grows.
+            </p>
+          </section>
         </section>
       </div>
     </main>

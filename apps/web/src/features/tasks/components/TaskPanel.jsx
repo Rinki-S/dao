@@ -142,7 +142,7 @@ export function TaskPanel() {
   }
 
   return (
-    <section className="mt-6 max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5">
+    <section id="tasks" className="mt-6 max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold text-[#111827]">Tasks</h2>
@@ -200,6 +200,7 @@ export function TaskPanel() {
           onChange={(event) => setTaskTitle(event.target.value)}
           placeholder="Task title"
           disabled={workspaces.length === 0}
+          data-command-target="task-title"
         />
 
         <input

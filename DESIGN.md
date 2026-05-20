@@ -512,7 +512,7 @@ It should feel fast, dense, and developer-native.
 Shortcut:
 
 ```txt
-Cmd/Ctrl + K
+Command/Ctrl + Shift + P
 ```
 
 Command palette should support:

@@ -150,7 +150,7 @@ export function NotePanel() {
   }
 
   return (
-    <section className="mt-6 max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5">
+    <section id="notes" className="mt-6 max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold text-[#111827]">Notes</h2>
@@ -208,6 +208,7 @@ export function NotePanel() {
           onChange={(event) => setNoteTitle(event.target.value)}
           placeholder="Note title"
           disabled={workspaces.length === 0}
+          data-command-target="note-title"
         />
 
         <select

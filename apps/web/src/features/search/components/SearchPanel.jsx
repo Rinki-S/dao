@@ -33,7 +33,7 @@ export function SearchPanel() {
   }
 
   return (
-    <section className="mt-6 max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5">
+    <section id="search" className="mt-6 max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5">
       <div className="mb-5">
         <h2 className="text-base font-semibold text-[#111827]">Search</h2>
         <p className="mt-1 text-sm text-[#6B7280]">
@@ -47,6 +47,7 @@ export function SearchPanel() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search projects, tasks, and notes"
+          data-command-target="search-query"
         />
 
         <button

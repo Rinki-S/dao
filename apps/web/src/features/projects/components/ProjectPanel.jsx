@@ -112,7 +112,10 @@ export function ProjectPanel() {
   }
 
   return (
-    <section className="mt-6 max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5">
+    <section
+      id="projects"
+      className="mt-6 max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5"
+    >
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold text-[#111827]">Projects</h2>
@@ -152,6 +155,7 @@ export function ProjectPanel() {
           onChange={(event) => setProjectName(event.target.value)}
           placeholder="Project name"
           disabled={workspaces.length === 0}
+          data-command-target="project-name"
         />
 
         <input
