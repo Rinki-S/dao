@@ -19,7 +19,7 @@ func (r *Repository) List() ([]Activity, error) {
 	rows, err := r.db.Query(`
 		SELECT id, workspace_id, project_id, entity_type, entity_id, action, metadata_json, created_at
 		FROM activities
-		ORDER BY created_at DESC
+		ORDER BY created_at DESC, id DESC
 	`)
 	if err != nil {
 		return nil, err
