@@ -673,6 +673,43 @@ RAG
 AI context retrieval
 ```
 
+### Vector Search Strategy
+
+Vector search should not replace SQLite as Dao's source of truth.
+
+SQLite remains responsible for durable local data:
+
+```txt
+workspaces
+projects
+tasks
+notes
+activities
+sync metadata
+```
+
+FTS5 remains the first local keyword search layer.
+
+Future vector search should be treated as a derived retrieval index that can be rebuilt from SQLite data.
+
+Possible future vector index options include:
+
+- SQLite vector extensions such as `sqlite-vec` or `sqlite-vss`
+- an embedded local vector store such as LanceDB
+- a heavier local service such as Qdrant only if the product needs it
+- server-side Postgres with `pgvector` only if Dao later adds cloud sync or team/server features
+
+Long-term local AI retrieval should be layered:
+
+```txt
+SQLite source data
+SQLite FTS5 keyword search
+Derived vector index for semantic search
+Go service result merging and context assembly
+```
+
+Do not introduce a vector database before core local data, FTS5 search, activity log, and basic AI summary/retrieval needs justify it.
+
 ## 13.1 Tags and Organization
 
 Tags are a valid future organization feature for notes and other Dao entities.

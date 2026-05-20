@@ -345,42 +345,29 @@ Keep extensions modular but simple.
 
 ## 9.1 Search Rules
 
-The first search implementation should use SQLite FTS5.
+Use SQLite FTS5 for the first search implementation.
 
-Use a shared `search_index` FTS5 table for searchable project, task, and note content.
+Use the shared `search_index` table for searchable project, task, and note content.
 
-Index:
+Write search index rows explicitly from create flows in the first implementation.
 
-- project name and description
-- task title and description
-- note title and content
+Do not add trigger-based indexing, a dedicated search service, rebuild-index commands, semantic search, embeddings, RAG, or AI retrieval until the architecture calls for them.
 
-Keep `workspace_id` and `project_id` as unindexed metadata for filtering.
+Future vector search must be treated as a derived index, not the source of truth.
 
-In the first implementation, write search index rows explicitly from application create flows.
+SQLite remains the durable local source of truth for core data.
 
-Do not introduce trigger-based indexing, a dedicated search service, or a rebuild-index command until update/delete behavior becomes more complex.
-
-Defer semantic search, embeddings, RAG, and AI retrieval until core local search works.
+For search and vector details, see `docs/architecture.md`.
 
 ## 9.2 Tag Rules
 
-Tags are a valid future organization feature for notes.
-
 Do not implement tags in the basic Note Loop.
 
-Do not store note tags as plain text directly on the `notes` table.
+Do not store tags as plain text directly on the `notes` table.
 
-Prefer a normalized future model such as:
+Future tags should use a normalized model or a general entity tagging model.
 
-```txt
-tags
-note_tags
-```
-
-or a more general entity tagging model that can support notes, tasks, projects, learning records, snippets, and extension data.
-
-Revisit tags during a later search, filtering, or organization milestone.
+For tag architecture details, see `docs/architecture.md`.
 
 ## 10. AI Feature Rules
 
