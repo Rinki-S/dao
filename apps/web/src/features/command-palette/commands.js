@@ -40,8 +40,17 @@ export const coreCommands = [
     title: 'Open Workspaces',
     description: 'Jump to workspace management',
     group: 'Navigate',
-    keywords: ['workspace', 'switch workspace'],
+    keywords: ['workspace'],
     targetId: 'workspaces',
+  },
+  {
+    id: 'switch-workspace',
+    title: 'Switch Workspace',
+    description: 'Review available workspaces',
+    group: 'Navigate',
+    keywords: ['workspace', 'change workspace'],
+    targetId: 'workspaces',
+    focusSelector: '[data-command-target="workspace-name"]',
   },
   {
     id: 'open-projects',

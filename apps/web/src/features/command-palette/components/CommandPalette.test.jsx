@@ -87,4 +87,17 @@ describe('CommandPalette', () => {
 
     expect(window.location.hash).toBe('#projects');
   });
+
+  it('runs the switch workspace command', async () => {
+    const user = userEvent.setup();
+
+    renderCommandPaletteWithTargets();
+
+    await user.keyboard('{Control>}{Shift>}p{/Shift}{/Control}');
+    await user.type(screen.getByPlaceholderText('Type a command'), 'switch workspace');
+    await user.keyboard('{Enter}');
+
+    expect(window.location.hash).toBe('#workspaces');
+    expect(screen.getByLabelText('Workspace name')).toHaveFocus();
+  });
 });

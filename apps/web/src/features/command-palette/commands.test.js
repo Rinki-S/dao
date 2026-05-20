@@ -19,6 +19,12 @@ describe('command palette command filtering', () => {
     expect(results.map((command) => command.id)).toEqual(['open-settings']);
   });
 
+  it('exposes switch workspace as a first-class command', () => {
+    const results = filterCommands(coreCommands, 'switch workspace');
+
+    expect(results.map((command) => command.id)).toEqual(['switch-workspace']);
+  });
+
   it('returns an empty list when no command matches', () => {
     expect(filterCommands(coreCommands, 'publish release')).toEqual([]);
   });
