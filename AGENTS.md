@@ -343,6 +343,45 @@ Backend module interface should support:
 
 Keep extensions modular but simple.
 
+## 9.1 Search Rules
+
+The first search implementation should use SQLite FTS5.
+
+Use a shared `search_index` FTS5 table for searchable project, task, and note content.
+
+Index:
+
+- project name and description
+- task title and description
+- note title and content
+
+Keep `workspace_id` and `project_id` as unindexed metadata for filtering.
+
+In the first implementation, write search index rows explicitly from application create flows.
+
+Do not introduce trigger-based indexing, a dedicated search service, or a rebuild-index command until update/delete behavior becomes more complex.
+
+Defer semantic search, embeddings, RAG, and AI retrieval until core local search works.
+
+## 9.2 Tag Rules
+
+Tags are a valid future organization feature for notes.
+
+Do not implement tags in the basic Note Loop.
+
+Do not store note tags as plain text directly on the `notes` table.
+
+Prefer a normalized future model such as:
+
+```txt
+tags
+note_tags
+```
+
+or a more general entity tagging model that can support notes, tasks, projects, learning records, snippets, and extension data.
+
+Revisit tags during a later search, filtering, or organization milestone.
+
 ## 10. AI Feature Rules
 
 Do not build AI Agent features before core data exists.

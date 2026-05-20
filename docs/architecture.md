@@ -609,6 +609,61 @@ Search should index:
 - note title
 - note content
 
+### Search Index
+
+Use a shared SQLite FTS5 table named:
+
+```txt
+search_index
+```
+
+Initial fields:
+
+```txt
+entity_type
+entity_id
+workspace_id
+project_id
+title
+body
+created_at
+updated_at
+```
+
+Use `entity_type` to distinguish:
+
+```txt
+project
+task
+note
+```
+
+Use `entity_id` to point back to the source row.
+
+Keep `workspace_id` and `project_id` as unindexed metadata so search can later be filtered by workspace or project.
+
+Index text content through:
+
+```txt
+title
+body
+```
+
+### Initial Indexing Strategy
+
+In the first implementation, write search index rows explicitly from application create flows.
+
+Do not use database triggers for the first search milestone.
+
+Do not introduce a dedicated search service or rebuild-index command until update/delete behavior becomes more complex.
+
+When update/delete behavior grows, revisit one of these options:
+
+- a dedicated search service
+- trigger-based indexing
+- a rebuild-index command
+- a combination of explicit writes and periodic rebuild
+
 Future version:
 
 ```txt
@@ -617,6 +672,40 @@ semantic search
 RAG
 AI context retrieval
 ```
+
+## 13.1 Tags and Organization
+
+Tags are a valid future organization feature for notes and other Dao entities.
+
+Do not implement tags in the basic Note Loop.
+
+Do not store note tags as plain text directly on the `notes` table.
+
+Prefer a normalized model when tags are introduced.
+
+Possible note-specific model:
+
+```txt
+tags
+  id
+  workspace_id
+  name
+  color
+  created_at
+  updated_at
+  deleted_at
+  version
+  sync_status
+
+note_tags
+  note_id
+  tag_id
+  created_at
+```
+
+If tags need to apply across notes, tasks, projects, learning records, snippets, or extension data, consider a more general entity tagging model instead.
+
+Revisit tags during a later search, filtering, or organization milestone.
 
 ## 14. AI Architecture Roadmap
 

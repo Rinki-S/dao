@@ -237,6 +237,14 @@ Planned scope:
 - add a basic search UI
 - keep search scoped to local data
 
+Initial indexing strategy:
+
+- Use a shared SQLite FTS5 table named `search_index`.
+- Store searchable rows for projects, tasks, and notes.
+- Keep `workspace_id` and `project_id` as unindexed metadata for filtering.
+- In the first implementation, write search index rows explicitly from create flows instead of adding database triggers.
+- If update/delete behavior grows more complex, revisit a dedicated search service, trigger-based indexing, or a rebuild-index command.
+
 Keep deferred:
 
 - semantic search
