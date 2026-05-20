@@ -177,14 +177,14 @@ For details, see [`DESIGN.md`](./DESIGN.md).
 
 ## Documentation
 
-- [`DESIGN.md`](./DESIGN.md)
-- [`AGENTS.md`](./AGENTS.md)
-- [`docs/vision.md`](./docs/vision.md)
-- [`docs/product-plan.md`](./docs/product-plan.md)
-- [`docs/architecture.md`](./docs/architecture.md)
-- [`docs/ai-harness.md`](./docs/ai-harness.md)
-- [`docs/open-source-strategy.md`](./docs/open-source-strategy.md)
-- [`docs/development-log.md`](./docs/development-log.md)
+- [`DESIGN.md`](./DESIGN.md) — visual identity, UI style, design tokens, and interaction tone.
+- [`AGENTS.md`](./AGENTS.md) — agent instructions, coding rules, architecture guardrails, and collaboration workflow.
+- [`docs/vision.md`](./docs/vision.md) — product vision, positioning, principles, and long-term shape.
+- [`docs/product-plan.md`](./docs/product-plan.md) — MVP scope, module roadmap, user flows, and product milestones.
+- [`docs/architecture.md`](./docs/architecture.md) — system boundaries, local service design, data model, API contracts, search, tags, and AI/vector strategy.
+- [`docs/ai-harness.md`](./docs/ai-harness.md) — future AI execution layer, context, tools, permissions, validation, traces, and confirmation rules.
+- [`docs/open-source-strategy.md`](./docs/open-source-strategy.md) — when and how to extract companion packages from real Dao needs.
+- [`docs/development-log.md`](./docs/development-log.md) — completed milestones, current milestone context, and near-term development direction.
 
 ## Development
 

@@ -537,7 +537,29 @@ Suggested ADR path:
 docs/adr/
 ```
 
-## 15.1 Collaboration Rules
+## 15.1 Documentation Lookup Rules
+
+Before starting a feature or architectural change, check the relevant project documents.
+
+Use this lookup map:
+
+- Product scope and module priority: `docs/product-plan.md`
+- Product vision and principles: `docs/vision.md`
+- Architecture boundaries, data model, API contracts, search, tags, sync, security, and AI/vector strategy: `docs/architecture.md`
+- UI design, visual tone, density, colors, and component style: `DESIGN.md`
+- Current milestone state and next milestone direction: `docs/development-log.md`
+- Future AI summaries, retrieval, tool calling, agent workflows, permissions, validation, traces, and confirmation: `docs/ai-harness.md`
+- Package extraction, companion repositories, and open-source strategy: `docs/open-source-strategy.md`
+
+Read `docs/ai-harness.md` before implementing any AI feature.
+
+Read `docs/open-source-strategy.md` before extracting a package, creating a companion repository, or adding public-package-oriented APIs.
+
+Read `docs/architecture.md` before changing data models, migrations, API contracts, local service boundaries, Electron/Go communication, search, sync, security, or AI/vector architecture.
+
+Read `DESIGN.md` before making significant UI styling, layout, or component-system changes.
+
+## 15.2 Collaboration Rules
 
 Default development mode:
 
