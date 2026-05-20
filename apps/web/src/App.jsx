@@ -1,3 +1,4 @@
+import { NotePanel } from './features/notes/components/NotePanel.jsx';
 import { ProjectPanel } from './features/projects/components/ProjectPanel.jsx';
 import { TaskPanel } from './features/tasks/components/TaskPanel.jsx';
 import { WorkspacePanel } from './features/workspaces/components/WorkspacePanel.jsx';
@@ -39,6 +40,7 @@ function App() {
           <WorkspacePanel />
           <ProjectPanel />
           <TaskPanel />
+          <NotePanel />
         </section>
       </div>
     </main>
