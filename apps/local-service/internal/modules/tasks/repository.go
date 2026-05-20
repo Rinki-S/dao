@@ -5,14 +5,16 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
 
 type Repository struct {
-	db *sql.DB
+	db      *sql.DB
+	indexer search.Indexer
 }
 
-func NewRepository(db *sql.DB) *Repository {
-	return &Repository{db: db}
+func NewRepository(db *sql.DB, indexer search.Indexer) *Repository {
+	return &Repository{db: db, indexer: indexer}
 }
 
 func (r *Repository) List() ([]Task, error) {
@@ -81,7 +83,13 @@ func (r *Repository) Create(req CreateTaskRequest) (Task, error) {
 		SyncStatus:  "local",
 	}
 
-	_, err := r.db.Exec(`
+	tx, err := r.db.Begin()
+	if err != nil {
+		return Task{}, err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
 		INSERT INTO tasks (
 			id, workspace_id, project_id, title, description, status, priority, due_date,
 			created_at, updated_at, deleted_at, version, sync_status
@@ -105,6 +113,23 @@ func (r *Repository) Create(req CreateTaskRequest) (Task, error) {
 		task.SyncStatus,
 	)
 	if err != nil {
+		return Task{}, err
+	}
+
+	if err := r.indexer.IndexTx(tx, search.IndexEntry{
+		EntityType:  "task",
+		EntityID:    task.ID,
+		WorkspaceID: task.WorkspaceID,
+		ProjectID:   task.ProjectID,
+		Title:       task.Title,
+		Body:        task.Description,
+		CreatedAt:   task.CreatedAt,
+		UpdatedAt:   task.UpdatedAt,
+	}); err != nil {
+		return Task{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return Task{}, err
 	}
 

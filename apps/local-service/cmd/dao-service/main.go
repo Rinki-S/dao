@@ -37,23 +37,24 @@ func main() {
 
 	apiMux := http.NewServeMux()
 
+	searchRepo := search.NewRepository(db)
+
 	workspaceRepo := workspaces.NewRepository(db)
 	workspaceHandler := workspaces.NewHandler(workspaceRepo)
 	workspaceHandler.RegisterRoutes(apiMux)
 
-	projectRepo := projects.NewRepository(db)
+	projectRepo := projects.NewRepository(db, searchRepo)
 	projectHandler := projects.NewHandler(projectRepo)
 	projectHandler.RegisterRoutes(apiMux)
 
-	taskRepo := tasks.NewRepository(db)
+	taskRepo := tasks.NewRepository(db, searchRepo)
 	taskHandler := tasks.NewHandler(taskRepo)
 	taskHandler.RegisterRoutes(apiMux)
 
-	noteRepo := notes.NewRepository(db)
+	noteRepo := notes.NewRepository(db, searchRepo)
 	noteHandler := notes.NewHandler(noteRepo)
 	noteHandler.RegisterRoutes(apiMux)
 
-	searchRepo := search.NewRepository(db)
 	searchHandler := search.NewHandler(searchRepo)
 	searchHandler.RegisterRoutes(apiMux)
 

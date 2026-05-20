@@ -13,6 +13,35 @@ func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
+func (r *Repository) IndexTx(tx *sql.Tx, entry IndexEntry) error {
+	_, err := tx.Exec(`
+		INSERT INTO search_index (
+			entity_type,
+			entity_id,
+			workspace_id,
+			project_id,
+			title,
+			body,
+			created_at,
+			updated_at
+		)
+		VALUES (
+			?, ?, ?, ?, ?, ?, ?, ?
+		)
+	`,
+		entry.EntityType,
+		entry.EntityID,
+		entry.WorkspaceID,
+		entry.ProjectID,
+		entry.Title,
+		entry.Body,
+		entry.CreatedAt,
+		entry.UpdatedAt,
+	)
+
+	return err
+}
+
 func (r *Repository) Search(query string) ([]Result, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
