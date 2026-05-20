@@ -182,6 +182,8 @@ For details, see [`DESIGN.md`](./DESIGN.md).
 - [`docs/vision.md`](./docs/vision.md)
 - [`docs/product-plan.md`](./docs/product-plan.md)
 - [`docs/architecture.md`](./docs/architecture.md)
+- [`docs/ai-harness.md`](./docs/ai-harness.md)
+- [`docs/open-source-strategy.md`](./docs/open-source-strategy.md)
 - [`docs/development-log.md`](./docs/development-log.md)
 
 ## Development

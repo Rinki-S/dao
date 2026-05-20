@@ -396,6 +396,10 @@ AI output must be validated with Zod before being used.
 
 Major AI-generated changes should require user confirmation before writing to Dao.
 
+Do not add ad-hoc AI calls directly inside UI components or feature modules.
+
+Once AI development starts, all AI features must go through the Dao AI Harness layer.
+
 ## 11. MVP Scope
 
 The MVP includes:
