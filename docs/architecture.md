@@ -609,6 +609,85 @@ Search should index:
 - note title
 - note content
 
+### Search Index
+
+Use a shared SQLite FTS5 table named:
+
+```txt
+search_index
+```
+
+Initial fields:
+
+```txt
+entity_type
+entity_id
+workspace_id
+project_id
+title
+body
+created_at
+updated_at
+```
+
+Use `entity_type` to distinguish:
+
+```txt
+project
+task
+note
+```
+
+Use `entity_id` to point back to the source row.
+
+Keep `workspace_id` and `project_id` as unindexed metadata so search can later be filtered by workspace or project.
+
+Index text content through:
+
+```txt
+title
+body
+```
+
+### Initial Indexing Strategy
+
+In the first implementation, write search index rows explicitly from application create flows.
+
+Do not use database triggers for the first search milestone.
+
+Do not introduce a dedicated search service or rebuild-index command until update/delete behavior becomes more complex.
+
+When update/delete behavior grows, revisit one of these options:
+
+- a dedicated search service
+- trigger-based indexing
+- a rebuild-index command
+- a combination of explicit writes and periodic rebuild
+
+### Initial Query Strategy
+
+The first search implementation should sanitize user input before passing it to FTS5 `MATCH`.
+
+Use a conservative tokenization strategy that treats non-letter and non-number characters as separators, then constructs a safe FTS5 query from the remaining tokens.
+
+This is an MVP safety strategy, not the final search experience.
+
+Known limitations:
+
+- technical terms can lose useful symbols, such as `C++`, `React.js`, or `node_modules`
+- URLs and file paths are split into separate tokens
+- CJK search may be rough because safe tokenization is not the same as language-aware segmentation
+- multi-token search behavior may feel stricter than users expect
+
+Future improvements may include:
+
+- better technical-token handling
+- prefix search
+- query parser tests
+- CJK-aware search behavior
+- fallback search strategies
+- tokenizer tuning
+
 Future version:
 
 ```txt
@@ -617,6 +696,77 @@ semantic search
 RAG
 AI context retrieval
 ```
+
+### Vector Search Strategy
+
+Vector search should not replace SQLite as Dao's source of truth.
+
+SQLite remains responsible for durable local data:
+
+```txt
+workspaces
+projects
+tasks
+notes
+activities
+sync metadata
+```
+
+FTS5 remains the first local keyword search layer.
+
+Future vector search should be treated as a derived retrieval index that can be rebuilt from SQLite data.
+
+Possible future vector index options include:
+
+- SQLite vector extensions such as `sqlite-vec` or `sqlite-vss`
+- an embedded local vector store such as LanceDB
+- a heavier local service such as Qdrant only if the product needs it
+- server-side Postgres with `pgvector` only if Dao later adds cloud sync or team/server features
+
+Long-term local AI retrieval should be layered:
+
+```txt
+SQLite source data
+SQLite FTS5 keyword search
+Derived vector index for semantic search
+Go service result merging and context assembly
+```
+
+Do not introduce a vector database before core local data, FTS5 search, activity log, and basic AI summary/retrieval needs justify it.
+
+## 13.1 Tags and Organization
+
+Tags are a valid future organization feature for notes and other Dao entities.
+
+Do not implement tags in the basic Note Loop.
+
+Do not store note tags as plain text directly on the `notes` table.
+
+Prefer a normalized model when tags are introduced.
+
+Possible note-specific model:
+
+```txt
+tags
+  id
+  workspace_id
+  name
+  color
+  created_at
+  updated_at
+  deleted_at
+  version
+  sync_status
+
+note_tags
+  note_id
+  tag_id
+  created_at
+```
+
+If tags need to apply across notes, tasks, projects, learning records, snippets, or extension data, consider a more general entity tagging model instead.
+
+Revisit tags during a later search, filtering, or organization milestone.
 
 ## 14. AI Architecture Roadmap
 

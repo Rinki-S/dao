@@ -343,6 +343,34 @@ Backend module interface should support:
 
 Keep extensions modular but simple.
 
+## 9.1 Search Rules
+
+Use SQLite FTS5 for the first search implementation.
+
+Use the shared `search_index` table for searchable project, task, and note content.
+
+Write search index rows explicitly from create flows in the first implementation.
+
+Do not add trigger-based indexing, a dedicated search service, rebuild-index commands, semantic search, embeddings, RAG, or AI retrieval until the architecture calls for them.
+
+Future vector search must be treated as a derived index, not the source of truth.
+
+SQLite remains the durable local source of truth for core data.
+
+Treat the first FTS5 query sanitizer as an MVP safety strategy. Improve technical-token and CJK search behavior later based on tests and real usage.
+
+For search and vector details, see `docs/architecture.md`.
+
+## 9.2 Tag Rules
+
+Do not implement tags in the basic Note Loop.
+
+Do not store tags as plain text directly on the `notes` table.
+
+Future tags should use a normalized model or a general entity tagging model.
+
+For tag architecture details, see `docs/architecture.md`.
+
 ## 10. AI Feature Rules
 
 Do not build AI Agent features before core data exists.

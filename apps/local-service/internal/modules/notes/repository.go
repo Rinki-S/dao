@@ -5,14 +5,16 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
 
 type Repository struct {
-	db *sql.DB
+	db      *sql.DB
+	indexer search.Indexer
 }
 
-func NewRepository(db *sql.DB) *Repository {
-	return &Repository{db: db}
+func NewRepository(db *sql.DB, indexer search.Indexer) *Repository {
+	return &Repository{db: db, indexer: indexer}
 }
 
 func (r *Repository) List() ([]Note, error) {
@@ -84,7 +86,13 @@ func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 		SyncStatus:  "local",
 	}
 
-	_, err := r.db.Exec(`
+	tx, err := r.db.Begin()
+	if err != nil {
+		return Note{}, err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
 		INSERT INTO notes (
 			id, workspace_id, project_id, title, content, content_type, note_type,
 			created_at, updated_at, deleted_at, version, sync_status
@@ -107,6 +115,23 @@ func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 		note.SyncStatus,
 	)
 	if err != nil {
+		return Note{}, err
+	}
+
+	if err := r.indexer.IndexTx(tx, search.IndexEntry{
+		EntityType:  "note",
+		EntityID:    note.ID,
+		WorkspaceID: note.WorkspaceID,
+		ProjectID:   note.ProjectID,
+		Title:       note.Title,
+		Body:        note.Content,
+		CreatedAt:   note.CreatedAt,
+		UpdatedAt:   note.UpdatedAt,
+	}); err != nil {
+		return Note{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return Note{}, err
 	}
 

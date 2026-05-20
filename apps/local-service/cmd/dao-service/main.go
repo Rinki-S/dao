@@ -13,6 +13,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/notes"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/projects"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/tasks"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/workspaces"
 
@@ -36,21 +37,26 @@ func main() {
 
 	apiMux := http.NewServeMux()
 
+	searchRepo := search.NewRepository(db)
+
 	workspaceRepo := workspaces.NewRepository(db)
 	workspaceHandler := workspaces.NewHandler(workspaceRepo)
 	workspaceHandler.RegisterRoutes(apiMux)
 
-	projectRepo := projects.NewRepository(db)
+	projectRepo := projects.NewRepository(db, searchRepo)
 	projectHandler := projects.NewHandler(projectRepo)
 	projectHandler.RegisterRoutes(apiMux)
 
-	taskRepo := tasks.NewRepository(db)
+	taskRepo := tasks.NewRepository(db, searchRepo)
 	taskHandler := tasks.NewHandler(taskRepo)
 	taskHandler.RegisterRoutes(apiMux)
 
-	noteRepo := notes.NewRepository(db)
+	noteRepo := notes.NewRepository(db, searchRepo)
 	noteHandler := notes.NewHandler(noteRepo)
 	noteHandler.RegisterRoutes(apiMux)
+
+	searchHandler := search.NewHandler(searchRepo)
+	searchHandler.RegisterRoutes(apiMux)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", requireToken(*token, apiMux))
