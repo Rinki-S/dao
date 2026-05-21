@@ -1,3 +1,4 @@
+import { dashboardExtension } from './dashboard.js';
 import { notesExtension } from './notes.js';
 import { projectsExtension } from './projects.js';
 import { searchExtension } from './search.js';
@@ -6,6 +7,7 @@ import { tasksExtension } from './tasks.js';
 import { workspacesExtension } from './workspaces.js';
 
 export const builtInExtensions = [
+  dashboardExtension,
   workspacesExtension,
   projectsExtension,
   tasksExtension,
@@ -16,4 +18,10 @@ export const builtInExtensions = [
 
 export function getRegisteredCommands(extensions = builtInExtensions) {
   return extensions.flatMap((extension) => extension.capabilities?.commands ?? []);
+}
+
+export function getRegisteredSidebarItems(extensions = builtInExtensions) {
+  return extensions
+    .flatMap((extension) => extension.capabilities?.sidebarItems ?? [])
+    .toSorted((firstItem, secondItem) => firstItem.order - secondItem.order);
 }

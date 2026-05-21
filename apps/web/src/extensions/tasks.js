@@ -2,6 +2,14 @@ export const tasksExtension = {
   id: 'tasks',
   name: 'Tasks',
   capabilities: {
+    sidebarItems: [
+      {
+        id: 'tasks',
+        label: 'Tasks',
+        href: '#tasks',
+        order: 40,
+      },
+    ],
     commands: [
       {
         id: 'create-task',

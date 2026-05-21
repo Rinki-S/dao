@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { builtInExtensions, getRegisteredCommands } from './registry.js';
+import { builtInExtensions, getRegisteredCommands, getRegisteredSidebarItems } from './registry.js';
 
 describe('extension registry', () => {
   it('registers built-in extension commands', () => {
     const commands = getRegisteredCommands();
 
     expect(builtInExtensions.map((extension) => extension.id)).toEqual([
+      'dashboard',
       'workspaces',
       'projects',
       'tasks',
@@ -28,6 +29,20 @@ describe('extension registry', () => {
     ]);
   });
 
+  it('registers sidebar items by order', () => {
+    const sidebarItems = getRegisteredSidebarItems();
+
+    expect(sidebarItems.map((item) => item.id)).toEqual([
+      'dashboard',
+      'workspaces',
+      'projects',
+      'tasks',
+      'notes',
+      'search',
+      'settings',
+    ]);
+  });
+
   it('ignores extensions without command capabilities', () => {
     const commands = getRegisteredCommands([
       {
@@ -38,5 +53,17 @@ describe('extension registry', () => {
     ]);
 
     expect(commands).toEqual([]);
+  });
+
+  it('ignores extensions without sidebar item capabilities', () => {
+    const sidebarItems = getRegisteredSidebarItems([
+      {
+        id: 'empty',
+        name: 'Empty',
+        capabilities: {},
+      },
+    ]);
+
+    expect(sidebarItems).toEqual([]);
   });
 });

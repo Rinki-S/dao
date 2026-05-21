@@ -2,6 +2,14 @@ export const workspacesExtension = {
   id: 'workspaces',
   name: 'Workspaces',
   capabilities: {
+    sidebarItems: [
+      {
+        id: 'workspaces',
+        label: 'Workspaces',
+        href: '#workspaces',
+        order: 20,
+      },
+    ],
     commands: [
       {
         id: 'create-workspace',

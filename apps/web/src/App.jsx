@@ -5,8 +5,11 @@ import { ProjectPanel } from './features/projects/components/ProjectPanel.jsx';
 import { SearchPanel } from './features/search/components/SearchPanel.jsx';
 import { TaskPanel } from './features/tasks/components/TaskPanel.jsx';
 import { WorkspacePanel } from './features/workspaces/components/WorkspacePanel.jsx';
+import { getRegisteredSidebarItems } from './extensions/registry.js';
 
 function App() {
+  const sidebarItems = getRegisteredSidebarItems();
+
   return (
     <main className="min-h-screen bg-[#F7F4ED] text-[#2B2F36]">
       <CommandPalette />
@@ -18,13 +21,13 @@ function App() {
           </div>
 
           <nav className="grid gap-1 text-sm text-[#6B7280]">
-            {['Dashboard', 'Projects', 'Tasks', 'Notes', 'Search', 'Settings'].map((item) => (
+            {sidebarItems.map((item) => (
               <a
-                key={item}
+                key={item.id}
                 className="rounded-md px-3 py-2 hover:bg-[#F2EFE8] hover:text-[#2B2F36]"
-                href={`#${item.toLowerCase()}`}
+                href={item.href}
               >
-                {item}
+                {item.label}
               </a>
             ))}
           </nav>
@@ -41,7 +44,9 @@ function App() {
             </p>
           </div>
 
-          <ActivityMetricsPanel />
+          <section id="dashboard">
+            <ActivityMetricsPanel />
+          </section>
           <WorkspacePanel />
           <ProjectPanel />
           <TaskPanel />

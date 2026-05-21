@@ -2,6 +2,14 @@ export const searchExtension = {
   id: 'search',
   name: 'Search',
   capabilities: {
+    sidebarItems: [
+      {
+        id: 'search',
+        label: 'Search',
+        href: '#search',
+        order: 60,
+      },
+    ],
     commands: [
       {
         id: 'open-search',

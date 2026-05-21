@@ -2,6 +2,14 @@ export const notesExtension = {
   id: 'notes',
   name: 'Notes',
   capabilities: {
+    sidebarItems: [
+      {
+        id: 'notes',
+        label: 'Notes',
+        href: '#notes',
+        order: 50,
+      },
+    ],
     commands: [
       {
         id: 'create-note',

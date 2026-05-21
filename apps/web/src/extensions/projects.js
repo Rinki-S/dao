@@ -2,6 +2,14 @@ export const projectsExtension = {
   id: 'projects',
   name: 'Projects',
   capabilities: {
+    sidebarItems: [
+      {
+        id: 'projects',
+        label: 'Projects',
+        href: '#projects',
+        order: 30,
+      },
+    ],
     commands: [
       {
         id: 'create-project',
