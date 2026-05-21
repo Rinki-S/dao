@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  coreCommands,
-  filterCommands,
-  getCommandFocusTarget,
-  getCommandTarget,
-} from '../commands.js';
+import { getRegisteredCommands } from '../../../extensions/registry.js';
+import { filterCommands, getCommandFocusTarget, getCommandTarget } from '../commands.js';
 
 function isCommandPaletteShortcut(event) {
   const isModifierPressed = event.metaKey || event.ctrlKey;
@@ -41,9 +37,10 @@ export function CommandPalette() {
   const [feedback, setFeedback] = useState('');
   const inputRef = useRef(null);
 
+  const commands = useMemo(() => getRegisteredCommands(), []);
   const visibleCommands = useMemo(() => {
-    return filterCommands(coreCommands, query);
-  }, [query]);
+    return filterCommands(commands, query);
+  }, [commands, query]);
   const activeIndex = Math.min(selectedIndex, Math.max(visibleCommands.length - 1, 0));
 
   useEffect(() => {

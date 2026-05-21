@@ -98,6 +98,28 @@ The first version should only support official built-in extensions.
 
 A third-party plugin marketplace should be deferred.
 
+Dao extensions should be modeled as capability providers, not only as sidebar items.
+
+Early extension capabilities include:
+
+- commands
+- routes
+- sidebar items
+
+Future extension capabilities may include:
+
+- importers
+- exporters
+- content transforms
+- browser integrations
+- file handlers
+- background jobs
+- settings sections
+- AI context providers
+
+The built-in extension registry is the internal precursor to a future plugin system.
+It should keep the extension and capability model stable while deferring marketplace-level concerns such as third-party package loading, signing, sandboxing, permissions, review, and distribution.
+
 ## 5. MVP User Flow
 
 The MVP user flow:
