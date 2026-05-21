@@ -10,11 +10,7 @@ function getApiConfig() {
 function getApiBaseUrl() {
   const { baseUrl } = getApiConfig();
 
-  const isViteDev =
-    window.location.origin === 'http://localhost:5173' ||
-    window.location.origin === 'http://127.0.0.1:5173';
-
-  return isViteDev ? '' : baseUrl;
+  return import.meta.env.DEV ? '' : baseUrl;
 }
 
 export async function apiFetch(path, options = {}) {
