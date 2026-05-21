@@ -2,6 +2,14 @@ export const settingsExtension = {
   id: 'settings',
   name: 'Settings',
   capabilities: {
+    surfaces: [
+      {
+        id: 'settings',
+        label: 'Settings',
+        anchorId: 'settings',
+        order: 90,
+      },
+    ],
     sidebarItems: [
       {
         id: 'settings',

@@ -25,3 +25,9 @@ export function getRegisteredSidebarItems(extensions = builtInExtensions) {
     .flatMap((extension) => extension.capabilities?.sidebarItems ?? [])
     .toSorted((firstItem, secondItem) => firstItem.order - secondItem.order);
 }
+
+export function getRegisteredSurfaces(extensions = builtInExtensions) {
+  return extensions
+    .flatMap((extension) => extension.capabilities?.surfaces ?? [])
+    .toSorted((firstSurface, secondSurface) => firstSurface.order - secondSurface.order);
+}

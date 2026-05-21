@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { builtInExtensions, getRegisteredCommands, getRegisteredSidebarItems } from './registry.js';
+import {
+  builtInExtensions,
+  getRegisteredCommands,
+  getRegisteredSidebarItems,
+  getRegisteredSurfaces,
+} from './registry.js';
 
 describe('extension registry', () => {
   it('registers built-in extension commands', () => {
@@ -43,6 +48,20 @@ describe('extension registry', () => {
     ]);
   });
 
+  it('registers surfaces by order', () => {
+    const surfaces = getRegisteredSurfaces();
+
+    expect(surfaces.map((surface) => surface.id)).toEqual([
+      'dashboard',
+      'workspaces',
+      'projects',
+      'tasks',
+      'notes',
+      'search',
+      'settings',
+    ]);
+  });
+
   it('ignores extensions without command capabilities', () => {
     const commands = getRegisteredCommands([
       {
@@ -65,5 +84,17 @@ describe('extension registry', () => {
     ]);
 
     expect(sidebarItems).toEqual([]);
+  });
+
+  it('ignores extensions without surface capabilities', () => {
+    const surfaces = getRegisteredSurfaces([
+      {
+        id: 'empty',
+        name: 'Empty',
+        capabilities: {},
+      },
+    ]);
+
+    expect(surfaces).toEqual([]);
   });
 });

@@ -2,6 +2,14 @@ export const tasksExtension = {
   id: 'tasks',
   name: 'Tasks',
   capabilities: {
+    surfaces: [
+      {
+        id: 'tasks',
+        label: 'Tasks',
+        anchorId: 'tasks',
+        order: 40,
+      },
+    ],
     sidebarItems: [
       {
         id: 'tasks',

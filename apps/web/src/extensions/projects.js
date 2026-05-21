@@ -2,6 +2,14 @@ export const projectsExtension = {
   id: 'projects',
   name: 'Projects',
   capabilities: {
+    surfaces: [
+      {
+        id: 'projects',
+        label: 'Projects',
+        anchorId: 'projects',
+        order: 30,
+      },
+    ],
     sidebarItems: [
       {
         id: 'projects',

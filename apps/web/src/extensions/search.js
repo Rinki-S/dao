@@ -2,6 +2,14 @@ export const searchExtension = {
   id: 'search',
   name: 'Search',
   capabilities: {
+    surfaces: [
+      {
+        id: 'search',
+        label: 'Search',
+        anchorId: 'search',
+        order: 60,
+      },
+    ],
     sidebarItems: [
       {
         id: 'search',

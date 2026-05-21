@@ -2,6 +2,14 @@ export const notesExtension = {
   id: 'notes',
   name: 'Notes',
   capabilities: {
+    surfaces: [
+      {
+        id: 'notes',
+        label: 'Notes',
+        anchorId: 'notes',
+        order: 50,
+      },
+    ],
     sidebarItems: [
       {
         id: 'notes',
