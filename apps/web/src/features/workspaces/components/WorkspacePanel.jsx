@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifyActivityChanged } from '../../activities/events.js';
 import { createWorkspace, listWorkspaces } from '../api.js';
 
 export function WorkspacePanel() {
@@ -63,6 +64,7 @@ export function WorkspacePanel() {
       setWorkspaceName('');
       setWorkspaceDescription('');
       await loadWorkspaces();
+      notifyActivityChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create workspace');
       setStatus('error');

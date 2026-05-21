@@ -110,7 +110,7 @@ The MVP user flow:
 5. User writes notes related to the project
 6. User searches across projects, tasks, and notes
 7. User uses command palette to quickly create or open content
-8. User reviews recent activity
+8. User sees lightweight progress signals derived from local activity
 ```
 
 ## 6. MVP Modules
@@ -287,7 +287,11 @@ Command/Ctrl + Shift + P
 
 ## 6.7 Activity Log
 
-Activity log records important user actions.
+Activity log records important user actions as an internal event layer.
+
+It is not a primary user-facing feed in the MVP. Dao should avoid exposing a noisy detailed action timeline by default.
+
+User-facing activity should appear as lightweight aggregate signals, review metrics, or future AI-generated summaries.
 
 Examples:
 
@@ -298,6 +302,8 @@ Examples:
 - project archived
 
 This prepares the foundation for future AI summaries and growth review.
+
+MVP activity log should prioritize reliable event capture over detailed activity browsing UI.
 
 ## 7. Deferred Features
 
@@ -427,7 +433,7 @@ Dashboard should show:
 - today’s tasks
 - active projects
 - recent notes
-- recent activity
+- lightweight activity metrics
 - quick actions
 
 ### Project detail page

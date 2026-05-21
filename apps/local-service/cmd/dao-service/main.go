@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/pressly/goose/v3"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/notes"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/projects"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
@@ -37,21 +38,25 @@ func main() {
 
 	apiMux := http.NewServeMux()
 
+	activityRepo := activities.NewRepository(db)
+	activityHandler := activities.NewHandler(activityRepo)
+	activityHandler.RegisterRoutes(apiMux)
+
 	searchRepo := search.NewRepository(db)
 
-	workspaceRepo := workspaces.NewRepository(db)
+	workspaceRepo := workspaces.NewRepository(db, activityRepo)
 	workspaceHandler := workspaces.NewHandler(workspaceRepo)
 	workspaceHandler.RegisterRoutes(apiMux)
 
-	projectRepo := projects.NewRepository(db, searchRepo)
+	projectRepo := projects.NewRepository(db, searchRepo, activityRepo)
 	projectHandler := projects.NewHandler(projectRepo)
 	projectHandler.RegisterRoutes(apiMux)
 
-	taskRepo := tasks.NewRepository(db, searchRepo)
+	taskRepo := tasks.NewRepository(db, searchRepo, activityRepo)
 	taskHandler := tasks.NewHandler(taskRepo)
 	taskHandler.RegisterRoutes(apiMux)
 
-	noteRepo := notes.NewRepository(db, searchRepo)
+	noteRepo := notes.NewRepository(db, searchRepo, activityRepo)
 	noteHandler := notes.NewHandler(noteRepo)
 	noteHandler.RegisterRoutes(apiMux)
 

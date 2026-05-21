@@ -2,17 +2,20 @@ package workspaces
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 )
 
 type Repository struct {
-	db *sql.DB
+	db       *sql.DB
+	activity *activities.Repository
 }
 
-func NewRepository(db *sql.DB) *Repository {
-	return &Repository{db: db}
+func NewRepository(db *sql.DB, activity *activities.Repository) *Repository {
+	return &Repository{db: db, activity: activity}
 }
 
 func (r *Repository) List() ([]Workspace, error) {
@@ -66,7 +69,13 @@ func (r *Repository) Create(req CreateWorkspaceRequest) (Workspace, error) {
 		SyncStatus:  "local",
 	}
 
-	_, err := r.db.Exec(`
+	tx, err := r.db.Begin()
+	if err != nil {
+		return Workspace{}, err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
 		INSERT INTO workspaces (
 			id, name, description, created_at, updated_at, deleted_at, version, sync_status
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -82,6 +91,28 @@ func (r *Repository) Create(req CreateWorkspaceRequest) (Workspace, error) {
 	)
 
 	if err != nil {
+		return Workspace{}, err
+	}
+
+	metadata, err := json.Marshal(map[string]string{
+		"name": workspace.Name,
+	})
+	if err != nil {
+		return Workspace{}, err
+	}
+
+	if _, err := r.activity.CreateTx(tx, activities.CreateActivityRequest{
+		WorkspaceID:  workspace.ID,
+		ProjectID:    nil,
+		EntityType:   "workspace",
+		EntityID:     workspace.ID,
+		Action:       "created",
+		MetadataJSON: string(metadata),
+	}); err != nil {
+		return Workspace{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return Workspace{}, err
 	}
 

@@ -2,19 +2,22 @@ package projects
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
 
 type Repository struct {
-	db      *sql.DB
-	indexer search.Indexer
+	db       *sql.DB
+	indexer  search.Indexer
+	activity *activities.Repository
 }
 
-func NewRepository(db *sql.DB, indexer search.Indexer) *Repository {
-	return &Repository{db: db, indexer: indexer}
+func NewRepository(db *sql.DB, indexer search.Indexer, activity *activities.Repository) *Repository {
+	return &Repository{db: db, indexer: indexer, activity: activity}
 }
 
 func (r *Repository) List() ([]Project, error) {
@@ -117,6 +120,24 @@ func (r *Repository) Create(req CreateProjectRequest) (Project, error) {
 		Body:        project.Description,
 		CreatedAt:   project.CreatedAt,
 		UpdatedAt:   project.UpdatedAt,
+	}); err != nil {
+		return Project{}, err
+	}
+
+	metadata, err := json.Marshal(map[string]string{
+		"name": project.Name,
+	})
+	if err != nil {
+		return Project{}, err
+	}
+
+	if _, err := r.activity.CreateTx(tx, activities.CreateActivityRequest{
+		WorkspaceID:  project.WorkspaceID,
+		ProjectID:    &projectID,
+		EntityType:   "project",
+		EntityID:     project.ID,
+		Action:       "created",
+		MetadataJSON: string(metadata),
 	}); err != nil {
 		return Project{}, err
 	}

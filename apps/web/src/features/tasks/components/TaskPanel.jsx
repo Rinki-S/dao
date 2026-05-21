@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { notifyActivityChanged } from '../../activities/events.js';
 import { listProjects } from '../../projects/api.js';
 import { listWorkspaces } from '../../workspaces/api.js';
 import { createTask, listTasks } from '../api.js';
@@ -133,6 +134,7 @@ export function TaskPanel() {
       setTaskDescription('');
       setTaskPriority('medium');
       await loadTaskData();
+      notifyActivityChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create task');
       setStatus('error');

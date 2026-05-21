@@ -204,7 +204,7 @@ Create tasks
 Write notes
 Search across content
 Use command palette for quick actions
-Review recent activity
+See lightweight progress signals derived from local activity
 ```
 
 ## 11. MVP Scope
