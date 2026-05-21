@@ -1,3 +1,4 @@
+import { ActivityMetricsPanel } from './features/activities/components/ActivityMetricsPanel.jsx';
 import { CommandPalette } from './features/command-palette/components/CommandPalette.jsx';
 import { NotePanel } from './features/notes/components/NotePanel.jsx';
 import { ProjectPanel } from './features/projects/components/ProjectPanel.jsx';
@@ -40,6 +41,7 @@ function App() {
             </p>
           </div>
 
+          <ActivityMetricsPanel />
           <WorkspacePanel />
           <ProjectPanel />
           <TaskPanel />
