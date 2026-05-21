@@ -373,6 +373,9 @@ Activities are an internal event log for product review, aggregate metrics, and 
 
 They should not be treated as the main user-facing activity UI in the MVP.
 
+The MVP frontend can refresh lightweight activity metrics through a small local browser event after create actions.
+If data dependencies become broader, replace this with shared query invalidation or a dedicated client data layer such as React Query.
+
 ```txt
 id
 workspace_id

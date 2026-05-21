@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { notifyActivityChanged } from '../../activities/events.js';
 import { listProjects } from '../../projects/api.js';
 import { listWorkspaces } from '../../workspaces/api.js';
 import { createNote, listNotes } from '../api.js';
@@ -141,6 +142,7 @@ export function NotePanel() {
       setNoteContent('');
       setNoteType('general');
       await loadNoteData();
+      notifyActivityChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create note');
       setStatus('error');

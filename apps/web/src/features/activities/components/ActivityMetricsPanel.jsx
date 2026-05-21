@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getActivityMetrics } from '../api.js';
+import { subscribeToActivityChanged } from '../events.js';
 
 const metricItems = [
   { key: 'workspaceCount', label: 'Workspaces' },
@@ -37,8 +38,13 @@ export function ActivityMetricsPanel() {
 
     load();
 
+    const unsubscribe = subscribeToActivityChanged(() => {
+      load();
+    });
+
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 

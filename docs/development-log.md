@@ -337,11 +337,13 @@ Planned scope:
 - add `GET /api/activities`
 - validate activity API responses in React with Zod
 - keep activity logging explicit and small for the MVP
+- refresh lightweight activity metrics after create actions with a small frontend event
 
 Keep deferred:
 
 - detailed activity feed UI
-- dashboard activity metrics
+- richer dashboard activity metrics
+- shared query invalidation or React Query
 - activity filters
 - timeline grouping
 - activity editing

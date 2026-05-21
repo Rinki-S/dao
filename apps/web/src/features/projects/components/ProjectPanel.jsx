@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useState } from 'react';
+import { notifyActivityChanged } from '../../activities/events.js';
 import { listWorkspaces } from '../../workspaces/api.js';
 import { createProject, listProjects } from '../api.js';
 import { useEffect } from 'react';
@@ -103,6 +104,7 @@ export function ProjectPanel() {
       setProjectName('');
       setProjectDescription('');
       await loadProjectData();
+      notifyActivityChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create project');
       setStatus('error');
