@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ActivityListSchema } from './schemas.js';
+import { ActivityListSchema, ActivityMetricsSchema } from './schemas.js';
 
 describe('ActivityListSchema', () => {
   it('parses activity API responses', () => {
@@ -43,6 +43,31 @@ describe('ActivityListSchema', () => {
           createdAt: '2026-05-20T00:00:00Z',
         },
       ]),
+    ).toThrow();
+  });
+});
+
+describe('ActivityMetricsSchema', () => {
+  it('parses activity metrics API responses', () => {
+    const metrics = ActivityMetricsSchema.parse({
+      totalCount: 8,
+      workspaceCount: 1,
+      projectCount: 2,
+      taskCount: 3,
+      noteCount: 2,
+    });
+
+    expect(metrics.taskCount).toBe(3);
+  });
+
+  it('rejects incomplete metrics responses', () => {
+    expect(() =>
+      ActivityMetricsSchema.parse({
+        totalCount: 8,
+        workspaceCount: 1,
+        projectCount: 2,
+        taskCount: 3,
+      }),
     ).toThrow();
   });
 });
