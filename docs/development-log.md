@@ -307,9 +307,11 @@ Notes:
 - Command registration remains static until the extension registry milestone introduces a broader registration contract.
 - Command palette tests currently cover filtering, open/close behavior, keyboard selection, command execution, hash updates, and focus targets.
 
-## Next Milestone: Activity Log Loop
+## Milestone 6: Activity Log Loop
 
-Recommended branch:
+Status: complete
+
+Branch:
 
 ```txt
 feat/activity-log
@@ -329,13 +331,15 @@ Activity Log is an internal event layer, not a detailed user-facing feed.
 
 User-facing activity should appear later as lightweight aggregate metrics, review signals, or AI-generated summaries.
 
-Planned scope:
+Completed scope:
 
 - add `activities` SQLite migration
 - add activity model and repository in the Go local service
 - write activity rows from create workspace/project/task/note flows
 - add `GET /api/activities`
+- add `GET /api/activities/metrics`
 - validate activity API responses in React with Zod
+- show lightweight aggregate activity metrics in the React renderer
 - keep activity logging explicit and small for the MVP
 - refresh lightweight activity metrics after create actions with a small frontend event
 
@@ -349,3 +353,32 @@ Keep deferred:
 - activity editing
 - analytics
 - AI summaries
+
+Notes:
+
+- Activity rows are written from the existing create flows, inside the same transaction as the source entity where applicable.
+- Activity metrics are deliberately aggregate-only so the feature supports future review and AI context without exposing a detailed user-facing feed.
+- The frontend uses a small local event to refresh metrics after successful create actions.
+- Shared query invalidation or React Query remains deferred until more frontend data surfaces need coordinated cache behavior.
+
+## Next Milestone: Extension Registry Loop
+
+Recommended branch:
+
+```txt
+feat/extension-registry
+```
+
+Goal:
+
+```txt
+Dao defines a small built-in extension registry so core modules can expose routes, sidebar items, and commands through a consistent contract.
+```
+
+Planned scope:
+
+- document the first extension registry contract
+- keep the registry limited to built-in extensions
+- move existing core module navigation metadata toward registry-driven definitions
+- prepare command registration for extension-owned commands
+- keep third-party plugin marketplace support deferred
