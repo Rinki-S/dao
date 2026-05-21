@@ -11,6 +11,14 @@ type Activity struct {
 	CreatedAt    string  `json:"createdAt"`
 }
 
+type ActivityMetrics struct {
+	TotalCount     int64 `json:"totalCount"`
+	WorkspaceCount int64 `json:"workspaceCount"`
+	ProjectCount   int64 `json:"projectCount"`
+	TaskCount      int64 `json:"taskCount"`
+	NoteCount      int64 `json:"noteCount"`
+}
+
 type CreateActivityRequest struct {
 	WorkspaceID  string
 	ProjectID    *string
