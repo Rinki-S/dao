@@ -1,14 +1,11 @@
-import { ActivityMetricsPanel } from './features/activities/components/ActivityMetricsPanel.jsx';
+import { Fragment } from 'react';
+import { surfaceComponents } from './app-surfaces.jsx';
 import { CommandPalette } from './features/command-palette/components/CommandPalette.jsx';
-import { NotePanel } from './features/notes/components/NotePanel.jsx';
-import { ProjectPanel } from './features/projects/components/ProjectPanel.jsx';
-import { SearchPanel } from './features/search/components/SearchPanel.jsx';
-import { TaskPanel } from './features/tasks/components/TaskPanel.jsx';
-import { WorkspacePanel } from './features/workspaces/components/WorkspacePanel.jsx';
-import { getRegisteredSidebarItems } from './extensions/registry.js';
+import { getRegisteredSidebarItems, getRegisteredSurfaces } from './extensions/registry.js';
 
 function App() {
   const sidebarItems = getRegisteredSidebarItems();
+  const surfaces = getRegisteredSurfaces();
 
   return (
     <main className="min-h-screen bg-[#F7F4ED] text-[#2B2F36]">
@@ -44,24 +41,9 @@ function App() {
             </p>
           </div>
 
-          <section id="dashboard">
-            <ActivityMetricsPanel />
-          </section>
-          <WorkspacePanel />
-          <ProjectPanel />
-          <TaskPanel />
-          <NotePanel />
-          <SearchPanel />
-
-          <section
-            id="settings"
-            className="mt-6 max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5"
-          >
-            <h2 className="text-base font-semibold text-[#111827]">Settings</h2>
-            <p className="mt-1 text-sm text-[#6B7280]">
-              Settings will hold local workspace preferences as the MVP grows.
-            </p>
-          </section>
+          {surfaces.map((surface) => (
+            <Fragment key={surface.id}>{surfaceComponents[surface.id]}</Fragment>
+          ))}
         </section>
       </div>
     </main>
