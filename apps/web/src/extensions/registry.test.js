@@ -5,8 +5,13 @@ import {
   getRegisteredSidebarItems,
   getRegisteredSurfaces,
 } from './registry.js';
+import { ExtensionListSchema } from './schemas.js';
 
 describe('extension registry', () => {
+  it('matches the built-in extension schema', () => {
+    expect(() => ExtensionListSchema.parse(builtInExtensions)).not.toThrow();
+  });
+
   it('registers built-in extension commands', () => {
     const commands = getRegisteredCommands();
 
