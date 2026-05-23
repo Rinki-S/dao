@@ -4,18 +4,19 @@ import {
   getRegisteredCommands,
   getRegisteredSidebarItems,
   getRegisteredSurfaces,
+  registeredExtensions,
 } from './registry.js';
 import { ExtensionListSchema } from './schemas.js';
 
 describe('extension registry', () => {
   it('matches the built-in extension schema', () => {
-    expect(() => ExtensionListSchema.parse(builtInExtensions)).not.toThrow();
+    expect(registeredExtensions).toEqual(ExtensionListSchema.parse(builtInExtensions));
   });
 
   it('registers built-in extension commands', () => {
     const commands = getRegisteredCommands();
 
-    expect(builtInExtensions.map((extension) => extension.id)).toEqual([
+    expect(registeredExtensions.map((extension) => extension.id)).toEqual([
       'dashboard',
       'workspaces',
       'projects',

@@ -3,6 +3,7 @@ import { notesExtension } from './notes.js';
 import { projectsExtension } from './projects.js';
 import { searchExtension } from './search.js';
 import { settingsExtension } from './settings.js';
+import { ExtensionListSchema } from './schemas.js';
 import { tasksExtension } from './tasks.js';
 import { workspacesExtension } from './workspaces.js';
 
@@ -16,17 +17,19 @@ export const builtInExtensions = [
   settingsExtension,
 ];
 
-export function getRegisteredCommands(extensions = builtInExtensions) {
+export const registeredExtensions = ExtensionListSchema.parse(builtInExtensions);
+
+export function getRegisteredCommands(extensions = registeredExtensions) {
   return extensions.flatMap((extension) => extension.capabilities?.commands ?? []);
 }
 
-export function getRegisteredSidebarItems(extensions = builtInExtensions) {
+export function getRegisteredSidebarItems(extensions = registeredExtensions) {
   return extensions
     .flatMap((extension) => extension.capabilities?.sidebarItems ?? [])
     .toSorted((firstItem, secondItem) => firstItem.order - secondItem.order);
 }
 
-export function getRegisteredSurfaces(extensions = builtInExtensions) {
+export function getRegisteredSurfaces(extensions = registeredExtensions) {
   return extensions
     .flatMap((extension) => extension.capabilities?.surfaces ?? [])
     .toSorted((firstSurface, secondSurface) => firstSurface.order - secondSurface.order);
