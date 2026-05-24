@@ -193,7 +193,7 @@ export function CommandPalette({ onSelectSurface }) {
         )}
 
         <CommandFooter>
-          <div className="flex w-full items-center justify-between px-2 pt-2 pb-1 text-[11px] text-muted-foreground">
+          <div className="flex w-full items-center justify-between px-1 pt-1 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <KbdGroup>
                 <Kbd>⌘</Kbd>
