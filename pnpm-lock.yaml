@@ -20,6 +20,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@fontsource-variable/funnel-sans':
+        specifier: ^5.2.8
+        version: 5.2.8
       '@fontsource-variable/geist':
         specifier: ^5.2.9
         version: 5.2.9
@@ -393,6 +396,9 @@ packages:
 
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
+
+  '@fontsource-variable/funnel-sans@5.2.8':
+    resolution: {integrity: sha512-HHicOhwA5IcF29JYO8koOUdVAePvp0Efi7dQ/TxY2WNW7cdE7ffRzw52GxKT3ksV/HShssYBFT5/etjFujEgtQ==}
 
   '@fontsource-variable/geist@5.2.9':
     resolution: {integrity: sha512-TP+QSBG3wxKGPE33CbMy/L0Nu3qvJ6Fy81Yc4LnQ95xH+i+cfEp8fyU8/kfV14YwszxIFPhnoMTbjL71waVpyQ==}
@@ -3882,6 +3888,8 @@ snapshots:
       react-dom: 19.2.6(react@19.2.6)
 
   '@floating-ui/utils@0.2.11': {}
+
+  '@fontsource-variable/funnel-sans@5.2.8': {}
 
   '@fontsource-variable/geist@5.2.9': {}
 

@@ -1,52 +1,73 @@
-import { Fragment } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { AppSidebar } from '@/components/app/AppSidebar.jsx';
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { surfaceComponents } from './app-surfaces.jsx';
 import { CommandPalette } from './features/command-palette/components/CommandPalette.jsx';
 import { getRegisteredSidebarItems, getRegisteredSurfaces } from './extensions/registry.js';
 
+function getSurfaceIdFromHash(surfaces) {
+  const hashSurfaceId = window.location.hash.replace(/^#/, '');
+
+  if (surfaces.some((surface) => surface.id === hashSurfaceId)) {
+    return hashSurfaceId;
+  }
+
+  return surfaces[0]?.id ?? '';
+}
+
 function App() {
   const sidebarItems = getRegisteredSidebarItems();
   const surfaces = getRegisteredSurfaces();
+  const [activeSurfaceId, setActiveSurfaceId] = useState(() => getSurfaceIdFromHash(surfaces));
+  const activeSurface = useMemo(
+    () => surfaces.find((surface) => surface.id === activeSurfaceId) ?? surfaces[0],
+    [activeSurfaceId, surfaces],
+  );
+
+  useEffect(() => {
+    function handleHashChange() {
+      setActiveSurfaceId(getSurfaceIdFromHash(surfaces));
+    }
+
+    window.addEventListener('hashchange', handleHashChange);
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [surfaces]);
+
+  function handleSelectSurface(surfaceId) {
+    if (!surfaces.some((surface) => surface.id === surfaceId)) {
+      return;
+    }
+
+    setActiveSurfaceId(surfaceId);
+    window.history.replaceState(null, '', `#${surfaceId}`);
+  }
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <CommandPalette />
-      <div className="grid min-h-screen grid-cols-[240px_1fr]">
-        <aside className="border-r border-border bg-card px-5 py-6">
-          <div className="mb-8 text-xl font-semibold tracking-normal">
-            <span>dao</span>
-            <span className="text-primary">.</span>
+    <SidebarProvider>
+      <CommandPalette onSelectSurface={handleSelectSurface} />
+      <AppSidebar
+        activeSurfaceId={activeSurface?.id}
+        sidebarItems={sidebarItems}
+        onSelectSurface={handleSelectSurface}
+      />
+      <SidebarInset className="min-h-screen">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-6">
+          <SidebarTrigger />
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-heading font-semibold tracking-normal text-foreground">
+              {activeSurface?.label ?? 'Dao'}
+            </h1>
           </div>
+        </header>
 
-          <nav className="grid gap-1 text-sm text-muted-foreground">
-            {sidebarItems.map((item) => (
-              <a
-                key={item.id}
-                className="rounded-md px-3 py-2 hover:bg-muted hover:text-foreground"
-                href={item.href}
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
-        </aside>
-
-        <section className="px-8 py-7">
-          <div className="mb-8 max-w-3xl">
-            <p className="mb-2 text-xs font-medium uppercase text-primary">
-              Local-first developer workspace
-            </p>
-            <h1 className="text-3xl font-semibold tracking-normal text-foreground">Dao</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-              A calm workspace for projects, tasks, notes, and long-term developer growth.
-            </p>
-          </div>
-
-          {surfaces.map((surface) => (
-            <Fragment key={surface.id}>{surfaceComponents[surface.id]}</Fragment>
-          ))}
+        <section className="flex-1 px-8 py-7">
+          {activeSurface ? surfaceComponents[activeSurface.id] : null}
         </section>
-      </div>
-    </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 

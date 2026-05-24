@@ -24,22 +24,24 @@ function isCommandPaletteShortcut(event) {
   return isModifierPressed && event.shiftKey && event.key.toLowerCase() === 'p';
 }
 
-function focusCommandTarget(command) {
+function focusCommandTarget(command, root = document) {
   window.setTimeout(() => {
-    const focusTarget = getCommandFocusTarget(command);
+    const focusTarget = getCommandFocusTarget(command, root);
 
     focusTarget?.focus();
   }, 0);
 }
 
-function runCommand(command) {
+function runCommand(command, onSelectSurface) {
+  onSelectSurface?.(command.targetId);
+
   const target = getCommandTarget(command);
 
-  if (!target) {
+  if (!target && !onSelectSurface) {
     return `${command.title} is not available yet.`;
   }
 
-  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   window.history.replaceState(null, '', `#${command.targetId}`);
   focusCommandTarget(command);
 
@@ -70,7 +72,7 @@ function groupCommands(commands) {
   }));
 }
 
-export function CommandPalette() {
+export function CommandPalette({ onSelectSurface }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedCommandValue, setSelectedCommandValue] = useState('');
@@ -130,7 +132,7 @@ export function CommandPalette() {
   }
 
   function handleRunCommand(command) {
-    const nextFeedback = runCommand(command);
+    const nextFeedback = runCommand(command, onSelectSurface);
 
     if (nextFeedback) {
       setFeedback(nextFeedback);
