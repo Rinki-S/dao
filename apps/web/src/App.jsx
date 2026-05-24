@@ -8,20 +8,20 @@ function App() {
   const surfaces = getRegisteredSurfaces();
 
   return (
-    <main className="min-h-screen bg-[#F7F4ED] text-[#2B2F36]">
+    <main className="min-h-screen bg-background text-foreground">
       <CommandPalette />
       <div className="grid min-h-screen grid-cols-[240px_1fr]">
-        <aside className="border-r border-[#E5E7EB] bg-white px-5 py-6">
+        <aside className="border-r border-border bg-card px-5 py-6">
           <div className="mb-8 text-xl font-semibold tracking-normal">
             <span>dao</span>
-            <span className="text-[#00A86B]">.</span>
+            <span className="text-primary">.</span>
           </div>
 
-          <nav className="grid gap-1 text-sm text-[#6B7280]">
+          <nav className="grid gap-1 text-sm text-muted-foreground">
             {sidebarItems.map((item) => (
               <a
                 key={item.id}
-                className="rounded-md px-3 py-2 hover:bg-[#F2EFE8] hover:text-[#2B2F36]"
+                className="rounded-md px-3 py-2 hover:bg-muted hover:text-foreground"
                 href={item.href}
               >
                 {item.label}
@@ -32,11 +32,11 @@ function App() {
 
         <section className="px-8 py-7">
           <div className="mb-8 max-w-3xl">
-            <p className="mb-2 text-xs font-medium uppercase text-[#00A86B]">
+            <p className="mb-2 text-xs font-medium uppercase text-primary">
               Local-first developer workspace
             </p>
-            <h1 className="text-3xl font-semibold tracking-normal text-[#111827]">Dao</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#6B7280]">
+            <h1 className="text-3xl font-semibold tracking-normal text-foreground">Dao</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
               A calm workspace for projects, tasks, notes, and long-term developer growth.
             </p>
           </div>
