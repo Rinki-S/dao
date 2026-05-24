@@ -379,6 +379,14 @@ Planned scope:
 
 - document the first extension registry contract
 - keep the registry limited to built-in extensions
+- model extensions as capability providers rather than sidebar entries
 - move existing core module navigation metadata toward registry-driven definitions
 - prepare command registration for extension-owned commands
 - keep third-party plugin marketplace support deferred
+
+Design constraints:
+
+- support built-in extension capabilities first: commands, routes, and sidebar items
+- leave room for future importers, exporters, content transforms, browser integrations, file handlers, background jobs, settings sections, and AI context providers
+- avoid dynamic external plugin loading, marketplace distribution, signing, sandboxing, and permission prompts in the MVP
+- keep command capabilities lightweight so they route users to existing UI flows instead of bypassing page validation and state

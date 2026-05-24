@@ -539,37 +539,72 @@ Dao should implement internal official extensions first.
 
 The goal is modularity, not a public plugin marketplace.
 
+The extension registry should be a capability registry, not a sidebar registry.
+
+An extension is a built-in capability provider. Sidebar items, routes, and commands are the first supported capabilities, but the architecture should leave room for future capabilities such as importers, exporters, content transforms, browser integrations, file handlers, background jobs, settings sections, and AI context providers.
+
+The MVP registry must stay limited to official built-in extensions.
+
+Deferred:
+
+- third-party plugin marketplace
+- dynamic loading of external plugin code
+- plugin signing and review
+- plugin sandboxing
+- plugin permission prompts
+- plugin data isolation
+- marketplace install, update, disable, and remove workflows
+
 ### Frontend extension interface
 
 ```js
 export const extension = {
   id: 'tasks',
   name: 'Tasks',
+  capabilities: {
+    commands: [
+      {
+        id: 'tasks.create',
+        title: 'Create Task',
+        group: 'Tasks',
+        targetId: 'tasks',
+        focusSelector: '[data-command-target="task-title"]',
+      },
+    ],
 
-  routes: [
-    {
-      path: '/tasks',
-      component: TasksPage,
-    },
-  ],
+    routes: [
+      {
+        path: '/tasks',
+        component: TasksPage,
+      },
+    ],
 
-  sidebarItems: [
-    {
-      label: 'Tasks',
-      path: '/tasks',
-      icon: 'check',
-    },
-  ],
-
-  commands: [
-    {
-      id: 'task.create',
-      title: 'Create Task',
-      handler: createTask,
-    },
-  ],
+    sidebarItems: [
+      {
+        id: 'tasks',
+        label: 'Tasks',
+        path: '/tasks',
+        icon: 'check',
+        order: 30,
+      },
+    ],
+  },
 }
 ```
+
+Business pages should not import extension internals directly.
+
+Consumers should read specific capabilities through registry helpers, such as:
+
+```js
+getRegisteredCommands()
+getRegisteredRoutes()
+getRegisteredSidebarItems()
+```
+
+Command capabilities should initially stay lightweight and UI-oriented. They may navigate to an existing surface and focus a target input, but should not bypass page-level validation, form state, or existing create flows by calling API functions directly.
+
+Future executable capabilities should be routed through dedicated layers such as an import pipeline, content transform pipeline, browser bridge, backend service, or AI Harness instead of becoming arbitrary registry handlers.
 
 ### Go module interface
 
