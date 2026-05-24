@@ -9,6 +9,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { getRegisteredCommands } from '../../../extensions/registry.js';
 import {
   filterCommands,
@@ -190,9 +191,24 @@ export function CommandPalette() {
         )}
 
         <CommandFooter>
-          <div className="flex items-center justify-between px-4 py-2 font-mono text-[11px] text-muted-foreground">
-            <span>Command/Ctrl + Shift + P</span>
-            <span>Enter to run / Esc to close</span>
+          <div className="flex w-full items-center justify-between px-4 py-2 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <KbdGroup>
+                <Kbd>⌘</Kbd>
+                <Kbd>Ctrl</Kbd>
+              </KbdGroup>
+              <span>+</span>
+              <Kbd>⇧</Kbd>
+              <span>+</span>
+              <Kbd>P</Kbd>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Kbd>Enter</Kbd>
+              <span>to run</span>
+              <span>/</span>
+              <Kbd>Esc</Kbd>
+              <span>to close</span>
+            </span>
           </div>
         </CommandFooter>
       </Command>
