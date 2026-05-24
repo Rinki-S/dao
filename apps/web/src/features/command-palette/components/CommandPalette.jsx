@@ -3,14 +3,19 @@ import {
   Command,
   CommandDialog,
   CommandEmpty,
+  CommandFooter,
+  CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
-  CommandShortcut,
 } from '@/components/ui/command';
 import { getRegisteredCommands } from '../../../extensions/registry.js';
-import { getCommandFocusTarget, getCommandSearchText, getCommandTarget } from '../commands.js';
+import {
+  filterCommands,
+  getCommandFocusTarget,
+  getCommandSearchText,
+  getCommandTarget,
+} from '../commands.js';
 
 function isCommandPaletteShortcut(event) {
   const isModifierPressed = event.metaKey || event.ctrlKey;
@@ -40,12 +45,39 @@ function runCommand(command) {
   return '';
 }
 
+function getCommandValue(command) {
+  return `${command.id} ${getCommandSearchText(command)}`;
+}
+
+function groupCommands(commands) {
+  const commandGroups = new Map();
+
+  for (const command of commands) {
+    const existingCommands = commandGroups.get(command.group);
+
+    if (existingCommands) {
+      existingCommands.push(command);
+      continue;
+    }
+
+    commandGroups.set(command.group, [command]);
+  }
+
+  return Array.from(commandGroups, ([group, groupedCommands]) => ({
+    group,
+    commands: groupedCommands,
+  }));
+}
+
 export function CommandPalette() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [selectedCommandValue, setSelectedCommandValue] = useState('');
   const [feedback, setFeedback] = useState('');
 
   const commands = useMemo(() => getRegisteredCommands(), []);
+  const visibleCommands = useMemo(() => filterCommands(commands, query), [commands, query]);
+  const commandGroups = useMemo(() => groupCommands(visibleCommands), [visibleCommands]);
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -56,6 +88,7 @@ export function CommandPalette() {
 
           if (nextIsOpen) {
             setQuery('');
+            setSelectedCommandValue(commands[0] ? getCommandValue(commands[0]) : '');
             setFeedback('');
           }
 
@@ -74,10 +107,11 @@ export function CommandPalette() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [commands]);
 
   function handleClose() {
     setQuery('');
+    setSelectedCommandValue('');
     setFeedback('');
     setIsOpen(false);
   }
@@ -85,6 +119,7 @@ export function CommandPalette() {
   function handleOpenChange(nextIsOpen) {
     if (nextIsOpen) {
       setQuery('');
+      setSelectedCommandValue(commands[0] ? getCommandValue(commands[0]) : '');
       setFeedback('');
       setIsOpen(true);
       return;
@@ -106,6 +141,8 @@ export function CommandPalette() {
 
   function handleQueryChange(nextQuery) {
     setQuery(nextQuery);
+    const nextVisibleCommands = filterCommands(commands, nextQuery);
+    setSelectedCommandValue(nextVisibleCommands[0] ? getCommandValue(nextVisibleCommands[0]) : '');
     setFeedback('');
   }
 
@@ -116,7 +153,11 @@ export function CommandPalette() {
       title="Command Palette"
       description="Search for a command to run."
     >
-      <Command shouldFilter>
+      <Command
+        shouldFilter={false}
+        value={selectedCommandValue}
+        onValueChange={setSelectedCommandValue}
+      >
         <CommandInput
           value={query}
           onValueChange={handleQueryChange}
@@ -126,18 +167,21 @@ export function CommandPalette() {
         <CommandList>
           <CommandEmpty>No commands found.</CommandEmpty>
 
-          {commands.map((command) => (
-            <CommandItem
-              key={command.id}
-              value={`${command.id} ${getCommandSearchText(command)}`}
-              onSelect={() => handleRunCommand(command)}
-            >
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-medium">{command.title}</span>
-                <span className="truncate text-muted-foreground">{command.description}</span>
-              </span>
-              <CommandShortcut>{command.group}</CommandShortcut>
-            </CommandItem>
+          {commandGroups.map((commandGroup) => (
+            <CommandGroup key={commandGroup.group} heading={commandGroup.group}>
+              {commandGroup.commands.map((command) => (
+                <CommandItem
+                  key={command.id}
+                  value={getCommandValue(command)}
+                  onSelect={() => handleRunCommand(command)}
+                >
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate font-medium">{command.title}</span>
+                    <span className="truncate text-muted-foreground">{command.description}</span>
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
           ))}
         </CommandList>
 
@@ -145,11 +189,12 @@ export function CommandPalette() {
           <p className="border-t border-border px-4 py-2 text-xs text-destructive">{feedback}</p>
         )}
 
-        <CommandSeparator />
-        <div className="flex items-center justify-between px-4 py-2 font-mono text-[11px] text-muted-foreground">
-          <span>Command/Ctrl + Shift + P</span>
-          <span>Enter to run / Esc to close</span>
-        </div>
+        <CommandFooter>
+          <div className="flex items-center justify-between px-4 py-2 font-mono text-[11px] text-muted-foreground">
+            <span>Command/Ctrl + Shift + P</span>
+            <span>Enter to run / Esc to close</span>
+          </div>
+        </CommandFooter>
       </Command>
     </CommandDialog>
   );

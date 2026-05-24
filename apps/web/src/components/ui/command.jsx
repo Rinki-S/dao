@@ -143,6 +143,19 @@ function CommandShortcut({ className, ...props }) {
   );
 }
 
+function CommandFooter({ children, className }) {
+  return (
+    <div
+      className={cn(
+        'flex items-center w-full rounded-b-lg border-t bottom-0 justify-between px-1',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export {
   Command,
   CommandDialog,
@@ -153,4 +166,5 @@ export {
   CommandItem,
   CommandShortcut,
   CommandSeparator,
+  CommandFooter,
 };

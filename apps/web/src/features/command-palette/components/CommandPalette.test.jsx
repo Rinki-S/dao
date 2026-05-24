@@ -61,6 +61,19 @@ describe('CommandPalette', () => {
     expect(screen.queryByRole('option', { name: /Create Task/ })).not.toBeInTheDocument();
   });
 
+  it('groups commands by command group', async () => {
+    const user = userEvent.setup();
+
+    renderCommandPaletteWithTargets();
+
+    await user.keyboard('{Control>}{Shift>}p{/Shift}{/Control}');
+
+    expect(screen.getByText('Create')).toBeInTheDocument();
+    expect(screen.getByText('Navigate')).toBeInTheDocument();
+    expect(screen.queryByText('Actions')).not.toBeInTheDocument();
+    expect(screen.queryByText('Other Commands')).not.toBeInTheDocument();
+  });
+
   it('runs the selected command on Enter', async () => {
     const user = userEvent.setup();
 
