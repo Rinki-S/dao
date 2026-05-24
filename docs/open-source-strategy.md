@@ -132,7 +132,7 @@ It is concrete, searchable, and easy to understand from a README.
 
 ## 5.2 Jade UI
 
-A compact React UI kit for developer tools, built on Base UI and Tailwind CSS.
+A compact React UI kit for developer tools, built from Dao's shadcn/ui-based component layer and Tailwind CSS.
 
 ### Problem
 
@@ -164,6 +164,8 @@ Medium High
 It shows design system ability, React component abstraction, accessibility awareness, and real usage in Dao.
 
 This project should become a focused component system for developer tools.
+
+It should not be extracted while Dao is still deciding its core UI patterns. The app should first validate the shadcn/ui preset, Dao design tokens, density, forms, command palette, sidebar, panel, and dialog patterns in real product surfaces.
 
 ## 5.3 dao-command-kit
 
@@ -346,7 +348,7 @@ Extracted from real engineering needs in Dao and continuously validated through 
 Example resume wording:
 
 ```txt
-Extracted and maintained reusable infrastructure packages from Dao, including an Electron-Go service bridge and a Base UI-based React component system, both validated through continuous use in the main product.
+Extracted and maintained reusable infrastructure packages from Dao, including an Electron-Go service bridge and a shadcn/ui-based React component system, both validated through continuous use in the main product.
 ```
 
 The goal is to show engineering judgment, not repository count.

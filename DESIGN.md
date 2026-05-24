@@ -431,17 +431,21 @@ Avoid heavy card shadows.
 Dao uses:
 
 ```txt
-Base UI + Tailwind CSS + custom Dao design system
+shadcn/ui + Tailwind CSS + custom Dao design system
 ```
 
-Base UI provides accessible headless primitives.
+shadcn/ui provides source-owned, accessible React components that Dao can adapt to its own product needs.
 
-Dao should define its own component layer instead of importing Base UI directly inside business pages.
+Dao should define its own UI layer on top of shadcn/ui components instead of scattering one-off Tailwind styling across business pages.
+
+Business pages should import stable Dao UI components and composed feature components, not copy registry examples directly.
+
+The shadcn/ui preset should be treated as the starting component contract and token baseline. Dao should still keep its own visual identity: neutral-first surfaces, restrained jade accent, compact developer-tool density, and calm product voice.
 
 ## 9.1 Recommended Component Package
 
 ```txt
-packages/ui/
+apps/web/src/components/ui/
   Button.jsx
   Input.jsx
   Textarea.jsx
@@ -455,7 +459,9 @@ packages/ui/
   Panel.jsx
 ```
 
-Business code should import from `packages/ui`.
+If the component layer later proves reusable outside the app, it may be extracted into `packages/ui`.
+
+Do not extract a shared package before the components have been validated inside Dao.
 
 ## 9.2 Component Design Rules
 
@@ -683,6 +689,7 @@ Social preview should include:
 - use red-and-gold festival colors
 - make everything green
 - copy default shadcn/ui style
+- bypass Dao's component layer with one-off shadcn example code
 - build a generic SaaS dashboard
 - use heavy gradients
 - overuse shadows
@@ -726,7 +733,7 @@ Dao’s design is successful when:
 Dao should use:
 
 ```txt
-Base UI + Tailwind CSS
+shadcn/ui + Tailwind CSS
 Custom Dao UI layer
 Jade Green #00A86B as primary accent
 Neutral-first interface
