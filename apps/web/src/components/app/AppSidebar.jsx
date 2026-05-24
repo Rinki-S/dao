@@ -15,10 +15,10 @@ import { resolveSidebarIcon } from '@/extensions/sidebar-icons.js';
 export function AppSidebar({ activeSurfaceId, sidebarItems, onSelectSurface }) {
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className="app-drag-region pt-12">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip="Dao" className="font-heading">
+            <SidebarMenuButton size="lg" tooltip="Dao" className="app-no-drag font-heading">
               <span className="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
                 d
               </span>
@@ -47,6 +47,7 @@ export function AppSidebar({ activeSurfaceId, sidebarItems, onSelectSurface }) {
                       tooltip={item.label}
                     >
                       <a
+                        className="app-no-drag"
                         href={item.href}
                         onClick={(event) => {
                           event.preventDefault();

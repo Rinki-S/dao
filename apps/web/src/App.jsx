@@ -54,8 +54,8 @@ function App() {
         onSelectSurface={handleSelectSurface}
       />
       <SidebarInset className="min-h-screen">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-6">
-          <SidebarTrigger />
+        <header className="app-drag-region flex h-14 shrink-0 items-center gap-3 border-b border-border px-6">
+          <SidebarTrigger className="app-no-drag" />
           <div className="min-w-0">
             <h1 className="truncate text-lg font-heading font-semibold tracking-normal text-foreground">
               {activeSurface?.label ?? 'Dao'}

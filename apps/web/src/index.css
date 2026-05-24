@@ -85,6 +85,14 @@ body {
   flex-direction: column;
 }
 
+.app-drag-region {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
+
 @theme inline {
   --font-sans: 'Funnel Sans Variable', sans-serif;
   --font-heading: 'Outfit Variable', sans-serif;
