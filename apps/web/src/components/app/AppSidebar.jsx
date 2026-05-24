@@ -14,7 +14,10 @@ import { resolveSidebarIcon } from '@/extensions/sidebar-icons.js';
 
 export function AppSidebar({ activeSurfaceId, sidebarItems, onSelectSurface }) {
   return (
-    <Sidebar collapsible="icon" className="top-12 h-[calc(100svh-3rem)]">
+    <Sidebar
+      collapsible="icon"
+      className="top-12 h-[calc(100svh-3rem)] [&_[data-sidebar=sidebar]]:bg-background"
+    >
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
