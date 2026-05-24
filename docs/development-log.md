@@ -38,7 +38,7 @@ Important decisions:
 - Use SQLite as the first local database.
 - Use `net/http` first, with a possible future move to `chi` when routing and middleware complexity justify it.
 - Use Tailwind CSS for styling.
-- Introduce Base UI later when accessible interactive primitives are needed.
+- Use shadcn/ui for the React component system, with Dao-specific design tokens and composition on top.
 
 ## Milestone 1: Project Loop
 

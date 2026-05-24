@@ -43,7 +43,7 @@ Dao brings these fragments into one calm, local-first workspace.
 - JavaScript
 - Go
 - SQLite
-- Base UI
+- shadcn/ui
 - Tailwind CSS
 - Zod
 - JSDoc

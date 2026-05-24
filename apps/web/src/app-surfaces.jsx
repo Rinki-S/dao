@@ -1,3 +1,4 @@
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ActivityMetricsPanel } from './features/activities/components/ActivityMetricsPanel.jsx';
 import { NotePanel } from './features/notes/components/NotePanel.jsx';
 import { ProjectPanel } from './features/projects/components/ProjectPanel.jsx';
@@ -17,14 +18,13 @@ export const surfaceComponents = {
   notes: <NotePanel />,
   search: <SearchPanel />,
   settings: (
-    <section
-      id="settings"
-      className="mt-6 max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5"
-    >
-      <h2 className="text-base font-semibold text-[#111827]">Settings</h2>
-      <p className="mt-1 text-sm text-[#6B7280]">
-        Settings will hold local workspace preferences as the MVP grows.
-      </p>
-    </section>
+    <Card id="settings" className="mt-6 max-w-3xl">
+      <CardHeader>
+        <CardTitle>Settings</CardTitle>
+        <CardDescription>
+          Settings will hold local workspace preferences as the MVP grows.
+        </CardDescription>
+      </CardHeader>
+    </Card>
   ),
 };
