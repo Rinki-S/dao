@@ -27,6 +27,7 @@ export function startLocalService(config) {
         ['run', './cmd/dao-service', '--port', config.port, '--token', config.sessionToken],
         {
             cwd: serviceDir,
+            detached: process.platform !== 'win32',
             stdio: 'inherit',
             env: {
                 ...process.env,
@@ -68,7 +69,18 @@ export function stopLocalService(child) {
         return
     }
 
-    child.kill()
+    if (process.platform === 'win32') {
+        child.kill()
+        return
+    }
+
+    try {
+        process.kill(-child.pid, 'SIGTERM')
+    } catch (error) {
+        if (error.code !== 'ESRCH') {
+            console.warn(`failed to stop dao local service process group: ${error.message}`)
+        }
+    }
 }
 
 function sleep(ms) {

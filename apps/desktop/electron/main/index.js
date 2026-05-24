@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename)
 
 let localService = null
 let serviceConfig = null
+let isStoppingLocalService = false
 
 function createWindow() {
     const mainWindow = new BrowserWindow({
@@ -49,11 +50,35 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', () => {
-    stopLocalService(localService)
+    stopServiceOnce()
 })
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit()
     }
+})
+
+function stopServiceOnce() {
+    if (isStoppingLocalService) {
+        return
+    }
+
+    isStoppingLocalService = true
+    stopLocalService(localService)
+}
+
+process.on('exit', stopServiceOnce)
+process.on('SIGINT', () => {
+    stopServiceOnce()
+    process.exit(130)
+})
+process.on('SIGTERM', () => {
+    stopServiceOnce()
+    process.exit(143)
+})
+process.on('uncaughtException', (error) => {
+    console.error(error)
+    stopServiceOnce()
+    process.exit(1)
 })

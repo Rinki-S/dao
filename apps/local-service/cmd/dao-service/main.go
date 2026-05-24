@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"flag"
@@ -8,7 +9,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/pressly/goose/v3"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
@@ -76,10 +80,27 @@ func main() {
 	})
 
 	addr := fmt.Sprintf("127.0.0.1:%s", *port)
+	server := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
 
 	log.Printf("dao local service listening on http://%s", addr)
 
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	go func() {
+		shutdownSignals := make(chan os.Signal, 1)
+		signal.Notify(shutdownSignals, os.Interrupt, syscall.SIGTERM)
+		<-shutdownSignals
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("dao local service shutdown failed: %v", err)
+		}
+	}()
+
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }
