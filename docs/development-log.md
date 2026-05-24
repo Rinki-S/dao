@@ -413,7 +413,79 @@ Keep deferred:
 - plugin permissions, signing, sandboxing, and review
 - importer, exporter, transform, browser integration, job, settings, and AI context provider capabilities
 
-## Next Milestone: AI Summary Loop
+## Milestone 8: UI Foundation
+
+Status: complete
+
+Branch:
+
+```txt
+feat/ui-foundation
+```
+
+Goal:
+
+```txt
+Dao replaces temporary test-oriented renderer styling with a consistent shadcn/ui foundation.
+```
+
+Completed scope:
+
+- switch the renderer UI direction to shadcn/ui
+- configure shadcn/ui for the Vite React app
+- add the initial shadcn component set used by current MVP surfaces
+- migrate workspace, project, task, note, search, activity metrics, and settings surfaces to shadcn component composition
+- migrate the command palette to shadcn `Command` and `Dialog` backed by `cmdk`
+- group command palette commands by extension-provided `command.group`
+- use `Kbd` for command palette keyboard hints
+- align app shell styling with semantic Tailwind tokens
+- apply Geist Variable as the UI body font and Outfit Variable as the heading font
+- remove unused Vite starter assets and early workspace form CSS
+- keep current screens functionally equivalent while preparing for product UI work
+
+Keep deferred:
+
+- product-grade app shell information architecture
+- route-like active surface navigation
+- dashboard redesign
+- project detail page
+- task workspace layout
+- note editor and preview experience
+- design token consolidation in `src/index.css`
+- reusable Dao-specific component wrappers above shadcn/ui
+- visual QA with browser screenshots across desktop and small viewports
+
+Notes:
+
+- This milestone is a UI foundation milestone, not the final product UI.
+- Current screens still primarily expose MVP create/list/test flows.
+- The next UI phase should turn the renderer from stacked feature panels into a real product workspace.
+- The first product UI branch should focus on the app shell, active surface navigation, dashboard shape, and command palette fit inside the product workflow.
+
+## Next Milestone: Product Shell
+
+Recommended branch:
+
+```txt
+feat/product-shell
+```
+
+Goal:
+
+```txt
+Dao starts moving from functional test panels to a real product workspace experience.
+```
+
+Planned scope:
+
+- replace the stacked all-surfaces page with route-like active surface navigation
+- make the sidebar communicate the current workspace structure and active surface
+- turn Dashboard into the first real product home surface
+- keep command palette as the global action entry point
+- preserve existing API contracts and MVP create/list behavior while reorganizing the UI
+- avoid AI features until the product shell can carry existing local context clearly
+
+## Later Milestone: AI Summary Loop
 
 Recommended branch:
 

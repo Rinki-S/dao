@@ -268,30 +268,30 @@ The typography should communicate:
 
 | Usage | Typeface |
 |---|---|
-| Brand / Headings | Geist |
-| UI Body | Inter |
-| Code / Technical surfaces | JetBrains Mono |
+| Brand / Headings | Outfit Variable |
+| UI Body | Geist Variable |
+| Code / Technical surfaces | System monospace now, JetBrains Mono later |
 
 ## 7.3 Brand Typeface
 
-Use **Geist** for:
+Use **Outfit Variable** for:
 
 - wordmark
 - landing page headings
 - key product messaging
 - dashboard headings
 
-Why Geist works:
+Why Outfit works:
 
 - modern
-- clear
-- technical
+- geometric
+- warm without becoming decorative
 - restrained
-- suitable for developer tools
+- distinct enough to carry the short `dao` brand mark
 
 ## 7.4 UI Body Typeface
 
-Use **Inter** for:
+Use **Geist Variable** for:
 
 - app UI
 - body text
@@ -300,11 +300,11 @@ Use **Inter** for:
 - forms
 - documentation
 
-Inter provides strong readability and scales well across dense interfaces.
+Geist provides strong readability, compact rhythm, and a developer-tool tone that works well across dense interfaces.
 
 ## 7.5 Code Typeface
 
-Use **JetBrains Mono** for:
+Use a clear monospace face for:
 
 - code blocks
 - shortcuts
@@ -312,6 +312,8 @@ Use **JetBrains Mono** for:
 - logs
 - AI tool execution traces
 - developer-facing details
+
+Dao currently uses the system monospace stack. JetBrains Mono remains a strong candidate once code-heavy surfaces become more important.
 
 ## 7.6 Typography Rules
 
@@ -587,13 +589,14 @@ Icon style should be:
 Recommended icon library:
 
 ```txt
-Lucide
+Phosphor Icons
 ```
 
-Icon stroke width:
+Icon style:
 
 ```txt
-1.75px or 2px
+regular outline weight
+compact sizing inside controls
 ```
 
 Use jade for active icons only.
@@ -737,7 +740,8 @@ shadcn/ui + Tailwind CSS
 Custom Dao UI layer
 Jade Green #00A86B as primary accent
 Neutral-first interface
-Geist / Inter / JetBrains Mono typography
+Outfit Variable headings + Geist Variable body
+Phosphor Icons
 Geometric English and Chinese logo system
 ```
 

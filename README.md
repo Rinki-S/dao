@@ -76,8 +76,12 @@ React creates tasks
 React lists notes
 React creates notes
 React searches projects, tasks, and notes
+React exposes core actions through a shadcn/cmdk command palette
+React renders MVP surfaces on a shadcn/ui foundation
 SQLite persists workspace data locally
 ```
+
+The current renderer UI is a foundation layer rather than the final product experience. The next product UI phase should turn the existing stacked MVP surfaces into a real workspace shell with active navigation, a stronger dashboard, and domain-specific project/task/note experiences.
 
 ## MVP Scope
 
@@ -118,6 +122,8 @@ These features are planned for later stages:
 - [x] Add command palette
 - [x] Add activity log
 - [x] Add extension system
+- [x] Add shadcn/ui foundation
+- [ ] Build product app shell
 - [ ] Add AI summary features
 - [ ] Add contextual AI workflow features
 
