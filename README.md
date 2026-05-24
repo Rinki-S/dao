@@ -117,7 +117,7 @@ These features are planned for later stages:
 - [x] Add search
 - [x] Add command palette
 - [x] Add activity log
-- [ ] Add extension system
+- [x] Add extension system
 - [ ] Add AI summary features
 - [ ] Add contextual AI workflow features
 

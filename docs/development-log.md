@@ -361,9 +361,11 @@ Notes:
 - The frontend uses a small local event to refresh metrics after successful create actions.
 - Shared query invalidation or React Query remains deferred until more frontend data surfaces need coordinated cache behavior.
 
-## Next Milestone: Extension Registry Loop
+## Milestone 7: Extension Registry Loop
 
-Recommended branch:
+Status: complete
+
+Branch:
 
 ```txt
 feat/extension-registry
@@ -372,21 +374,64 @@ feat/extension-registry
 Goal:
 
 ```txt
-Dao defines a small built-in extension registry so core modules can expose routes, sidebar items, and commands through a consistent contract.
+Dao defines a small built-in extension registry so core modules can expose commands, sidebar items, and surfaces through a consistent contract.
 ```
 
-Planned scope:
+Completed scope:
 
 - document the first extension registry contract
 - keep the registry limited to built-in extensions
 - model extensions as capability providers rather than sidebar entries
 - move existing core module navigation metadata toward registry-driven definitions
 - prepare command registration for extension-owned commands
+- split built-in extension definitions by core domain
+- add command, sidebar item, and surface capability helpers
+- render app surfaces in registry order while keeping React component assembly in the app layer
+- validate built-in extensions at the registry boundary with Zod
 - keep third-party plugin marketplace support deferred
 
 Design constraints:
 
-- support built-in extension capabilities first: commands, routes, and sidebar items
-- leave room for future importers, exporters, content transforms, browser integrations, file handlers, background jobs, settings sections, and AI context providers
+- support built-in extension capabilities first: commands, sidebar items, and surfaces
+- leave room for future routes, importers, exporters, content transforms, browser integrations, file handlers, background jobs, settings sections, and AI context providers
 - avoid dynamic external plugin loading, marketplace distribution, signing, sandboxing, and permission prompts in the MVP
 - keep command capabilities lightweight so they route users to existing UI flows instead of bypassing page validation and state
+
+Notes:
+
+- Command Palette reads registered command capabilities instead of owning a static command list.
+- Sidebar navigation reads registered sidebar item capabilities.
+- The main app renders registered surfaces in registry order.
+- `registeredExtensions` is parsed from `builtInExtensions` with Zod before registry helpers consume it.
+- Extension metadata remains declarative; React components are still explicitly mapped in the app layer.
+
+Keep deferred:
+
+- route capability and route library integration
+- third-party plugin marketplace
+- dynamic external plugin loading
+- plugin permissions, signing, sandboxing, and review
+- importer, exporter, transform, browser integration, job, settings, and AI context provider capabilities
+
+## Next Milestone: AI Summary Loop
+
+Recommended branch:
+
+```txt
+feat/ai-summary
+```
+
+Goal:
+
+```txt
+Dao starts the first AI feature by generating structured summaries from existing local workspace context through the AI Harness boundary.
+```
+
+Planned scope:
+
+- read `docs/ai-harness.md` before implementation
+- define the first AI summary contract
+- keep AI calls out of random React components and feature modules
+- validate AI output with Zod before using it
+- require user confirmation before writing AI-generated changes
+- keep tool calling and agent workflows deferred

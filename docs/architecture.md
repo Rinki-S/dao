@@ -541,9 +541,17 @@ The goal is modularity, not a public plugin marketplace.
 
 The extension registry should be a capability registry, not a sidebar registry.
 
-An extension is a built-in capability provider. Sidebar items, routes, and commands are the first supported capabilities, but the architecture should leave room for future capabilities such as importers, exporters, content transforms, browser integrations, file handlers, background jobs, settings sections, and AI context providers.
+An extension is a built-in capability provider. Commands, sidebar items, and surfaces are the first supported capabilities, but the architecture should leave room for future capabilities such as routes, importers, exporters, content transforms, browser integrations, file handlers, background jobs, settings sections, and AI context providers.
 
 The MVP registry must stay limited to official built-in extensions.
+
+The current frontend registry validates built-in extensions at the registry boundary with Zod:
+
+```js
+export const registeredExtensions = ExtensionListSchema.parse(builtInExtensions)
+```
+
+Consumers should use `registeredExtensions` indirectly through registry helpers.
 
 Deferred:
 
@@ -572,20 +580,21 @@ export const extension = {
       },
     ],
 
-    routes: [
-      {
-        path: '/tasks',
-        component: TasksPage,
-      },
-    ],
-
     sidebarItems: [
       {
         id: 'tasks',
         label: 'Tasks',
-        path: '/tasks',
-        icon: 'check',
-        order: 30,
+        href: '#tasks',
+        order: 40,
+      },
+    ],
+
+    surfaces: [
+      {
+        id: 'tasks',
+        label: 'Tasks',
+        anchorId: 'tasks',
+        order: 40,
       },
     ],
   },
@@ -598,9 +607,13 @@ Consumers should read specific capabilities through registry helpers, such as:
 
 ```js
 getRegisteredCommands()
-getRegisteredRoutes()
 getRegisteredSidebarItems()
+getRegisteredSurfaces()
 ```
+
+Surface capabilities describe stable main-content surfaces and their ordering. They are metadata only. React components remain explicitly assembled in the app layer, so extension metadata does not become a React component registry.
+
+Route capabilities are deferred until Dao introduces a real route layer.
 
 Command capabilities should initially stay lightweight and UI-oriented. They may navigate to an existing surface and focus a target input, but should not bypass page-level validation, form state, or existing create flows by calling API functions directly.
 

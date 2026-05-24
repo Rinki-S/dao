@@ -103,11 +103,12 @@ Dao extensions should be modeled as capability providers, not only as sidebar it
 Early extension capabilities include:
 
 - commands
-- routes
 - sidebar items
+- surfaces
 
 Future extension capabilities may include:
 
+- routes
 - importers
 - exporters
 - content transforms
