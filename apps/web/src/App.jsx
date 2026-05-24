@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AppSidebar } from '@/components/app/AppSidebar.jsx';
-import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { AppTitleBar } from '@/components/app/AppTitleBar.jsx';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { surfaceComponents } from './app-surfaces.jsx';
 import { CommandPalette } from './features/command-palette/components/CommandPalette.jsx';
 import { getRegisteredSidebarItems, getRegisteredSurfaces } from './extensions/registry.js';
@@ -46,27 +47,31 @@ function App() {
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="min-h-0 flex-1">
       <CommandPalette onSelectSurface={handleSelectSurface} />
-      <AppSidebar
-        activeSurfaceId={activeSurface?.id}
-        sidebarItems={sidebarItems}
-        onSelectSurface={handleSelectSurface}
-      />
-      <SidebarInset className="min-h-screen">
-        <header className="app-drag-region flex h-14 shrink-0 items-center gap-3 border-b border-border px-6">
-          <SidebarTrigger className="app-no-drag" />
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-heading font-semibold tracking-normal text-foreground">
-              {activeSurface?.label ?? 'Dao'}
-            </h1>
-          </div>
-        </header>
+      <div className="flex min-h-screen w-full flex-col bg-background text-foreground">
+        <AppTitleBar />
+        <div className="flex min-h-0 flex-1">
+          <AppSidebar
+            activeSurfaceId={activeSurface?.id}
+            sidebarItems={sidebarItems}
+            onSelectSurface={handleSelectSurface}
+          />
+          <SidebarInset className="min-h-0">
+            <header className="flex h-14 shrink-0 items-center border-b border-border px-6">
+              <div className="min-w-0">
+                <h1 className="truncate text-lg font-heading font-semibold tracking-normal text-foreground">
+                  {activeSurface?.label ?? 'Dao'}
+                </h1>
+              </div>
+            </header>
 
-        <section className="flex-1 px-8 py-7">
-          {activeSurface ? surfaceComponents[activeSurface.id] : null}
-        </section>
-      </SidebarInset>
+            <section className="flex-1 px-8 py-7">
+              {activeSurface ? surfaceComponents[activeSurface.id] : null}
+            </section>
+          </SidebarInset>
+        </div>
+      </div>
     </SidebarProvider>
   );
 }

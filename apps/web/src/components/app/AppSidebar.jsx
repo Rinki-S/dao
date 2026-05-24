@@ -14,8 +14,8 @@ import { resolveSidebarIcon } from '@/extensions/sidebar-icons.js';
 
 export function AppSidebar({ activeSurfaceId, sidebarItems, onSelectSurface }) {
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="app-drag-region pt-12">
+    <Sidebar collapsible="icon" className="top-12 h-[calc(100svh-3rem)]">
+      <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" tooltip="Dao" className="app-no-drag font-heading">
