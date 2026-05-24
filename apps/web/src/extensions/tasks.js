@@ -15,6 +15,10 @@ export const tasksExtension = {
         id: 'tasks',
         label: 'Tasks',
         href: '#tasks',
+        icon: {
+          type: 'phosphor',
+          name: 'CheckSquareIcon',
+        },
         order: 40,
       },
     ],

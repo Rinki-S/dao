@@ -15,6 +15,10 @@ export const workspacesExtension = {
         id: 'workspaces',
         label: 'Workspaces',
         href: '#workspaces',
+        icon: {
+          type: 'phosphor',
+          name: 'StackIcon',
+        },
         order: 20,
       },
     ],

@@ -15,6 +15,10 @@ export const dashboardExtension = {
         id: 'dashboard',
         label: 'Dashboard',
         href: '#dashboard',
+        icon: {
+          type: 'phosphor',
+          name: 'SquaresFourIcon',
+        },
         order: 10,
       },
     ],

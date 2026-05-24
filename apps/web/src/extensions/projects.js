@@ -15,6 +15,10 @@ export const projectsExtension = {
         id: 'projects',
         label: 'Projects',
         href: '#projects',
+        icon: {
+          type: 'phosphor',
+          name: 'FolderOpenIcon',
+        },
         order: 30,
       },
     ],

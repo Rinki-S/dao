@@ -10,6 +10,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
+import { resolveSidebarIcon } from '@/extensions/sidebar-icons.js';
 
 export function AppSidebar({ activeSurfaceId, sidebarItems, onSelectSurface }) {
   return (
@@ -36,6 +37,7 @@ export function AppSidebar({ activeSurfaceId, sidebarItems, onSelectSurface }) {
             <SidebarMenu>
               {sidebarItems.map((item) => {
                 const surfaceId = item.href.replace(/^#/, '');
+                const Icon = resolveSidebarIcon(item.icon);
 
                 return (
                   <SidebarMenuItem key={item.id}>
@@ -51,7 +53,7 @@ export function AppSidebar({ activeSurfaceId, sidebarItems, onSelectSurface }) {
                           onSelectSurface(surfaceId);
                         }}
                       >
-                        <span aria-hidden="true">{item.label.slice(0, 1)}</span>
+                        <Icon aria-hidden="true" />
                         <span>{item.label}</span>
                       </a>
                     </SidebarMenuButton>

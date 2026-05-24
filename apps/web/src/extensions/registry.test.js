@@ -52,6 +52,15 @@ describe('extension registry', () => {
       'search',
       'settings',
     ]);
+    expect(sidebarItems.map((item) => item.icon)).toEqual([
+      { type: 'phosphor', name: 'SquaresFourIcon' },
+      { type: 'phosphor', name: 'StackIcon' },
+      { type: 'phosphor', name: 'FolderOpenIcon' },
+      { type: 'phosphor', name: 'CheckSquareIcon' },
+      { type: 'phosphor', name: 'NotePencilIcon' },
+      { type: 'phosphor', name: 'MagnifyingGlassIcon' },
+      { type: 'phosphor', name: 'GearSixIcon' },
+    ]);
   });
 
   it('registers surfaces by order', () => {

@@ -15,6 +15,10 @@ export const searchExtension = {
         id: 'search',
         label: 'Search',
         href: '#search',
+        icon: {
+          type: 'phosphor',
+          name: 'MagnifyingGlassIcon',
+        },
         order: 60,
       },
     ],
