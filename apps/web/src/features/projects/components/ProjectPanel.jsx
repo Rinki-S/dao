@@ -1,9 +1,26 @@
-import { useMemo } from 'react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { notifyActivityChanged } from '../../activities/events.js';
 import { listWorkspaces } from '../../workspaces/api.js';
 import { createProject, listProjects } from '../api.js';
-import { useEffect } from 'react';
 
 export function ProjectPanel() {
   const [workspaces, setWorkspaces] = useState([]);
@@ -114,103 +131,104 @@ export function ProjectPanel() {
   }
 
   return (
-    <section
-      id="projects"
-      className="mt-6 max-w-3xl rounded-lg border border-[#E5E7EB] bg-white p-5"
-    >
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-base font-semibold text-[#111827]">Projects</h2>
-          <p className="mt-1 text-sm text-[#6B7280]">
-            Create projects inside the selected workspace.
-          </p>
-        </div>
-
+    <Card id="projects" className="mt-6 max-w-3xl">
+      <CardHeader>
+        <CardTitle>Projects</CardTitle>
+        <CardDescription>Create projects inside the selected workspace.</CardDescription>
         {selectedWorkspace && (
-          <span className="rounded-md border border-[#E5E7EB] px-2.5 py-1 text-xs text-[#6B7280]">
-            {selectedWorkspace.name}
-          </span>
+          <CardAction>
+            <Badge variant="outline">{selectedWorkspace.name}</Badge>
+          </CardAction>
         )}
-      </div>
+      </CardHeader>
 
-      {workspaces.length > 0 && (
-        <label className="mb-4 block">
-          <span className="mb-1 block text-xs font-medium text-[#6B7280]">Workspace</span>
-          <select
-            className="w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm outline-none focus:border-[#00A86B] focus:ring-3 focus:ring-[rgba(0,168,107,0.18)]"
-            value={selectedWorkspaceId}
-            onChange={(event) => setSelectedWorkspaceId(event.target.value)}
-          >
-            {workspaces.map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
+      <CardContent className="flex flex-col gap-5">
+        {workspaces.length > 0 && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Workspace</span>
+            <Select value={selectedWorkspaceId} onValueChange={setSelectedWorkspaceId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select workspace" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {workspaces.map((workspace) => (
+                    <SelectItem key={workspace.id} value={workspace.id}>
+                      {workspace.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </label>
+        )}
 
-      <form className="mb-5 grid gap-3" onSubmit={handleCreateProject}>
-        <input
-          className="rounded-md border border-[#E5E7EB] px-3 py-2 text-sm outline-none focus:border-[#00A86B] focus:ring-3 focus:ring-[rgba(0,168,107,0.18)]"
-          value={projectName}
-          onChange={(event) => setProjectName(event.target.value)}
-          placeholder="Project name"
-          disabled={workspaces.length === 0}
-          data-command-target="project-name"
-        />
+        <form className="flex flex-col gap-3" onSubmit={handleCreateProject}>
+          <label className="sr-only" htmlFor="project-name">
+            Project name
+          </label>
+          <Input
+            id="project-name"
+            value={projectName}
+            onChange={(event) => setProjectName(event.target.value)}
+            placeholder="Project name"
+            disabled={workspaces.length === 0}
+            data-command-target="project-name"
+          />
 
-        <input
-          className="rounded-md border border-[#E5E7EB] px-3 py-2 text-sm outline-none focus:border-[#00A86B] focus:ring-3 focus:ring-[rgba(0,168,107,0.18)]"
-          value={projectDescription}
-          onChange={(event) => setProjectDescription(event.target.value)}
-          placeholder="Description"
-          disabled={workspaces.length === 0}
-        />
+          <label className="sr-only" htmlFor="project-description">
+            Description
+          </label>
+          <Input
+            id="project-description"
+            value={projectDescription}
+            onChange={(event) => setProjectDescription(event.target.value)}
+            placeholder="Description"
+            disabled={workspaces.length === 0}
+          />
 
-        <button
-          className="w-fit rounded-md bg-[#00A86B] px-4 py-2 text-sm font-medium text-white hover:bg-[#34C38F] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isCreating || workspaces.length === 0}
-          type="submit"
-        >
-          {isCreating ? 'Creating...' : 'Create project'}
-        </button>
-      </form>
+          <Button className="w-fit" disabled={isCreating || workspaces.length === 0} type="submit">
+            {isCreating ? 'Creating...' : 'Create project'}
+          </Button>
+        </form>
 
-      {status === 'loading' && <p className="text-sm text-[#6B7280]">Loading projects...</p>}
+        {status === 'loading' && (
+          <p className="text-sm text-muted-foreground">Loading projects...</p>
+        )}
 
-      {status === 'error' && <p className="text-sm text-red-600">{error}</p>}
+        {status === 'error' && <p className="text-sm text-destructive">{error}</p>}
 
-      {status === 'ready' && workspaces.length === 0 && (
-        <p className="text-sm text-[#6B7280]">Create a workspace before adding projects.</p>
-      )}
+        {status === 'ready' && workspaces.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            Create a workspace before adding projects.
+          </p>
+        )}
 
-      {status === 'ready' && workspaces.length > 0 && visibleProjects.length === 0 && (
-        <p className="text-sm text-[#6B7280]">No projects in this workspace yet.</p>
-      )}
+        {status === 'ready' && workspaces.length > 0 && visibleProjects.length === 0 && (
+          <p className="text-sm text-muted-foreground">No projects in this workspace yet.</p>
+        )}
 
-      {status === 'ready' && visibleProjects.length > 0 && (
-        <ul className="grid gap-2">
-          {visibleProjects.map((project) => (
-            <li key={project.id} className="rounded-md border border-[#E5E7EB] px-3 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <strong className="block text-sm font-medium text-[#111827]">
-                    {project.name}
-                  </strong>
-                  <span className="mt-1 block text-sm text-[#6B7280]">
-                    {project.description || 'No description'}
-                  </span>
+        {status === 'ready' && visibleProjects.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {visibleProjects.map((project) => (
+              <li key={project.id} className="rounded-md border border-border px-3 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <strong className="block text-sm font-medium text-foreground">
+                      {project.name}
+                    </strong>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      {project.description || 'No description'}
+                    </span>
+                  </div>
+
+                  <Badge variant="secondary">{project.status}</Badge>
                 </div>
-
-                <span className="rounded-md bg-[#F2EFE8] px-2 py-1 text-xs text-[#6B7280]">
-                  {project.status}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
