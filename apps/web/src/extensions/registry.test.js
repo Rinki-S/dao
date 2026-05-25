@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   builtInExtensions,
+  getContentFormatIcon,
   getRegisteredCommands,
+  getRegisteredContentFormats,
   getRegisteredSidebarItems,
   getRegisteredSurfaces,
   registeredExtensions,
@@ -58,6 +60,17 @@ describe('extension registry', () => {
     ]);
   });
 
+  it('registers content formats', () => {
+    const contentFormats = getRegisteredContentFormats();
+
+    expect(contentFormats.map((contentFormat) => contentFormat.format)).toEqual(['markdown']);
+    expect(contentFormats.every((contentFormat) => typeof contentFormat.icon === 'function')).toBe(
+      true,
+    );
+    expect(getContentFormatIcon('markdown')).toBe(contentFormats[0].icon);
+    expect(typeof getContentFormatIcon('unknown-format')).toBe('function');
+  });
+
   it('ignores extensions without command capabilities', () => {
     const commands = getRegisteredCommands([
       {
@@ -92,5 +105,17 @@ describe('extension registry', () => {
     ]);
 
     expect(surfaces).toEqual([]);
+  });
+
+  it('ignores extensions without content format capabilities', () => {
+    const contentFormats = getRegisteredContentFormats([
+      {
+        id: 'empty',
+        name: 'Empty',
+        capabilities: {},
+      },
+    ]);
+
+    expect(contentFormats).toEqual([]);
   });
 });

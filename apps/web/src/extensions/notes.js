@@ -1,7 +1,16 @@
+import { Markdown } from '@nine-thirty-five/material-symbols-react/rounded';
+
 export const notesExtension = {
   id: 'notes',
   name: 'Notes',
   capabilities: {
+    contentFormats: [
+      {
+        format: 'markdown',
+        label: 'Markdown',
+        icon: Markdown,
+      },
+    ],
     surfaces: [
       {
         id: 'notes',

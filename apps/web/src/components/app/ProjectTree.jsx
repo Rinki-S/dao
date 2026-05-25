@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Add,
   AddNotes,
-  EditNote,
   Folder,
   FolderOpen,
 } from '@nine-thirty-five/material-symbols-react/rounded';
@@ -35,6 +34,7 @@ import {
   SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { Textarea } from '@/components/ui/textarea';
+import { getContentFormatIcon } from '@/extensions/registry.js';
 import { notifyActivityChanged, subscribeToActivityChanged } from '@/features/activities/events.js';
 import { createNote, listNotes } from '@/features/notes/api.js';
 import { createProject, listProjects } from '@/features/projects/api.js';
@@ -336,19 +336,23 @@ export function ProjectTree({
                       </SidebarMenuSubItem>
                     )}
 
-                    {projectNotes.map((note) => (
-                      <SidebarMenuSubItem key={note.id}>
-                        <SidebarMenuSubButton className="app-no-drag" asChild>
-                          <button type="button">
-                            <EditNote
-                              aria-hidden="true"
-                              className="size-[18px] shrink-0 translate-y-px"
-                            />
-                            <span>{note.title}</span>
-                          </button>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
+                    {projectNotes.map((note) => {
+                      const ContentIcon = getContentFormatIcon(note.contentType);
+
+                      return (
+                        <SidebarMenuSubItem key={note.id}>
+                          <SidebarMenuSubButton className="app-no-drag" asChild>
+                            <button type="button">
+                              <ContentIcon
+                                aria-hidden="true"
+                                className="size-[18px] shrink-0 translate-y-px"
+                              />
+                              <span>{note.title}</span>
+                            </button>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
                   </SidebarMenuSub>
                 )}
               </SidebarMenuItem>

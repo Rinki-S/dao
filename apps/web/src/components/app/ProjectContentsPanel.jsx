@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { EditNote, Folder } from '@nine-thirty-five/material-symbols-react/rounded';
+import { Folder } from '@nine-thirty-five/material-symbols-react/rounded';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getContentFormatIcon } from '@/extensions/registry.js';
 import { subscribeToActivityChanged } from '@/features/activities/events.js';
 import { listNotes } from '@/features/notes/api.js';
 import { listProjects } from '@/features/projects/api.js';
@@ -179,27 +180,34 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
               </TableRow>
             )}
 
-            {contentRows.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell className="max-w-sm pl-8">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <EditNote aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
-                    <div className="min-w-0">
-                      <div className="truncate font-medium text-foreground">{row.name}</div>
-                      <div className="truncate text-xs text-muted-foreground">{row.summary}</div>
+            {contentRows.map((row) => {
+              const ContentIcon = getContentFormatIcon(row.format);
+
+              return (
+                <TableRow key={row.id}>
+                  <TableCell className="max-w-sm pl-8">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <ContentIcon
+                        aria-hidden="true"
+                        className="size-[18px] shrink-0 translate-y-px"
+                      />
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-foreground">{row.name}</div>
+                        <div className="truncate text-xs text-muted-foreground">{row.summary}</div>
+                      </div>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell>{row.type}</TableCell>
-                <TableCell>
-                  <Badge variant="secondary">{row.source}</Badge>
-                </TableCell>
-                <TableCell>{formatUpdatedAt(row.updatedAt)}</TableCell>
-                <TableCell className="pr-8">
-                  <Badge variant="outline">{row.format}</Badge>
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                  <TableCell>{row.type}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{row.source}</Badge>
+                  </TableCell>
+                  <TableCell>{formatUpdatedAt(row.updatedAt)}</TableCell>
+                  <TableCell className="pr-8">
+                    <Badge variant="outline">{row.format}</Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

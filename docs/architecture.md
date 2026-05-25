@@ -541,7 +541,7 @@ The goal is modularity, not a public plugin marketplace.
 
 The extension registry should be a capability registry, not a sidebar registry.
 
-An extension is a built-in capability provider. Commands, sidebar items, and surfaces are the first supported capabilities, but the architecture should leave room for future capabilities such as routes, importers, exporters, content transforms, browser integrations, file handlers, background jobs, settings sections, and AI context providers.
+An extension is a built-in capability provider. Commands, sidebar items, surfaces, and content formats are the first supported capabilities, but the architecture should leave room for future capabilities such as routes, importers, exporters, content transforms, browser integrations, file handlers, background jobs, settings sections, and AI context providers.
 
 The MVP registry must stay limited to official built-in extensions.
 
@@ -597,6 +597,14 @@ export const extension = {
         order: 40,
       },
     ],
+
+    contentFormats: [
+      {
+        format: 'markdown',
+        label: 'Markdown',
+        icon: EditNote,
+      },
+    ],
   },
 }
 ```
@@ -609,9 +617,13 @@ Consumers should read specific capabilities through registry helpers, such as:
 getRegisteredCommands()
 getRegisteredSidebarItems()
 getRegisteredSurfaces()
+getRegisteredContentFormats()
+getContentFormatIcon(format)
 ```
 
 Surface capabilities describe stable main-content surfaces and their ordering. They are metadata only. React components remain explicitly assembled in the app layer, so extension metadata does not become a React component registry.
+
+Content format capabilities describe how content rows should be represented across shared UI surfaces such as project file trees and project content tables. Dao core may register icons for built-in durable content formats such as `markdown`. Extensions that introduce new content formats, such as future GitHub repositories, websites, LeetCode problems, imported files, or browser captures, should register their own `contentFormats` capability instead of requiring central UI files to maintain a growing icon map. UI consumers should ask the extension registry for the icon and fall back to a generic document icon when no format capability is registered.
 
 Route capabilities are deferred until Dao introduces a real route layer.
 

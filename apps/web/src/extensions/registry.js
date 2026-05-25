@@ -1,3 +1,4 @@
+import { UnknownDocument } from '@nine-thirty-five/material-symbols-react/rounded';
 import { dashboardExtension } from './dashboard.js';
 import { notesExtension } from './notes.js';
 import { projectsExtension } from './projects.js';
@@ -33,4 +34,15 @@ export function getRegisteredSurfaces(extensions = registeredExtensions) {
   return extensions
     .flatMap((extension) => extension.capabilities?.surfaces ?? [])
     .toSorted((firstSurface, secondSurface) => firstSurface.order - secondSurface.order);
+}
+
+export function getRegisteredContentFormats(extensions = registeredExtensions) {
+  return extensions.flatMap((extension) => extension.capabilities?.contentFormats ?? []);
+}
+
+export function getContentFormatIcon(format, extensions = registeredExtensions) {
+  return (
+    getRegisteredContentFormats(extensions).find((contentFormat) => contentFormat.format === format)
+      ?.icon ?? UnknownDocument
+  );
 }

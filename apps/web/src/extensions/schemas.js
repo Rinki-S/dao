@@ -26,6 +26,12 @@ const SurfaceCapabilitySchema = z.object({
   order: z.number(),
 });
 
+const ContentFormatCapabilitySchema = z.object({
+  format: z.string().min(1),
+  label: z.string().min(1),
+  icon: z.custom((value) => typeof value === 'function'),
+});
+
 export const ExtensionSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -33,6 +39,7 @@ export const ExtensionSchema = z.object({
     commands: z.array(CommandCapabilitySchema).optional(),
     sidebarItems: z.array(SidebarItemCapabilitySchema).optional(),
     surfaces: z.array(SurfaceCapabilitySchema).optional(),
+    contentFormats: z.array(ContentFormatCapabilitySchema).optional(),
   }),
 });
 
