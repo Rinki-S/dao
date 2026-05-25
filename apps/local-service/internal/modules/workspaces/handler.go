@@ -2,10 +2,12 @@ package workspaces
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/rinki-s/dao/apps/local-service/internal/httpx"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/settings"
 )
 
 type Handler struct {
@@ -48,6 +50,11 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 
 	workspace, err := h.repo.Create(req)
 	if err != nil {
+		if errors.Is(err, settings.ErrWorkingDirectoryNotConfigured) {
+			httpx.Error(w, http.StatusConflict, "working directory is not configured")
+			return
+		}
+
 		httpx.Error(w, http.StatusInternalServerError, "failed to create workspace")
 		return
 	}

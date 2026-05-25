@@ -7,24 +7,8 @@ import (
 	"unicode"
 )
 
-const daoDocumentsDirName = "Dao"
-
-func DaoDocumentsRoot() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(homeDir, "Documents", daoDocumentsDirName), nil
-}
-
-func WorkspaceFolderPath(name string, id string) (string, error) {
-	root, err := DaoDocumentsRoot()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(root, EntityFolderName(name, id)), nil
+func WorkspaceFolderPath(workingDirectory string, name string, id string) string {
+	return filepath.Join(workingDirectory, EntityFolderName(name, id))
 }
 
 func ProjectFolderPath(workspaceRoot string, name string, id string) string {

@@ -8,15 +8,17 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/rinki-s/dao/apps/local-service/internal/files"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/settings"
 )
 
 type Repository struct {
-	db       *sql.DB
-	activity *activities.Repository
+	db           *sql.DB
+	activity     *activities.Repository
+	settingsRepo *settings.Repository
 }
 
-func NewRepository(db *sql.DB, activity *activities.Repository) *Repository {
-	return &Repository{db: db, activity: activity}
+func NewRepository(db *sql.DB, activity *activities.Repository, settingsRepo *settings.Repository) *Repository {
+	return &Repository{db: db, activity: activity, settingsRepo: settingsRepo}
 }
 
 func (r *Repository) List() ([]Workspace, error) {
@@ -59,10 +61,11 @@ func (r *Repository) List() ([]Workspace, error) {
 func (r *Repository) Create(req CreateWorkspaceRequest) (Workspace, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id := ulid.Make().String()
-	rootPath, err := files.WorkspaceFolderPath(req.Name, id)
+	workingDirectory, err := r.settingsRepo.RequireWorkingDirectory()
 	if err != nil {
 		return Workspace{}, err
 	}
+	rootPath := files.WorkspaceFolderPath(workingDirectory, req.Name, id)
 
 	workspace := Workspace{
 		ID:          id,

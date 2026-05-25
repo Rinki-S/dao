@@ -19,6 +19,7 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/notes"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/projects"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/settings"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/tasks"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/workspaces"
 
@@ -48,7 +49,11 @@ func main() {
 
 	searchRepo := search.NewRepository(db)
 
-	workspaceRepo := workspaces.NewRepository(db, activityRepo)
+	settingsRepo := settings.NewRepository(db)
+	settingsHandler := settings.NewHandler(settingsRepo)
+	settingsHandler.RegisterRoutes(apiMux)
+
+	workspaceRepo := workspaces.NewRepository(db, activityRepo, settingsRepo)
 	workspaceHandler := workspaces.NewHandler(workspaceRepo)
 	workspaceHandler.RegisterRoutes(apiMux)
 
