@@ -99,7 +99,7 @@ export function AppSidebar({
   return (
     <Sidebar
       collapsible="icon"
-      className="top-12 h-[calc(100svh-3rem)] [&_[data-sidebar=sidebar]]:bg-background"
+      className="top-12 h-[calc(100dvh-3rem)] [&_[data-sidebar=sidebar]]:bg-background"
     >
       <SidebarHeader>
         <SidebarMenu>

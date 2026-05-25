@@ -222,7 +222,7 @@ function App() {
 
   if (workingDirectoryStatus === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+      <div className="flex min-h-dvh items-center justify-center bg-background text-sm text-muted-foreground">
         Loading Dao...
       </div>
     );
@@ -230,7 +230,7 @@ function App() {
 
   if (workingDirectoryStatus === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-6 text-sm text-destructive">
+      <div className="flex min-h-dvh items-center justify-center bg-background px-6 text-sm text-destructive">
         {workingDirectoryError}
       </div>
     );
@@ -257,7 +257,7 @@ function App() {
 
   return (
     <SidebarProvider
-      className="min-h-0 flex-1"
+      className="h-dvh min-h-0 overflow-hidden"
       open={isSidebarOpen}
       onOpenChange={handleSidebarOpenChange}
       style={{
@@ -265,9 +265,9 @@ function App() {
       }}
     >
       <CommandPalette onSelectSurface={handleSelectSurface} onRunAction={handleCommandAction} />
-      <div className="flex min-h-screen w-full flex-col bg-background text-foreground">
+      <div className="flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-background text-foreground">
         <AppTitleBar />
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           <AppSidebar
             activeSurfaceId={activeSurface?.id}
             sidebarItems={sidebarItems}
@@ -291,7 +291,7 @@ function App() {
             resizeMaxWidth={SIDEBAR_MAX_WIDTH}
             resizeCollapseThreshold={SIDEBAR_COLLAPSE_THRESHOLD}
           />
-          <SidebarInset className="min-h-0 bg-sidebar">
+          <SidebarInset className="min-h-0 overflow-hidden bg-sidebar">
             <header className="flex h-14 shrink-0 items-center border-b border-border px-8">
               <div className="min-w-0">
                 <h1 className="truncate text-lg font-heading font-semibold tracking-normal text-foreground">
@@ -302,18 +302,34 @@ function App() {
               </div>
             </header>
 
-            <section className="flex-1 px-8 py-7">
+            <section
+              className={
+                activeSurfaceId === 'tasks'
+                  ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+                  : 'flex min-h-0 flex-1 flex-col overflow-hidden px-8 py-7'
+              }
+            >
               {activeSurfaceId === 'project-contents' ? (
-                <ProjectContentsPanel
-                  currentWorkspace={currentWorkspace}
-                  selectedProjectId={selectedProjectId}
-                />
-              ) : activeSurface ? (
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <ProjectContentsPanel
+                    currentWorkspace={currentWorkspace}
+                    selectedProjectId={selectedProjectId}
+                  />
+                </div>
+              ) : activeSurfaceId === 'tasks' && activeSurface ? (
                 getSurfaceComponent(activeSurface.id, {
                   currentWorkspace,
                   currentWorkingDirectory: workingDirectory,
                   onReplayOnboarding: () => setIsReplayingOnboarding(true),
                 })
+              ) : activeSurface ? (
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  {getSurfaceComponent(activeSurface.id, {
+                    currentWorkspace,
+                    currentWorkingDirectory: workingDirectory,
+                    onReplayOnboarding: () => setIsReplayingOnboarding(true),
+                  })}
+                </div>
               ) : null}
             </section>
           </SidebarInset>

@@ -377,9 +377,9 @@ export function TaskPanel({ currentWorkspace }) {
   }
 
   return (
-    <section id="tasks" className="flex flex-col gap-6">
+    <section id="tasks" className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <form
-        className="-mx-8 flex flex-col gap-3 px-8"
+        className="flex shrink-0 flex-col gap-3 px-8 py-4 border-b"
         onSubmit={handleCreateTask}
         onKeyDown={handleQuickAddKeyDown}
       >
@@ -487,7 +487,7 @@ export function TaskPanel({ currentWorkspace }) {
               </InputGroup>
 
               {isQuickAddOpen && (
-                <Button disabled={isCreating || !currentWorkspace} type="submit">
+                <Button className="h-9" disabled={isCreating || !currentWorkspace} type="submit">
                   {isCreating ? 'Adding...' : 'Add'}
                 </Button>
               )}
@@ -498,15 +498,19 @@ export function TaskPanel({ currentWorkspace }) {
         </FieldGroup>
       </form>
 
-      <div className="flex flex-col gap-4">
-        {status === 'loading' && <p className="text-sm text-muted-foreground">Loading tasks...</p>}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {status === 'loading' && (
+          <p className="px-8 text-sm text-muted-foreground">Loading tasks...</p>
+        )}
 
         {status === 'ready' && !currentWorkspace && (
-          <p className="text-sm text-muted-foreground">Create a workspace before adding tasks.</p>
+          <p className="px-8 text-sm text-muted-foreground">
+            Create a workspace before adding tasks.
+          </p>
         )}
 
         {status === 'ready' && currentWorkspace && visibleTasks.length === 0 && (
-          <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border text-center">
+          <div className="mx-8 flex min-h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border text-center">
             <TaskAlt aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
             <p className="text-sm font-medium text-foreground">No tasks yet</p>
             <p className="max-w-sm text-sm text-muted-foreground text-pretty">
@@ -519,14 +523,14 @@ export function TaskPanel({ currentWorkspace }) {
           currentWorkspace &&
           visibleTasks.length > 0 &&
           parentTasks.length === 0 && (
-            <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+            <div className="mx-8 flex min-h-32 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
               No tasks match this filter.
             </div>
           )}
 
         {status === 'ready' && parentTasks.length > 0 && (
-          <div className="-mx-8">
-            <Table className={'border-t border-b'}>
+          <div>
+            <Table className={'border-b'}>
               <TableBody>
                 {parentTasks.map((task) => {
                   const taskChildren = childrenByParentId.get(task.id) ?? [];

@@ -105,7 +105,7 @@ export function WorkingDirectoryOnboarding({
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
+    <div className="flex min-h-dvh items-center justify-center bg-background px-6 text-foreground">
       <div className="flex w-full max-w-xl flex-col gap-6">
         <div className="flex flex-col gap-2">
           <p className="text-sm text-muted-foreground">
