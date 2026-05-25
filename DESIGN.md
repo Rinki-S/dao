@@ -442,6 +442,8 @@ Dao should define its own UI layer on top of shadcn/ui components instead of sca
 
 Business pages should import stable Dao UI components and composed feature components, not copy registry examples directly.
 
+When a screen needs a semantic or interactive primitive that is not installed yet, add the appropriate shadcn/ui component and adapt it into Dao's component layer. Do not avoid adding shadcn/ui components when doing so would lead to hand-rolled controls, weaker accessibility, or non-standard interaction behavior.
+
 The shadcn/ui preset should be treated as the starting component contract and token baseline. Dao should still keep its own visual identity: neutral-first surfaces, restrained jade accent, compact developer-tool density, and calm product voice.
 
 ## 9.1 Recommended Component Package
