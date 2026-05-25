@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CalendarToday, Circle, TaskAlt } from '@nine-thirty-five/material-symbols-react/rounded';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Add, CalendarToday, TaskAlt } from '@nine-thirty-five/material-symbols-react/rounded';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { notifyActivityChanged } from '../../activities/events.js';
@@ -31,13 +32,6 @@ const priorityLabels = {
   low: 'Low',
   medium: 'Medium',
   high: 'High',
-};
-
-const statusLabels = {
-  todo: 'Todo',
-  doing: 'Doing',
-  done: 'Done',
-  archived: 'Archived',
 };
 
 function formatDate(value) {
@@ -69,6 +63,9 @@ export function TaskPanel({ currentWorkspace }) {
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [updatingTaskIds, setUpdatingTaskIds] = useState(() => new Set());
+  const [childTaskParentId, setChildTaskParentId] = useState('');
+  const [childTaskTitle, setChildTaskTitle] = useState('');
+  const [isCreatingChild, setIsCreatingChild] = useState(false);
 
   const workspaceProjects = useMemo(() => {
     if (!currentWorkspace) {
@@ -98,16 +95,36 @@ export function TaskPanel({ currentWorkspace }) {
     return tasks.filter((task) => task.workspaceId === currentWorkspace.id);
   }, [tasks, currentWorkspace]);
 
-  const filteredTasks = useMemo(() => {
-    if (activeFilter === 'all') {
-      return visibleTasks;
+  const parentTasks = useMemo(() => {
+    return visibleTasks.filter((task) => task.parentId === null);
+  }, [visibleTasks]);
+
+  const childrenByParentId = useMemo(() => {
+    const nextChildrenByParentId = new Map();
+
+    for (const task of visibleTasks) {
+      if (!task.parentId) {
+        continue;
+      }
+
+      const children = nextChildrenByParentId.get(task.parentId) ?? [];
+      children.push(task);
+      nextChildrenByParentId.set(task.parentId, children);
     }
 
-    return visibleTasks.filter((task) => task.status === activeFilter);
-  }, [activeFilter, visibleTasks]);
+    return nextChildrenByParentId;
+  }, [visibleTasks]);
+
+  const filteredParentTasks = useMemo(() => {
+    if (activeFilter === 'all') {
+      return parentTasks;
+    }
+
+    return parentTasks.filter((task) => task.status === activeFilter);
+  }, [activeFilter, parentTasks]);
 
   const taskCounts = useMemo(() => {
-    return visibleTasks.reduce(
+    return parentTasks.reduce(
       (counts, task) => ({
         ...counts,
         [task.status]: (counts[task.status] ?? 0) + 1,
@@ -115,10 +132,13 @@ export function TaskPanel({ currentWorkspace }) {
       }),
       { all: 0, todo: 0, doing: 0, done: 0 },
     );
-  }, [visibleTasks]);
+  }, [parentTasks]);
 
-  async function loadTaskData() {
-    setStatus('loading');
+  async function loadTaskData({ showLoading = true } = {}) {
+    if (showLoading) {
+      setStatus('loading');
+    }
+
     setError('');
 
     const [nextProjects, nextTasks] = await Promise.all([listProjects(), listTasks()]);
@@ -209,13 +229,8 @@ export function TaskPanel({ currentWorkspace }) {
     setError('');
 
     try {
-      const updatedTask = await updateTaskStatus(task.id, { status: nextStatus });
-
-      setTasks((currentTasks) =>
-        currentTasks.map((currentTask) =>
-          currentTask.id === updatedTask.id ? updatedTask : currentTask,
-        ),
-      );
+      await updateTaskStatus(task.id, { status: nextStatus });
+      await loadTaskData({ showLoading: false });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update task');
     } finally {
@@ -225,6 +240,57 @@ export function TaskPanel({ currentWorkspace }) {
         return nextIds;
       });
     }
+  }
+
+  function openChildTaskForm(parentTaskId) {
+    setChildTaskParentId(parentTaskId);
+    setChildTaskTitle('');
+    setError('');
+  }
+
+  function closeChildTaskForm() {
+    setChildTaskParentId('');
+    setChildTaskTitle('');
+  }
+
+  async function handleCreateChildTask(event, parentTask) {
+    event.preventDefault();
+
+    if (!currentWorkspace) {
+      setError('Create a workspace before adding tasks');
+      return;
+    }
+
+    try {
+      setIsCreatingChild(true);
+      setError('');
+
+      await createTask({
+        workspaceId: currentWorkspace.id,
+        projectId: parentTask.projectId,
+        parentId: parentTask.id,
+        title: childTaskTitle,
+        description: '',
+        priority: parentTask.priority,
+        dueDate: null,
+      });
+
+      closeChildTaskForm();
+      await loadTaskData();
+      notifyActivityChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create child task');
+    } finally {
+      setIsCreatingChild(false);
+    }
+  }
+
+  function getCheckboxState(task) {
+    if (task.status === 'doing') {
+      return 'indeterminate';
+    }
+
+    return task.status === 'done';
   }
 
   return (
@@ -349,73 +415,181 @@ export function TaskPanel({ currentWorkspace }) {
         {status === 'ready' &&
           currentWorkspace &&
           visibleTasks.length > 0 &&
-          filteredTasks.length === 0 && (
+          filteredParentTasks.length === 0 && (
             <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
               No tasks match this filter.
             </div>
           )}
 
-        {status === 'ready' && filteredTasks.length > 0 && (
-          <ul className="flex flex-col">
-            {filteredTasks.map((task) => {
-              const isDone = task.status === 'done';
-              const projectName = task.projectId ? projectNameById.get(task.projectId) : null;
-              const dueDate = formatDate(task.dueDate);
-              const isUpdating = updatingTaskIds.has(task.id);
+        {status === 'ready' && filteredParentTasks.length > 0 && (
+          <div className="-mx-8">
+            <Table>
+              <TableBody>
+                {filteredParentTasks.map((task) => {
+                  const taskChildren = childrenByParentId.get(task.id) ?? [];
+                  const projectName = task.projectId ? projectNameById.get(task.projectId) : null;
+                  const dueDate = formatDate(task.dueDate);
+                  const isDone = task.status === 'done';
+                  const isUpdating = updatingTaskIds.has(task.id);
+                  const isAddingChild = childTaskParentId === task.id;
 
-              return (
-                <li key={task.id} className="border-b border-border py-3 first:pt-0">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      aria-label={`Mark ${task.title} as done`}
-                      checked={isDone}
-                      disabled={isUpdating}
-                      className="mt-0.5"
-                      onCheckedChange={() => {
-                        void handleToggleTaskDone(task);
-                      }}
-                    />
+                  return (
+                    <Fragment key={task.id}>
+                      <TableRow key={task.id}>
+                        <TableCell className="pl-8">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Checkbox
+                              aria-label={`Toggle ${task.title}`}
+                              checked={getCheckboxState(task)}
+                              disabled={isUpdating}
+                              onCheckedChange={() => {
+                                void handleToggleTaskDone(task);
+                              }}
+                            />
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={cn(
-                            'truncate text-sm font-medium text-foreground',
-                            isDone && 'text-muted-foreground line-through',
+                            <div className="min-w-0 flex-1">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <div
+                                  className={cn(
+                                    'min-w-0 truncate text-sm font-medium text-foreground',
+                                    isDone && 'text-muted-foreground line-through',
+                                  )}
+                                >
+                                  {task.title}
+                                  {projectName && (
+                                    <span className="font-normal text-muted-foreground">
+                                      /{projectName}
+                                    </span>
+                                  )}
+                                </div>
+                                <Badge variant={task.priority === 'high' ? 'default' : 'secondary'}>
+                                  {priorityLabels[task.priority]}
+                                </Badge>
+                              </div>
+
+                              {task.description && (
+                                <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                                  {task.description}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="w-28 text-muted-foreground">
+                          {dueDate && (
+                            <span className="flex items-center justify-end gap-1 text-xs">
+                              <CalendarToday aria-hidden="true" className="size-3 shrink-0" />
+                              {dueDate}
+                            </span>
                           )}
-                        >
-                          {task.title}
-                        </span>
-                        <Badge variant={task.priority === 'high' ? 'default' : 'secondary'}>
-                          {priorityLabels[task.priority]}
-                        </Badge>
-                      </div>
+                        </TableCell>
+                        <TableCell className="w-12 pr-8 text-right">
+                          <Button
+                            aria-label={`Add child todo to ${task.title}`}
+                            disabled={isCreatingChild}
+                            size="icon-xs"
+                            type="button"
+                            variant="ghost"
+                            onClick={() => openChildTaskForm(task.id)}
+                          >
+                            <Add
+                              aria-hidden="true"
+                              className="size-[18px] shrink-0 translate-y-px"
+                            />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
 
-                      {task.description && (
-                        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                          {task.description}
-                        </p>
+                      {isAddingChild && (
+                        <TableRow key={`${task.id}-child-form`}>
+                          <TableCell className="pl-16" colSpan={3}>
+                            <form
+                              className="flex items-center gap-2"
+                              onSubmit={(event) => {
+                                void handleCreateChildTask(event, task);
+                              }}
+                            >
+                              <Input
+                                aria-label={`Child todo for ${task.title}`}
+                                className="h-8"
+                                disabled={isCreatingChild}
+                                placeholder="Add child todo..."
+                                value={childTaskTitle}
+                                onChange={(event) => setChildTaskTitle(event.target.value)}
+                              />
+                              <Button disabled={isCreatingChild} size="sm" type="submit">
+                                Add
+                              </Button>
+                              <Button
+                                disabled={isCreatingChild}
+                                size="sm"
+                                type="button"
+                                variant="ghost"
+                                onClick={closeChildTaskForm}
+                              >
+                                Cancel
+                              </Button>
+                            </form>
+                          </TableCell>
+                        </TableRow>
                       )}
 
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Circle aria-hidden="true" className="size-3 shrink-0" />
-                          {statusLabels[task.status]}
-                        </span>
-                        <span>{projectName ?? 'No project'}</span>
-                        {dueDate && (
-                          <span className="flex items-center gap-1">
-                            <CalendarToday aria-hidden="true" className="size-3 shrink-0" />
-                            {dueDate}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                      {taskChildren.map((childTask) => {
+                        const childProjectName = childTask.projectId
+                          ? projectNameById.get(childTask.projectId)
+                          : null;
+                        const childDueDate = formatDate(childTask.dueDate);
+                        const isChildDone = childTask.status === 'done';
+                        const isChildUpdating = updatingTaskIds.has(childTask.id);
+
+                        return (
+                          <TableRow key={childTask.id}>
+                            <TableCell className="pl-16">
+                              <div className="flex min-w-0 items-center gap-3">
+                                <Checkbox
+                                  aria-label={`Toggle ${childTask.title}`}
+                                  checked={getCheckboxState(childTask)}
+                                  disabled={isChildUpdating}
+                                  onCheckedChange={() => {
+                                    void handleToggleTaskDone(childTask);
+                                  }}
+                                />
+
+                                <div className="min-w-0 flex-1">
+                                  <div
+                                    className={cn(
+                                      'min-w-0 truncate text-sm font-medium text-foreground',
+                                      isChildDone && 'text-muted-foreground line-through',
+                                    )}
+                                  >
+                                    {childTask.title}
+                                    {childProjectName && (
+                                      <span className="font-normal text-muted-foreground">
+                                        /{childProjectName}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="w-28 text-muted-foreground">
+                              {childDueDate && (
+                                <span className="flex items-center justify-end gap-1 text-xs">
+                                  <CalendarToday aria-hidden="true" className="size-3 shrink-0" />
+                                  {childDueDate}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="w-12 pr-8" />
+                          </TableRow>
+                        );
+                      })}
+                    </Fragment>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </div>
     </section>
