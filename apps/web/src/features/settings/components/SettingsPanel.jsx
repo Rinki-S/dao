@@ -2,30 +2,38 @@ import { Button } from '@/components/ui/button';
 
 export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
   return (
-    <section id="settings" className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-heading text-xl font-semibold text-foreground">Preferences</h2>
-        <p className="text-sm text-muted-foreground text-pretty">
-          Manage local preferences for this Dao installation.
-        </p>
-      </div>
+    <section id="settings" className="flex w-full flex-col gap-7">
+      <section className="flex flex-col gap-2">
+        <h2 className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Storage
+        </h2>
 
-      <section className="flex flex-col gap-4 border-t border-border pt-5">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-medium text-foreground">Working directory</h3>
-          <p className="text-sm text-muted-foreground text-pretty">
-            Dao stores workspace folders, project folders, notes, and imported files here.
-          </p>
-        </div>
+        <div className="overflow-hidden rounded-xl border border-border bg-background">
+          <div className="grid min-h-16 grid-cols-[minmax(0,1fr)_minmax(12rem,45%)] items-center gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium text-foreground">Working Directory</h3>
+              <p className="mt-0.5 text-sm text-muted-foreground text-pretty">
+                Stores workspace folders, project folders, notes, and imported files.
+              </p>
+            </div>
+            <p className="truncate text-right text-sm text-muted-foreground">
+              {currentWorkingDirectory?.path || 'Not configured'}
+            </p>
+          </div>
 
-        <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-          {currentWorkingDirectory?.path || 'No working directory configured'}
-        </div>
+          <div className="ml-4 border-t border-border" />
 
-        <div>
-          <Button type="button" variant="outline" onClick={onReplayOnboarding}>
-            Replay onboarding
-          </Button>
+          <div className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium text-foreground">Replay Onboarding</h3>
+              <p className="mt-0.5 text-sm text-muted-foreground text-pretty">
+                Reselect the working directory and review workspace setup.
+              </p>
+            </div>
+            <Button type="button" variant="outline" onClick={onReplayOnboarding}>
+              Open
+            </Button>
+          </div>
         </div>
       </section>
     </section>
