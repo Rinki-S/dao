@@ -1,3 +1,5 @@
+import { FolderOpen } from '@nine-thirty-five/material-symbols-react/rounded';
+
 export const projectsExtension = {
   id: 'projects',
   name: 'Projects',
@@ -15,10 +17,7 @@ export const projectsExtension = {
         id: 'projects',
         label: 'Projects',
         href: '#projects',
-        icon: {
-          type: 'material-symbol',
-          name: 'folder_open',
-        },
+        icon: FolderOpen,
         order: 30,
       },
     ],

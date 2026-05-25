@@ -1,3 +1,5 @@
+import { TaskAlt } from '@nine-thirty-five/material-symbols-react/rounded';
+
 export const tasksExtension = {
   id: 'tasks',
   name: 'Tasks',
@@ -15,10 +17,7 @@ export const tasksExtension = {
         id: 'tasks',
         label: 'Tasks',
         href: '#tasks',
-        icon: {
-          type: 'material-symbol',
-          name: 'task_alt',
-        },
+        icon: TaskAlt,
         order: 40,
       },
     ],

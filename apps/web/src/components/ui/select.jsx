@@ -1,7 +1,11 @@
 import { Select as SelectPrimitive } from 'radix-ui';
+import {
+  Check,
+  KeyboardArrowDown,
+  KeyboardArrowUp,
+} from '@nine-thirty-five/material-symbols-react/rounded';
 
 import { cn } from '@/lib/utils';
-import { MaterialSymbol } from '@/components/ui/material-symbol.jsx';
 
 function Select({ ...props }) {
   return <SelectPrimitive.Root data-slot="select" {...props} />;
@@ -34,10 +38,7 @@ function SelectTrigger({ className, size = 'default', children, ...props }) {
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <MaterialSymbol
-          name="keyboard_arrow_down"
-          className="pointer-events-none text-muted-foreground"
-        />
+        <KeyboardArrowDown className="pointer-events-none size-[18px] shrink-0 translate-y-px text-muted-foreground" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
@@ -103,7 +104,7 @@ function SelectItem({ className, children, ...props }) {
     >
       <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
         <SelectPrimitive.ItemIndicator>
-          <MaterialSymbol name="check" className="pointer-events-none" />
+          <Check className="pointer-events-none size-[18px] shrink-0 translate-y-px" />
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
@@ -131,7 +132,7 @@ function SelectScrollUpButton({ className, ...props }) {
       )}
       {...props}
     >
-      <MaterialSymbol name="keyboard_arrow_up" />
+      <KeyboardArrowUp className="size-[18px] shrink-0 translate-y-px" />
     </SelectPrimitive.ScrollUpButton>
   );
 }
@@ -146,7 +147,7 @@ function SelectScrollDownButton({ className, ...props }) {
       )}
       {...props}
     >
-      <MaterialSymbol name="keyboard_arrow_down" />
+      <KeyboardArrowDown className="size-[18px] shrink-0 translate-y-px" />
     </SelectPrimitive.ScrollDownButton>
   );
 }

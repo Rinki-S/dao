@@ -1,3 +1,4 @@
+import { Extension } from '@nine-thirty-five/material-symbols-react/rounded';
 import {
   Sidebar,
   SidebarContent,
@@ -10,7 +11,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { resolveSidebarIcon } from '@/extensions/sidebar-icons.js';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx';
 
 export function AppSidebar({
@@ -124,7 +124,7 @@ export function AppSidebar({
             <SidebarMenu>
               {sidebarItems.map((item) => {
                 const surfaceId = item.href.replace(/^#/, '');
-                const Icon = resolveSidebarIcon(item.icon);
+                const Icon = item.icon ?? Extension;
 
                 return (
                   <SidebarMenuItem key={item.id}>
@@ -141,7 +141,7 @@ export function AppSidebar({
                           onSelectSurface(surfaceId);
                         }}
                       >
-                        <Icon aria-hidden="true" />
+                        <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
                         <span>{item.label}</span>
                       </a>
                     </SidebarMenuButton>
@@ -158,7 +158,7 @@ export function AppSidebar({
           <SidebarMenu>
             {footerSidebarItems.map((item) => {
               const surfaceId = item.href.replace(/^#/, '');
-              const Icon = resolveSidebarIcon(item.icon);
+              const Icon = item.icon ?? Extension;
 
               return (
                 <SidebarMenuItem key={item.id}>
@@ -177,7 +177,7 @@ export function AppSidebar({
                         onSelectSurface(surfaceId);
                       }}
                     >
-                      <Icon aria-hidden="true" />
+                      <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
                       <span className="sr-only">{item.label}</span>
                     </a>
                   </SidebarMenuButton>

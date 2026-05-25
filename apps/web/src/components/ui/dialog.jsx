@@ -1,10 +1,10 @@
 'use client';
 
 import { Dialog as DialogPrimitive } from 'radix-ui';
+import { Close } from '@nine-thirty-five/material-symbols-react/rounded';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { MaterialSymbol } from '@/components/ui/material-symbol.jsx';
 
 function Dialog({ ...props }) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -51,7 +51,7 @@ function DialogContent({ className, children, showCloseButton = true, ...props }
         {showCloseButton && (
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <Button variant="ghost" className="absolute top-2 right-2" size="icon-sm">
-              <MaterialSymbol name="close" />
+              <Close className="size-[18px] shrink-0 translate-y-px" />
               <span className="sr-only">Close</span>
             </Button>
           </DialogPrimitive.Close>

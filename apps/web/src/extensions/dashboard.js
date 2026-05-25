@@ -1,3 +1,5 @@
+import { Dashboard } from '@nine-thirty-five/material-symbols-react/rounded';
+
 export const dashboardExtension = {
   id: 'dashboard',
   name: 'Dashboard',
@@ -15,10 +17,7 @@ export const dashboardExtension = {
         id: 'dashboard',
         label: 'Dashboard',
         href: '#dashboard',
-        icon: {
-          type: 'material-symbol',
-          name: 'dashboard',
-        },
+        icon: Dashboard,
         order: 10,
       },
     ],

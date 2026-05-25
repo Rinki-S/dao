@@ -29,6 +29,9 @@ importers:
       '@fontsource-variable/outfit':
         specifier: ^5.2.8
         version: 5.2.8
+      '@nine-thirty-five/material-symbols-react':
+        specifier: ^1.28.2
+        version: 1.28.2(react@19.2.6)
       '@tailwindcss/vite':
         specifier: ^4.3.0
         version: 4.3.0(vite@8.0.13(@types/node@24.12.4)(jiti@2.7.0))
@@ -41,9 +44,6 @@ importers:
       cmdk:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      material-symbols:
-        specifier: ^0.44.9
-        version: 0.44.9
       radix-ui:
         specifier: ^1.4.3
         version: 1.4.3(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -526,6 +526,11 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
+
+  '@nine-thirty-five/material-symbols-react@1.28.2':
+    resolution: {integrity: sha512-t9RnMMlJpp1bct0lTasBg0WRKDx4Xzj6QeEzjJ3DIJoycZLan7xN5axVCnIfykjOQa59LMY8QzY5h+BAZFnkgQ==}
+    peerDependencies:
+      react: '>=18.2.0'
 
   '@noble/ciphers@1.3.0':
     resolution: {integrity: sha512-2I0gnIVPtfnMw9ee9h1dJG7tp81+8Ob3OJb3Mv37rx5L40/b0i7djjCVvGOVqc9AEIQyvyu1i6ypKdFw8R8gQw==}
@@ -2646,9 +2651,6 @@ packages:
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
-  material-symbols@0.44.9:
-    resolution: {integrity: sha512-2niXijHb2Cucb0K98n6a65TG/DJaxFlg06R93T5AU21HQGGUuWr9YQxK9/pnKNaAP8Dwi1YHqMnNoGTgA8C7iQ==}
-
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
@@ -4018,6 +4020,10 @@ snapshots:
       '@emnapi/runtime': 1.10.0
       '@tybys/wasm-util': 0.10.2
     optional: true
+
+  '@nine-thirty-five/material-symbols-react@1.28.2(react@19.2.6)':
+    dependencies:
+      react: 19.2.6
 
   '@noble/ciphers@1.3.0': {}
 
@@ -6072,8 +6078,6 @@ snapshots:
   magic-string@0.30.21:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
-
-  material-symbols@0.44.9: {}
 
   math-intrinsics@1.1.0: {}
 

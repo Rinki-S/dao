@@ -1,8 +1,8 @@
 import { Dialog as SheetPrimitive } from 'radix-ui';
+import { Close } from '@nine-thirty-five/material-symbols-react/rounded';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { MaterialSymbol } from '@/components/ui/material-symbol.jsx';
 
 function Sheet({ ...props }) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -50,7 +50,7 @@ function SheetContent({ className, children, side = 'right', showCloseButton = t
         {showCloseButton && (
           <SheetPrimitive.Close data-slot="sheet-close" asChild>
             <Button variant="ghost" className="absolute top-3 right-3" size="icon-sm">
-              <MaterialSymbol name="close" />
+              <Close className="size-[18px] shrink-0 translate-y-px" />
               <span className="sr-only">Close</span>
             </Button>
           </SheetPrimitive.Close>

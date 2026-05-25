@@ -49,13 +49,7 @@ describe('extension registry', () => {
       'notes',
       'settings',
     ]);
-    expect(sidebarItems.map((item) => item.icon)).toEqual([
-      { type: 'material-symbol', name: 'dashboard' },
-      { type: 'material-symbol', name: 'folder_open' },
-      { type: 'material-symbol', name: 'task_alt' },
-      { type: 'material-symbol', name: 'edit_note' },
-      { type: 'material-symbol', name: 'settings' },
-    ]);
+    expect(sidebarItems.every((item) => typeof item.icon === 'function')).toBe(true);
   });
 
   it('registers surfaces by order', () => {

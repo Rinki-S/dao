@@ -1,3 +1,5 @@
+import { Settings } from '@nine-thirty-five/material-symbols-react/rounded';
+
 export const settingsExtension = {
   id: 'settings',
   name: 'Settings',
@@ -15,10 +17,7 @@ export const settingsExtension = {
         id: 'settings',
         label: 'Settings',
         href: '#settings',
-        icon: {
-          type: 'material-symbol',
-          name: 'settings',
-        },
+        icon: Settings,
         order: 90,
       },
     ],

@@ -1,6 +1,7 @@
 'use client';
 
 import { Command as CommandPrimitive } from 'cmdk';
+import { Check, Search } from '@nine-thirty-five/material-symbols-react/rounded';
 
 import { cn } from '@/lib/utils';
 import {
@@ -11,7 +12,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { InputGroup, InputGroupAddon } from '@/components/ui/input-group';
-import { MaterialSymbol } from '@/components/ui/material-symbol.jsx';
 
 function Command({ className, ...props }) {
   return (
@@ -63,7 +63,7 @@ function CommandInput({ className, ...props }) {
           {...props}
         />
         <InputGroupAddon>
-          <MaterialSymbol name="search" className="opacity-50" />
+          <Search className="size-[18px] shrink-0 translate-y-px opacity-50" />
         </InputGroupAddon>
       </InputGroup>
     </div>
@@ -127,10 +127,7 @@ function CommandItem({ className, children, ...props }) {
       {...props}
     >
       {children}
-      <MaterialSymbol
-        name="check"
-        className="ml-auto opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100"
-      />
+      <Check className="ml-auto size-[18px] shrink-0 translate-y-px opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
     </CommandPrimitive.Item>
   );
 }

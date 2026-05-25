@@ -1,7 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
-@import 'material-symbols/rounded.css';
 @import '@fontsource-variable/funnel-sans';
 @import '@fontsource-variable/outfit';
 
@@ -97,16 +96,6 @@ body {
 .app-sidebar-resizing [data-slot='sidebar-gap'],
 .app-sidebar-resizing [data-slot='sidebar-container'] {
   transition: none !important;
-}
-
-.material-symbols-rounded {
-  font-size: 16px;
-  font-variation-settings:
-    'FILL' var(--symbol-fill, 0),
-    'wght' var(--symbol-weight, 400),
-    'GRAD' var(--symbol-grade, 0),
-    'opsz' var(--symbol-optical-size, 20);
-  line-height: 1;
 }
 
 @theme inline {

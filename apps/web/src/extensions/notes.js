@@ -1,3 +1,5 @@
+import { EditNote } from '@nine-thirty-five/material-symbols-react/rounded';
+
 export const notesExtension = {
   id: 'notes',
   name: 'Notes',
@@ -15,10 +17,7 @@ export const notesExtension = {
         id: 'notes',
         label: 'Notes',
         href: '#notes',
-        icon: {
-          type: 'material-symbol',
-          name: 'edit_note',
-        },
+        icon: EditNote,
         order: 50,
       },
     ],
