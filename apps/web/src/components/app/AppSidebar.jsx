@@ -20,11 +20,13 @@ export function AppSidebar({
   footerSidebarItems,
   workspaces,
   currentWorkspace,
+  selectedProjectId,
   isWorkspaceLoading,
   workspaceError,
   workspaceMenuOpen,
   createWorkspaceDialogOpen,
   onSelectSurface,
+  onSelectProject,
   onSelectWorkspace,
   onWorkspaceMenuOpenChange,
   onCreateWorkspaceDialogOpenChange,
@@ -153,7 +155,11 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <ProjectTree currentWorkspace={currentWorkspace} />
+        <ProjectTree
+          currentWorkspace={currentWorkspace}
+          selectedProjectId={selectedProjectId}
+          onSelectProject={onSelectProject}
+        />
       </SidebarContent>
 
       {footerSidebarItems.length > 0 && (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AppSidebar } from '@/components/app/AppSidebar.jsx';
 import { AppTitleBar } from '@/components/app/AppTitleBar.jsx';
+import { ProjectContentsPanel } from '@/components/app/ProjectContentsPanel.jsx';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { getSurfaceComponent } from './app-surfaces.jsx';
 import { CommandPalette } from './features/command-palette/components/CommandPalette.jsx';
@@ -37,8 +38,9 @@ function App() {
   const [workspaceError, setWorkspaceError] = useState('');
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const [isCreateWorkspaceDialogOpen, setIsCreateWorkspaceDialogOpen] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
   const activeSurface = useMemo(
-    () => surfaces.find((surface) => surface.id === activeSurfaceId) ?? surfaces[0],
+    () => surfaces.find((surface) => surface.id === activeSurfaceId) ?? null,
     [activeSurfaceId, surfaces],
   );
   const currentWorkspace = useMemo(() => {
@@ -100,8 +102,15 @@ function App() {
       return;
     }
 
+    setSelectedProjectId('');
     setActiveSurfaceId(surfaceId);
     window.history.replaceState(null, '', `#${surfaceId}`);
+  }
+
+  function handleSelectProject(projectId) {
+    setSelectedProjectId(projectId);
+    setActiveSurfaceId('project-contents');
+    window.history.replaceState(null, '', '#project-contents');
   }
 
   function handleSidebarOpenChange(nextIsSidebarOpen) {
@@ -175,11 +184,13 @@ function App() {
             footerSidebarItems={footerSidebarItems}
             workspaces={workspaces}
             currentWorkspace={currentWorkspace}
+            selectedProjectId={selectedProjectId}
             isWorkspaceLoading={workspaceStatus === 'loading'}
             workspaceError={workspaceError}
             workspaceMenuOpen={isWorkspaceMenuOpen}
             createWorkspaceDialogOpen={isCreateWorkspaceDialogOpen}
             onSelectSurface={handleSelectSurface}
+            onSelectProject={handleSelectProject}
             onSelectWorkspace={setCurrentWorkspaceId}
             onWorkspaceMenuOpenChange={setIsWorkspaceMenuOpen}
             onCreateWorkspaceDialogOpenChange={setIsCreateWorkspaceDialogOpen}
@@ -194,13 +205,22 @@ function App() {
             <header className="flex h-14 shrink-0 items-center border-b border-border px-6">
               <div className="min-w-0">
                 <h1 className="truncate text-lg font-heading font-semibold tracking-normal text-foreground">
-                  {activeSurface?.label ?? 'Dao'}
+                  {activeSurfaceId === 'project-contents'
+                    ? 'Project'
+                    : (activeSurface?.label ?? 'Dao')}
                 </h1>
               </div>
             </header>
 
             <section className="flex-1 px-8 py-7">
-              {activeSurface ? getSurfaceComponent(activeSurface.id, { currentWorkspace }) : null}
+              {activeSurfaceId === 'project-contents' ? (
+                <ProjectContentsPanel
+                  currentWorkspace={currentWorkspace}
+                  selectedProjectId={selectedProjectId}
+                />
+              ) : activeSurface ? (
+                getSurfaceComponent(activeSurface.id, { currentWorkspace })
+              ) : null}
             </section>
           </SidebarInset>
         </div>
