@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,22 +11,24 @@ export function AppSearchBar() {
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
-  const isPanelVisible = status !== 'idle' || query.trim() !== '';
+  const trimmedQuery = query.trim();
+  const isPanelVisible = trimmedQuery !== '';
+  const displayStatus = isPanelVisible && status === 'idle' ? 'pending' : status;
 
   const panelContent = useMemo(() => {
-    if (status === 'loading') {
+    if (displayStatus === 'loading' || displayStatus === 'pending') {
       return <p className="px-3 py-2 text-sm text-muted-foreground">Searching...</p>;
     }
 
-    if (status === 'error') {
+    if (displayStatus === 'error') {
       return <p className="px-3 py-2 text-sm text-destructive">{error}</p>;
     }
 
-    if (status === 'ready' && results.length === 0) {
+    if (displayStatus === 'ready' && results.length === 0) {
       return <p className="px-3 py-2 text-sm text-muted-foreground">No results found.</p>;
     }
 
-    if (status === 'ready') {
+    if (displayStatus === 'ready') {
       return (
         <ul className="flex max-h-80 flex-col overflow-y-auto p-1">
           {results.map((result) => (
@@ -52,31 +54,43 @@ export function AppSearchBar() {
     }
 
     return null;
-  }, [error, results, status]);
+  }, [displayStatus, error, results]);
 
-  async function handleSearch(event) {
-    event.preventDefault();
-
-    const nextQuery = query.trim();
-    if (nextQuery === '') {
-      setResults([]);
-      setError('');
-      setStatus('idle');
+  useEffect(() => {
+    if (trimmedQuery === '') {
       return;
     }
 
-    try {
-      setStatus('loading');
-      setError('');
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        setStatus('loading');
+        setError('');
 
-      const nextResults = await searchAll({ query: nextQuery });
+        const nextResults = await searchAll({ query: trimmedQuery });
 
-      setResults(nextResults);
-      setStatus('ready');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to search');
-      setStatus('error');
-    }
+        if (cancelled) {
+          return;
+        }
+
+        setResults(nextResults);
+        setStatus('ready');
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to search');
+          setStatus('error');
+        }
+      }
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [trimmedQuery]);
+
+  function handleSearch(event) {
+    event.preventDefault();
   }
 
   function handleQueryChange(event) {
@@ -127,7 +141,7 @@ export function AppSearchBar() {
       </form>
 
       {isPanelVisible && (
-        <div className="absolute top-10 left-0 z-50 w-full rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10">
+        <div className="absolute top-10 left-0 z-[100] w-full rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10">
           {panelContent}
         </div>
       )}

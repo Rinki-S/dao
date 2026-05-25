@@ -165,6 +165,7 @@ export function AppSidebar({
                   <SidebarMenuButton
                     asChild
                     isActive={surfaceId === activeSurfaceId}
+                    className="w-8 justify-center"
                     tooltip={item.label}
                   >
                     <a

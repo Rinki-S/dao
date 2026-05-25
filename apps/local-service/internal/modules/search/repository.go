@@ -101,7 +101,7 @@ func buildMatchQuery(query string) string {
 			continue
 		}
 
-		quotedTokens = append(quotedTokens, `"`+strings.ReplaceAll(token, `"`, `""`)+`"`)
+		quotedTokens = append(quotedTokens, `"`+strings.ReplaceAll(token, `"`, `""`)+`"*`)
 	}
 
 	return strings.Join(quotedTokens, " ")

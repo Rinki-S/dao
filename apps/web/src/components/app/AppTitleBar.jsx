@@ -3,7 +3,7 @@ import { AppSearchBar } from './AppSearchBar.jsx';
 
 export function AppTitleBar() {
   return (
-    <header className="app-drag-region relative z-30 flex h-12 shrink-0 items-center border-b border-border bg-background">
+    <header className="app-drag-region relative z-[100] flex h-12 shrink-0 items-center border-b border-border bg-background">
       <div className="flex w-20 shrink-0" aria-hidden="true" />
       <div className="flex min-w-0 flex-1 items-center gap-2 px-2">
         <SidebarTrigger className="app-no-drag" />
