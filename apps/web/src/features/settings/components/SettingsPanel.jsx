@@ -1,31 +1,6 @@
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { WorkingDirectoryOnboarding } from '@/components/app/WorkingDirectoryOnboarding.jsx';
 
-export function SettingsPanel({
-  currentWorkingDirectory,
-  hasWorkspace,
-  onReplayOnboardingComplete,
-}) {
-  const [isReplayingOnboarding, setIsReplayingOnboarding] = useState(false);
-
-  if (isReplayingOnboarding) {
-    return (
-      <section id="settings">
-        <WorkingDirectoryOnboarding
-          hasWorkspace={hasWorkspace}
-          initialPath={currentWorkingDirectory?.path ?? ''}
-          mode="replay"
-          onCancel={() => setIsReplayingOnboarding(false)}
-          onComplete={async (input) => {
-            await onReplayOnboardingComplete(input);
-            setIsReplayingOnboarding(false);
-          }}
-        />
-      </section>
-    );
-  }
-
+export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
   return (
     <section id="settings" className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -48,7 +23,7 @@ export function SettingsPanel({
         </div>
 
         <div>
-          <Button type="button" variant="outline" onClick={() => setIsReplayingOnboarding(true)}>
+          <Button type="button" variant="outline" onClick={onReplayOnboarding}>
             Replay onboarding
           </Button>
         </div>

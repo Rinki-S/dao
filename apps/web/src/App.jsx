@@ -44,6 +44,7 @@ function App() {
   const [workingDirectoryStatus, setWorkingDirectoryStatus] = useState('loading');
   const [workingDirectoryError, setWorkingDirectoryError] = useState('');
   const [workingDirectory, setWorkingDirectory] = useState(null);
+  const [isReplayingOnboarding, setIsReplayingOnboarding] = useState(false);
   const activeSurface = useMemo(
     () => surfaces.find((surface) => surface.id === activeSurfaceId) ?? null,
     [activeSurfaceId, surfaces],
@@ -239,6 +240,21 @@ function App() {
     return <WorkingDirectoryOnboarding onComplete={handleWorkingDirectoryComplete} />;
   }
 
+  if (isReplayingOnboarding) {
+    return (
+      <WorkingDirectoryOnboarding
+        hasWorkspace={workspaces.length > 0}
+        initialPath={workingDirectory?.path ?? ''}
+        mode="replay"
+        onCancel={() => setIsReplayingOnboarding(false)}
+        onComplete={async (input) => {
+          await handleWorkingDirectoryComplete(input);
+          setIsReplayingOnboarding(false);
+        }}
+      />
+    );
+  }
+
   return (
     <SidebarProvider
       className="min-h-0 flex-1"
@@ -296,8 +312,7 @@ function App() {
                 getSurfaceComponent(activeSurface.id, {
                   currentWorkspace,
                   currentWorkingDirectory: workingDirectory,
-                  hasWorkspace: workspaces.length > 0,
-                  onReplayOnboardingComplete: handleWorkingDirectoryComplete,
+                  onReplayOnboarding: () => setIsReplayingOnboarding(true),
                 })
               ) : null}
             </section>

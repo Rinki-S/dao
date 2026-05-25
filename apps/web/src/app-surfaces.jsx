@@ -6,7 +6,7 @@ import { TaskPanel } from './features/tasks/components/TaskPanel.jsx';
 
 export function getSurfaceComponent(
   surfaceId,
-  { currentWorkspace, currentWorkingDirectory, hasWorkspace, onReplayOnboardingComplete },
+  { currentWorkspace, currentWorkingDirectory, onReplayOnboarding },
 ) {
   const surfaceComponents = {
     dashboard: (
@@ -20,8 +20,7 @@ export function getSurfaceComponent(
     settings: (
       <SettingsPanel
         currentWorkingDirectory={currentWorkingDirectory}
-        hasWorkspace={hasWorkspace}
-        onReplayOnboardingComplete={onReplayOnboardingComplete}
+        onReplayOnboarding={onReplayOnboarding}
       />
     ),
   };
