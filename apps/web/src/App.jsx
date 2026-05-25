@@ -125,17 +125,30 @@ function App() {
 
   async function handleWorkingDirectoryComplete({ path, workspace }) {
     const nextWorkingDirectory = await updateWorkingDirectory({ path });
-    const createdWorkspace = await createWorkspace(workspace);
+    const createdWorkspace = workspace ? await createWorkspace(workspace) : null;
     const nextWorkspaces = await listWorkspaces();
 
     setWorkingDirectory(nextWorkingDirectory);
     setWorkingDirectoryStatus('ready');
     setWorkingDirectoryError('');
     setWorkspaces(nextWorkspaces);
-    setCurrentWorkspaceId(createdWorkspace.id);
+    setCurrentWorkspaceId((currentId) => {
+      if (createdWorkspace) {
+        return createdWorkspace.id;
+      }
+
+      if (nextWorkspaces.some((nextWorkspace) => nextWorkspace.id === currentId)) {
+        return currentId;
+      }
+
+      return nextWorkspaces[0]?.id ?? '';
+    });
     setWorkspaceStatus('ready');
     setWorkspaceError('');
-    notifyActivityChanged();
+
+    if (createdWorkspace) {
+      notifyActivityChanged();
+    }
   }
 
   function handleSelectSurface(surfaceId) {
@@ -280,7 +293,12 @@ function App() {
                   selectedProjectId={selectedProjectId}
                 />
               ) : activeSurface ? (
-                getSurfaceComponent(activeSurface.id, { currentWorkspace })
+                getSurfaceComponent(activeSurface.id, {
+                  currentWorkspace,
+                  currentWorkingDirectory: workingDirectory,
+                  hasWorkspace: workspaces.length > 0,
+                  onReplayOnboardingComplete: handleWorkingDirectoryComplete,
+                })
               ) : null}
             </section>
           </SidebarInset>

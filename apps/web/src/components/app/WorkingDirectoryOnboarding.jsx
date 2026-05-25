@@ -5,11 +5,18 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input';
 import { DirectoryPickerResultSchema } from '@/features/settings/schemas.js';
 
-export function WorkingDirectoryOnboarding({ onComplete }) {
+export function WorkingDirectoryOnboarding({
+  hasWorkspace = false,
+  initialPath = '',
+  mode = 'initial',
+  onCancel,
+  onComplete,
+}) {
   const [step, setStep] = useState('directory');
-  const [selectedPath, setSelectedPath] = useState('');
+  const [selectedPath, setSelectedPath] = useState(initialPath);
   const [workspaceName, setWorkspaceName] = useState('');
   const [workspaceDescription, setWorkspaceDescription] = useState('');
+  const [directoryStrategy, setDirectoryStrategy] = useState('start-fresh');
   const [error, setError] = useState('');
   const [isChoosing, setIsChoosing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -28,7 +35,11 @@ export function WorkingDirectoryOnboarding({ onComplete }) {
 
       if (!result.canceled) {
         setSelectedPath(result.path);
-        setStep('workspace');
+        setStep(
+          mode === 'replay' && initialPath && result.path !== initialPath
+            ? 'strategy'
+            : 'workspace',
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to choose directory');
@@ -40,6 +51,18 @@ export function WorkingDirectoryOnboarding({ onComplete }) {
   function handleContinueToWorkspace() {
     if (!selectedPath) {
       setError('Choose a working directory before continuing.');
+      return;
+    }
+
+    setError('');
+    setStep(
+      mode === 'replay' && initialPath && selectedPath !== initialPath ? 'strategy' : 'workspace',
+    );
+  }
+
+  function handleContinueFromStrategy() {
+    if (directoryStrategy === 'migrate') {
+      setError('File migration will be handled by a dedicated migration flow.');
       return;
     }
 
@@ -56,7 +79,7 @@ export function WorkingDirectoryOnboarding({ onComplete }) {
       return;
     }
 
-    if (workspaceName.trim() === '') {
+    if (!hasWorkspace && workspaceName.trim() === '') {
       setError('Workspace name is required.');
       return;
     }
@@ -66,10 +89,13 @@ export function WorkingDirectoryOnboarding({ onComplete }) {
       setError('');
       await onComplete({
         path: selectedPath,
-        workspace: {
-          name: workspaceName,
-          description: workspaceDescription,
-        },
+        strategy: directoryStrategy,
+        workspace: workspaceName.trim()
+          ? {
+              name: workspaceName,
+              description: workspaceDescription,
+            }
+          : null,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create workspace');
@@ -83,15 +109,27 @@ export function WorkingDirectoryOnboarding({ onComplete }) {
       <div className="flex w-full max-w-xl flex-col gap-6">
         <div className="flex flex-col gap-2">
           <p className="text-sm text-muted-foreground">
-            Step {step === 'directory' ? '1' : '2'} of 2
+            {mode === 'replay'
+              ? 'Working directory setup'
+              : `Step ${step === 'directory' ? '1' : '2'} of 2`}
           </p>
           <h1 className="font-heading text-2xl font-semibold text-foreground">
-            {step === 'directory' ? 'Choose a working directory' : 'Create your first workspace'}
+            {step === 'directory'
+              ? 'Choose a working directory'
+              : step === 'strategy'
+                ? 'Choose how to use this directory'
+                : hasWorkspace
+                  ? 'Workspace setup'
+                  : 'Create your first workspace'}
           </h1>
           <p className="text-sm text-muted-foreground text-pretty">
             {step === 'directory'
               ? 'Dao stores workspace folders, project folders, notes, and future imported files in a directory you control.'
-              : 'A workspace is the top-level place for your projects, tasks, notes, and future local files.'}
+              : step === 'strategy'
+                ? 'Changing the working directory can either start fresh or migrate existing files later.'
+                : hasWorkspace
+                  ? 'You already have a workspace. You can continue without creating another one.'
+                  : 'A workspace is the top-level place for your projects, tasks, notes, and future local files.'}
           </p>
         </div>
 
@@ -120,6 +158,62 @@ export function WorkingDirectoryOnboarding({ onComplete }) {
               >
                 Continue
               </Button>
+              {onCancel && (
+                <Button disabled={isSaving} type="button" variant="ghost" onClick={onCancel}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : step === 'strategy' ? (
+          <div className="flex flex-col gap-4">
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              {selectedPath}
+            </div>
+
+            <div className="grid gap-2">
+              <button
+                className="rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-muted/50"
+                type="button"
+                onClick={() => setDirectoryStrategy('start-fresh')}
+              >
+                <span className="font-medium text-foreground">Start fresh</span>
+                <span className="mt-1 block text-muted-foreground">
+                  Use this directory for new workspace and project folders from now on.
+                </span>
+              </button>
+              <button
+                className="rounded-lg border border-border px-3 py-2 text-left text-sm opacity-60"
+                disabled
+                type="button"
+                onClick={() => setDirectoryStrategy('migrate')}
+              >
+                <span className="font-medium text-foreground">Migrate files</span>
+                <span className="mt-1 block text-muted-foreground">
+                  Move existing workspace and project folders to the new directory. Coming soon.
+                </span>
+              </button>
+            </div>
+
+            {error && <FieldError>{error}</FieldError>}
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button disabled={isSaving} type="button" onClick={handleContinueFromStrategy}>
+                Continue
+              </Button>
+              <Button
+                disabled={isSaving}
+                type="button"
+                variant="ghost"
+                onClick={() => setStep('directory')}
+              >
+                Back
+              </Button>
+              {onCancel && (
+                <Button disabled={isSaving} type="button" variant="ghost" onClick={onCancel}>
+                  Cancel
+                </Button>
+              )}
             </div>
           </div>
         ) : (
@@ -128,29 +222,31 @@ export function WorkingDirectoryOnboarding({ onComplete }) {
               {selectedPath}
             </div>
 
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="onboarding-workspace-name">Workspace name</FieldLabel>
-                <Input
-                  id="onboarding-workspace-name"
-                  value={workspaceName}
-                  onChange={(event) => setWorkspaceName(event.target.value)}
-                  placeholder="Personal"
-                  disabled={isSaving}
-                  autoFocus
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="onboarding-workspace-description">Description</FieldLabel>
-                <Input
-                  id="onboarding-workspace-description"
-                  value={workspaceDescription}
-                  onChange={(event) => setWorkspaceDescription(event.target.value)}
-                  placeholder="Optional"
-                  disabled={isSaving}
-                />
-              </Field>
-            </FieldGroup>
+            {!hasWorkspace && (
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="onboarding-workspace-name">Workspace name</FieldLabel>
+                  <Input
+                    id="onboarding-workspace-name"
+                    value={workspaceName}
+                    onChange={(event) => setWorkspaceName(event.target.value)}
+                    placeholder="Personal"
+                    disabled={isSaving}
+                    autoFocus
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="onboarding-workspace-description">Description</FieldLabel>
+                  <Input
+                    id="onboarding-workspace-description"
+                    value={workspaceDescription}
+                    onChange={(event) => setWorkspaceDescription(event.target.value)}
+                    placeholder="Optional"
+                    disabled={isSaving}
+                  />
+                </Field>
+              </FieldGroup>
+            )}
 
             {error && <FieldError>{error}</FieldError>}
 
@@ -167,8 +263,19 @@ export function WorkingDirectoryOnboarding({ onComplete }) {
                 Back
               </Button>
               <Button disabled={isSaving} type="submit">
-                {isSaving ? 'Creating...' : 'Create workspace'}
+                {isSaving
+                  ? hasWorkspace
+                    ? 'Saving...'
+                    : 'Creating...'
+                  : hasWorkspace
+                    ? 'Continue'
+                    : 'Create workspace'}
               </Button>
+              {onCancel && (
+                <Button disabled={isSaving} type="button" variant="ghost" onClick={onCancel}>
+                  Cancel
+                </Button>
+              )}
             </div>
           </form>
         )}
