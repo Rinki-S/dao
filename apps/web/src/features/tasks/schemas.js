@@ -19,9 +19,9 @@ export const TaskSchema = z.object({
 export const TaskListSchema = z.array(TaskSchema);
 
 export const CreateTaskInputSchema = z.object({
-  workspaceId: z.string().trim().min(1, 'Workspace is required'),
+  workspaceId: z.string().trim().min(1, { error: 'Workspace is required' }),
   projectId: z.string().trim().nullable(),
-  title: z.string().trim().min(1, 'Task title is required'),
+  title: z.string().trim().min(1, { error: 'Task title is required' }),
   description: z.string().trim(),
   priority: z.enum(['low', 'medium', 'high']).default('medium'),
   dueDate: z.string().trim().nullable(),

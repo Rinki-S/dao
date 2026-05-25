@@ -18,9 +18,9 @@ export const NoteSchema = z.object({
 export const NoteListSchema = z.array(NoteSchema);
 
 export const CreateNoteInputSchema = z.object({
-  workspaceId: z.string().trim().min(1, 'Workspace is required'),
+  workspaceId: z.string().trim().min(1, { error: 'Workspace is required' }),
   projectId: z.string().trim().nullable(),
-  title: z.string().trim().min(1, 'Note title is required'),
+  title: z.string().trim().min(1, { error: 'Note title is required' }),
   content: z.string(),
   contentType: z.enum(['markdown']).default('markdown'),
   noteType: z.enum(['general', 'project', 'learning', 'daily', 'interview']).default('general'),

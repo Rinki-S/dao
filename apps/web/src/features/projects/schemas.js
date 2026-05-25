@@ -18,7 +18,7 @@ export const ProjectSchema = z.object({
 export const ProjectListSchema = z.array(ProjectSchema);
 
 export const CreateProjectInputSchema = z.object({
-  workspaceId: z.string().trim().min(1, 'Workspace is required'),
-  name: z.string().trim().min(1, 'Project name is required'),
+  workspaceId: z.string().trim().min(1, { error: 'Workspace is required' }),
+  name: z.string().trim().min(1, { error: 'Project name is required' }),
   description: z.string().trim(),
 });
