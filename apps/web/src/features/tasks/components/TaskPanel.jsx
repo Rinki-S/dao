@@ -3,6 +3,7 @@ import {
   Add,
   CalendarToday,
   KeyboardArrowRight,
+  MoreHoriz,
   TaskAlt,
 } from '@nine-thirty-five/material-symbols-react/rounded';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +25,9 @@ import {
   InputGroupInput,
 } from '@/components/ui/input-group';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { notifyActivityChanged } from '../../activities/events.js';
 import { listProjects } from '../../projects/api.js';
@@ -99,12 +102,13 @@ export function TaskPanel({ currentWorkspace }) {
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
+  const [isDescriptionPopoverOpen, setIsDescriptionPopoverOpen] = useState(false);
   const [updatingTaskIds, setUpdatingTaskIds] = useState(() => new Set());
   const [childTaskParentId, setChildTaskParentId] = useState('');
   const [childTaskTitle, setChildTaskTitle] = useState('');
   const [isCreatingChild, setIsCreatingChild] = useState(false);
   const [collapsedTaskIds, setCollapsedTaskIds] = useState(() => new Set());
+  const [expandedDescriptionTaskIds, setExpandedDescriptionTaskIds] = useState(() => new Set());
   const taskTitleInputRef = useRef(null);
 
   const workspaceProjects = useMemo(() => {
@@ -235,7 +239,7 @@ export function TaskPanel({ currentWorkspace }) {
       setTaskTitle('');
       setTaskDescription('');
       setTaskPriority('medium');
-      setIsDescriptionOpen(false);
+      setIsDescriptionPopoverOpen(false);
       await loadTaskData();
       notifyActivityChanged();
       window.requestAnimationFrame(() => {
@@ -258,7 +262,7 @@ export function TaskPanel({ currentWorkspace }) {
     setTaskTitle('');
     setTaskDescription('');
     setTaskPriority('medium');
-    setIsDescriptionOpen(false);
+    setIsDescriptionPopoverOpen(false);
     setIsQuickAddOpen(false);
     setError('');
     taskTitleInputRef.current?.blur();
@@ -358,6 +362,20 @@ export function TaskPanel({ currentWorkspace }) {
     });
   }
 
+  function toggleTaskDescription(taskId) {
+    setExpandedDescriptionTaskIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+
+      if (nextIds.has(taskId)) {
+        nextIds.delete(taskId);
+      } else {
+        nextIds.add(taskId);
+      }
+
+      return nextIds;
+    });
+  }
+
   return (
     <section id="tasks" className="flex flex-col gap-6">
       <form
@@ -437,6 +455,33 @@ export function TaskPanel({ currentWorkspace }) {
                         </DropdownMenuRadioGroup>
                       </DropdownMenuContent>
                     </DropdownMenu>
+
+                    <Popover
+                      open={isDescriptionPopoverOpen}
+                      onOpenChange={setIsDescriptionPopoverOpen}
+                    >
+                      <PopoverTrigger asChild>
+                        <InputGroupButton
+                          aria-label="Edit description"
+                          disabled={!currentWorkspace || isCreating}
+                        >
+                          {taskDescription.trim() ? 'Description' : 'No description'}
+                        </InputGroupButton>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-80">
+                        <Field>
+                          <FieldLabel htmlFor="task-description">Description</FieldLabel>
+                          <Textarea
+                            id="task-description"
+                            className="max-h-48 min-h-28 resize-none overflow-y-auto"
+                            value={taskDescription}
+                            onChange={(event) => setTaskDescription(event.target.value)}
+                            placeholder="Add details..."
+                            disabled={!currentWorkspace || isCreating}
+                          />
+                        </Field>
+                      </PopoverContent>
+                    </Popover>
                   </InputGroupAddon>
                 )}
               </InputGroup>
@@ -448,37 +493,6 @@ export function TaskPanel({ currentWorkspace }) {
               )}
             </div>
           </Field>
-
-          {isQuickAddOpen && (
-            <>
-              <div className="flex">
-                <Button
-                  className="w-fit"
-                  disabled={!currentWorkspace || isCreating}
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setIsDescriptionOpen((isOpen) => !isOpen)}
-                >
-                  {isDescriptionOpen ? 'Hide description' : 'Add description'}
-                </Button>
-              </div>
-
-              {isDescriptionOpen && (
-                <Field>
-                  <FieldLabel className="sr-only" htmlFor="task-description">
-                    Description
-                  </FieldLabel>
-                  <Input
-                    id="task-description"
-                    value={taskDescription}
-                    onChange={(event) => setTaskDescription(event.target.value)}
-                    placeholder="Description"
-                    disabled={!currentWorkspace || isCreating}
-                  />
-                </Field>
-              )}
-            </>
-          )}
 
           {error && <FieldError>{error}</FieldError>}
         </FieldGroup>
@@ -523,10 +537,15 @@ export function TaskPanel({ currentWorkspace }) {
                   const isAddingChild = childTaskParentId === task.id;
                   const hasChildren = taskChildren.length > 0;
                   const isCollapsed = collapsedTaskIds.has(task.id);
+                  const hasDescription = task.description.trim() !== '';
+                  const isDescriptionExpanded = expandedDescriptionTaskIds.has(task.id);
 
                   return (
                     <Fragment key={task.id}>
-                      <TableRow key={task.id}>
+                      <TableRow
+                        key={task.id}
+                        className={cn(hasDescription && isDescriptionExpanded && 'border-b-0')}
+                      >
                         <TableCell className="relative pl-8">
                           {hasChildren ? (
                             <Button
@@ -575,12 +594,6 @@ export function TaskPanel({ currentWorkspace }) {
                                   {priorityLabels[task.priority]}
                                 </Badge>
                               </div>
-
-                              {task.description && (
-                                <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                                  {task.description}
-                                </div>
-                              )}
                             </div>
                           </div>
                         </TableCell>
@@ -592,22 +605,49 @@ export function TaskPanel({ currentWorkspace }) {
                             </span>
                           )}
                         </TableCell>
-                        <TableCell className="w-12 pr-8 text-right">
-                          <Button
-                            aria-label={`Add child todo to ${task.title}`}
-                            disabled={isCreatingChild}
-                            size="icon-xs"
-                            type="button"
-                            variant="ghost"
-                            onClick={() => openChildTaskForm(task.id)}
-                          >
-                            <Add
-                              aria-hidden="true"
-                              className="size-[18px] shrink-0 translate-y-px"
-                            />
-                          </Button>
+                        <TableCell className="w-20 pr-8 text-right">
+                          <div className="flex justify-end gap-1">
+                            {hasDescription && (
+                              <Button
+                                aria-label={`${isDescriptionExpanded ? 'Hide' : 'Show'} notes for ${task.title}`}
+                                size="icon-xs"
+                                type="button"
+                                variant="ghost"
+                                onClick={() => toggleTaskDescription(task.id)}
+                              >
+                                <MoreHoriz
+                                  aria-hidden="true"
+                                  className="size-[18px] shrink-0 translate-y-px"
+                                />
+                              </Button>
+                            )}
+
+                            <Button
+                              aria-label={`Add child todo to ${task.title}`}
+                              disabled={isCreatingChild}
+                              size="icon-xs"
+                              type="button"
+                              variant="ghost"
+                              onClick={() => openChildTaskForm(task.id)}
+                            >
+                              <Add
+                                aria-hidden="true"
+                                className="size-[18px] shrink-0 translate-y-px"
+                              />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
+
+                      {hasDescription && isDescriptionExpanded && (
+                        <TableRow key={`${task.id}-description`}>
+                          <TableCell className="pl-15 pr-8" colSpan={3}>
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                              {task.description}
+                            </p>
+                          </TableCell>
+                        </TableRow>
+                      )}
 
                       {isAddingChild && !isCollapsed && (
                         <TableRow key={`${task.id}-child-form`}>
@@ -651,47 +691,85 @@ export function TaskPanel({ currentWorkspace }) {
                           const childDueDate = formatDate(childTask.dueDate);
                           const isChildDone = childTask.status === 'done';
                           const isChildUpdating = updatingTaskIds.has(childTask.id);
+                          const hasChildDescription = childTask.description.trim() !== '';
+                          const isChildDescriptionExpanded = expandedDescriptionTaskIds.has(
+                            childTask.id,
+                          );
 
                           return (
-                            <TableRow key={childTask.id}>
-                              <TableCell className="pl-16">
-                                <div className="flex min-w-0 items-center gap-3">
-                                  <Checkbox
-                                    aria-label={`Toggle ${childTask.title}`}
-                                    checked={getCheckboxState(childTask)}
-                                    disabled={isChildUpdating}
-                                    onCheckedChange={() => {
-                                      void handleToggleTaskDone(childTask);
-                                    }}
-                                  />
+                            <Fragment key={childTask.id}>
+                              <TableRow
+                                className={cn(
+                                  hasChildDescription && isChildDescriptionExpanded && 'border-b-0',
+                                )}
+                              >
+                                <TableCell className="pl-16">
+                                  <div className="flex min-w-0 items-center gap-3">
+                                    <Checkbox
+                                      aria-label={`Toggle ${childTask.title}`}
+                                      checked={getCheckboxState(childTask)}
+                                      disabled={isChildUpdating}
+                                      onCheckedChange={() => {
+                                        void handleToggleTaskDone(childTask);
+                                      }}
+                                    />
 
-                                  <div className="min-w-0 flex-1">
-                                    <div
-                                      className={cn(
-                                        'min-w-0 truncate text-sm font-medium text-foreground',
-                                        isChildDone && 'text-muted-foreground line-through',
-                                      )}
-                                    >
-                                      {childTask.title}
-                                      {childProjectName && (
-                                        <span className="font-normal text-muted-foreground">
-                                          /{childProjectName}
-                                        </span>
-                                      )}
+                                    <div className="min-w-0 flex-1">
+                                      <div
+                                        className={cn(
+                                          'min-w-0 truncate text-sm font-medium text-foreground',
+                                          isChildDone && 'text-muted-foreground line-through',
+                                        )}
+                                      >
+                                        {childTask.title}
+                                        {childProjectName && (
+                                          <span className="font-normal text-muted-foreground">
+                                            /{childProjectName}
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </TableCell>
-                              <TableCell className="w-28 text-muted-foreground">
-                                {childDueDate && (
-                                  <span className="flex items-center justify-end gap-1 text-xs">
-                                    <CalendarToday aria-hidden="true" className="size-3 shrink-0" />
-                                    {childDueDate}
-                                  </span>
-                                )}
-                              </TableCell>
-                              <TableCell className="w-12 pr-8" />
-                            </TableRow>
+                                </TableCell>
+                                <TableCell className="w-28 text-muted-foreground">
+                                  {childDueDate && (
+                                    <span className="flex items-center justify-end gap-1 text-xs">
+                                      <CalendarToday
+                                        aria-hidden="true"
+                                        className="size-3 shrink-0"
+                                      />
+                                      {childDueDate}
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="w-20 pr-8 text-right">
+                                  {hasChildDescription && (
+                                    <Button
+                                      aria-label={`${isChildDescriptionExpanded ? 'Hide' : 'Show'} notes for ${childTask.title}`}
+                                      size="icon-xs"
+                                      type="button"
+                                      variant="ghost"
+                                      onClick={() => toggleTaskDescription(childTask.id)}
+                                    >
+                                      <MoreHoriz
+                                        aria-hidden="true"
+                                        className="size-[18px] shrink-0 translate-y-px"
+                                      />
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+
+                              {hasChildDescription && isChildDescriptionExpanded && (
+                                <TableRow>
+                                  <TableCell className="pl-28 pr-8" colSpan={3}>
+                                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                                      {childTask.description}
+                                    </p>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </Fragment>
                           );
                         })}
                     </Fragment>
