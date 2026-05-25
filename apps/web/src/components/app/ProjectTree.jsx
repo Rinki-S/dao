@@ -98,6 +98,14 @@ export function ProjectTree({
     return nextNotesByProjectId;
   }, [currentWorkspace, notes]);
 
+  const unassignedNotes = useMemo(() => {
+    if (!currentWorkspace) {
+      return [];
+    }
+
+    return notes.filter((note) => note.workspaceId === currentWorkspace.id && !note.projectId);
+  }, [currentWorkspace, notes]);
+
   const loadTreeData = useCallback(async () => {
     if (!currentWorkspace) {
       setProjects([]);
@@ -303,7 +311,7 @@ export function ProjectTree({
             </SidebarMenuItem>
           )}
 
-          {status === 'ready' && workspaceProjects.length === 0 && (
+          {status === 'ready' && workspaceProjects.length === 0 && unassignedNotes.length === 0 && (
             <SidebarMenuItem>
               <span className="block px-2 py-1 text-xs text-muted-foreground">No projects</span>
             </SidebarMenuItem>
@@ -322,7 +330,7 @@ export function ProjectTree({
                   tooltip={project.name}
                   onClick={() => toggleProject(project.id)}
                 >
-                  <ProjectIcon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+                  <ProjectIcon aria-hidden="true" className="size-[18px] shrink-0" />
                   <span>{project.name}</span>
                 </SidebarMenuButton>
 
@@ -343,10 +351,7 @@ export function ProjectTree({
                         <SidebarMenuSubItem key={note.id}>
                           <SidebarMenuSubButton className="app-no-drag" asChild>
                             <button type="button">
-                              <ContentIcon
-                                aria-hidden="true"
-                                className="size-[18px] shrink-0 translate-y-px"
-                              />
+                              <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
                               <span>{note.title}</span>
                             </button>
                           </SidebarMenuSubButton>
@@ -358,6 +363,22 @@ export function ProjectTree({
               </SidebarMenuItem>
             );
           })}
+
+          {status === 'ready' &&
+            unassignedNotes.map((note) => {
+              const ContentIcon = getContentFormatIcon(note.contentType);
+
+              return (
+                <SidebarMenuItem key={note.id}>
+                  <SidebarMenuButton className="app-no-drag" tooltip={note.title} asChild>
+                    <button type="button">
+                      <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
+                      <span>{note.title}</span>
+                    </button>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
         </SidebarMenu>
       </SidebarGroupContent>
 
