@@ -158,6 +158,20 @@ Examples:
 - rename workspace
 - delete workspace
 
+Each workspace is backed by a real folder on disk under:
+
+```txt
+~/Documents/Dao
+```
+
+The folder name should be readable and collision-resistant:
+
+```txt
+{workspace-slug}-{workspace-id}
+```
+
+This makes future markdown notes, PDFs, imported files, and integration data easier to store, inspect, and back up.
+
 ### Future features
 
 - workspace icon
@@ -179,6 +193,14 @@ A project can contain:
 - links
 - future AI summaries
 - future GitHub repository links
+
+Each project is backed by a subfolder inside its workspace folder:
+
+```txt
+~/Documents/Dao/{workspace-slug}-{workspace-id}/{project-slug}-{project-id}
+```
+
+Dao should store the absolute folder path in project metadata, while the Go local service owns folder creation and path safety.
 
 ### MVP features
 

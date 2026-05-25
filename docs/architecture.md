@@ -308,6 +308,7 @@ Reasons:
 id
 name
 description
+root_path
 created_at
 updated_at
 deleted_at
@@ -322,6 +323,7 @@ id
 workspace_id
 name
 description
+folder_path
 status
 started_at
 ended_at
@@ -331,6 +333,67 @@ deleted_at
 version
 sync_status
 ```
+
+## 9.1 Filesystem-Backed Workspaces
+
+Dao workspaces and projects are backed by real folders on the user's disk.
+
+The first filesystem root is:
+
+```txt
+~/Documents/Dao
+```
+
+Workspace folders are created under this root:
+
+```txt
+~/Documents/Dao/{workspace-slug}-{workspace-id}
+```
+
+Project folders are created inside their workspace folder:
+
+```txt
+~/Documents/Dao/{workspace-slug}-{workspace-id}/{project-slug}-{project-id}
+```
+
+Examples:
+
+```txt
+~/Documents/Dao/my-workspace-01JABCDEF123
+~/Documents/Dao/my-workspace-01JABCDEF123/compiler-notes-01JXYZ987654
+```
+
+The folder slug is derived from the entity name for readability. The ULID suffix is required to avoid collisions when names repeat, when names are later changed, or when sanitized names become identical.
+
+SQLite remains the source of truth for entity metadata. The filesystem is the durable storage location for user-visible content files such as future markdown notes, PDFs, browser captures, imported files, and integration artifacts.
+
+Responsibilities:
+
+- Go local service owns all filesystem path generation and directory creation.
+- React must not construct workspace or project paths.
+- `workspaces.root_path` stores the absolute workspace folder path.
+- `projects.folder_path` stores the absolute project folder path.
+- Creating a workspace must create its folder before committing the workspace row.
+- Creating a project must create its folder before committing the project row.
+- Project folders must always live inside their workspace root.
+
+Current development-stage migration policy:
+
+- Existing local data does not need backward-compatible migration.
+- If the filesystem model changes during MVP development, developers may reset local data.
+- To reset SQLite data:
+
+```bash
+rm -f apps/local-service/data/dao.db
+```
+
+- To reset generated workspace folders:
+
+```bash
+rm -rf ~/Documents/Dao
+```
+
+Only run these commands when local MVP data is disposable.
 
 ### tasks
 
