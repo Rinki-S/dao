@@ -451,6 +451,9 @@ Keep deferred:
 - project detail page
 - task workspace layout
 - note editor and preview experience
+- filesystem-backed markdown notes with realtime autosave
+- WYSIWYG markdown editor exploration
+- scoped custom markdown renderer exploration
 - design token consolidation in `src/index.css`
 - reusable Dao-specific component wrappers above shadcn/ui
 - visual QA with browser screenshots across desktop and small viewports

@@ -276,7 +276,22 @@ Note is used for technical knowledge accumulation.
 - delete note
 - list notes
 - associate note with project
-- markdown support
+- filesystem-backed markdown support
+- realtime autosave
+- WYSIWYG markdown editing
+
+Markdown note storage:
+
+- Notes with a project are stored as `.md` files in that project folder.
+- Notes without a project are stored as `.md` files directly in the workspace root.
+- SQLite stores note metadata, not the full markdown body.
+- The Go local service owns note file reads and writes.
+
+The note editor should feel like a real writing surface, not a test form. It should autosave changes in the background and expose clear save state such as saving, saved, or failed.
+
+WYSIWYG editing is the target interaction model. The early implementation may use a proven editor engine while Dao controls persistence, validation, and filesystem boundaries.
+
+Dao may explore a small custom markdown renderer, but this should be treated as a scoped experiment. A custom renderer should start with a Dao-supported markdown subset instead of claiming full CommonMark or GFM compatibility.
 
 ### Note types
 
@@ -299,7 +314,7 @@ Search should be available from early versions.
 - task title
 - task description
 - note title
-- note content
+- note markdown file body
 
 ### First implementation
 
@@ -400,7 +415,7 @@ AI can summarize:
 
 - today’s progress
 - project status
-- note content
+- note markdown file body
 - completed tasks
 
 ### Phase AI-2: RAG

@@ -382,6 +382,40 @@ Responsibilities:
 - Creating a workspace must create its folder before committing the workspace row.
 - Creating a project must create its folder before committing the project row.
 
+### Markdown note files
+
+Markdown notes are filesystem-backed content.
+
+SQLite stores note metadata, but it must not store the full markdown body as the durable source of truth. The markdown file on disk is the durable note body.
+
+Markdown note placement:
+
+```txt
+With project:
+{workspace-root}/{project-folder}/{note-slug}-{note-id}.md
+
+Without project:
+{workspace-root}/{note-slug}-{note-id}.md
+```
+
+Examples:
+
+```txt
+/Users/rinki/Documents/Dao/personal-01JABCDEF123/compiler-notes-01JXYZ987654/parser-design-01JKLM456789.md
+/Users/rinki/Documents/Dao/personal-01JABCDEF123/reading-list-01JNOTE123456.md
+```
+
+Rules:
+
+- Go local service owns markdown file path generation, file creation, file reads, file writes, and path safety.
+- React must not construct markdown file paths and must not write markdown files directly.
+- Note filenames should use a readable slug plus the note ULID to avoid collisions.
+- A note with `project_id = NULL` is stored directly in the workspace root.
+- A note with `project_id != NULL` is stored inside that project folder.
+- `notes.file_path` stores the absolute markdown file path.
+- `notes.content` should be removed or ignored during the markdown-file migration. It is not the source of truth.
+- If Dao needs note body text for search, preview snippets, or AI context, Go should read the markdown file and write derived rows to the relevant index/cache.
+
 The working directory should be stored as app-level local configuration, not as React state. The first implementation should use a small settings API:
 
 ```txt
@@ -476,7 +510,7 @@ id
 workspace_id
 project_id
 title
-content
+file_path
 content_type
 note_type
 created_at
@@ -580,8 +614,18 @@ GET    /api/notes
 POST   /api/notes
 GET    /api/notes/:id
 PATCH  /api/notes/:id
+PUT    /api/notes/:id/content
 DELETE /api/notes/:id
 ```
+
+Note API responsibilities:
+
+- `GET /api/notes` returns note metadata for lists and file trees. It should not read every markdown file body.
+- `POST /api/notes` creates the metadata row and the initial markdown file.
+- `GET /api/notes/:id` returns note metadata plus markdown body read from disk.
+- `PATCH /api/notes/:id` updates metadata such as title, project association, or note type.
+- `PUT /api/notes/:id/content` writes the markdown file body and updates derived search index content.
+- Autosave should call the content endpoint with debounce from the renderer. Failed saves must surface an error and preserve unsaved editor state.
 
 ### Search API
 
@@ -793,7 +837,7 @@ Search should index:
 - task title
 - task description
 - note title
-- note content
+- note markdown file body
 
 ### Search Index
 
@@ -838,6 +882,8 @@ body
 ### Initial Indexing Strategy
 
 In the first implementation, write search index rows explicitly from application create flows.
+
+For filesystem-backed markdown notes, search index `body` is a derived value read from the markdown file. It must not be treated as the durable note body.
 
 Do not use database triggers for the first search milestone.
 
