@@ -15,24 +15,45 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { notifyActivityChanged } from '../../activities/events.js';
 import { listProjects } from '../../projects/api.js';
 import { createTask, listTasks, updateTaskStatus } from '../api.js';
-
-const filterOptions = [
-  { label: 'All', value: 'all' },
-  { label: 'Todo', value: 'todo' },
-  { label: 'Doing', value: 'doing' },
-  { label: 'Done', value: 'done' },
-];
 
 const priorityLabels = {
   low: 'Low',
   medium: 'Medium',
   high: 'High',
 };
+
+const statusSortOrder = {
+  todo: 0,
+  doing: 1,
+  done: 2,
+  archived: 3,
+};
+
+const prioritySortOrder = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
+function compareTasks(firstTask, secondTask) {
+  const statusDifference =
+    (statusSortOrder[firstTask.status] ?? 99) - (statusSortOrder[secondTask.status] ?? 99);
+  if (statusDifference !== 0) {
+    return statusDifference;
+  }
+
+  const priorityDifference =
+    (prioritySortOrder[firstTask.priority] ?? 99) - (prioritySortOrder[secondTask.priority] ?? 99);
+  if (priorityDifference !== 0) {
+    return priorityDifference;
+  }
+
+  return firstTask.title.localeCompare(secondTask.title, undefined, { sensitivity: 'base' });
+}
 
 function formatDate(value) {
   if (!value) {
@@ -58,7 +79,6 @@ export function TaskPanel({ currentWorkspace }) {
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskPriority, setTaskPriority] = useState('medium');
-  const [activeFilter, setActiveFilter] = useState('all');
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -96,7 +116,7 @@ export function TaskPanel({ currentWorkspace }) {
   }, [tasks, currentWorkspace]);
 
   const parentTasks = useMemo(() => {
-    return visibleTasks.filter((task) => task.parentId === null);
+    return visibleTasks.filter((task) => task.parentId === null).toSorted(compareTasks);
   }, [visibleTasks]);
 
   const childrenByParentId = useMemo(() => {
@@ -109,30 +129,12 @@ export function TaskPanel({ currentWorkspace }) {
 
       const children = nextChildrenByParentId.get(task.parentId) ?? [];
       children.push(task);
+      children.sort(compareTasks);
       nextChildrenByParentId.set(task.parentId, children);
     }
 
     return nextChildrenByParentId;
   }, [visibleTasks]);
-
-  const filteredParentTasks = useMemo(() => {
-    if (activeFilter === 'all') {
-      return parentTasks;
-    }
-
-    return parentTasks.filter((task) => task.status === activeFilter);
-  }, [activeFilter, parentTasks]);
-
-  const taskCounts = useMemo(() => {
-    return parentTasks.reduce(
-      (counts, task) => ({
-        ...counts,
-        [task.status]: (counts[task.status] ?? 0) + 1,
-        all: counts.all + 1,
-      }),
-      { all: 0, todo: 0, doing: 0, done: 0 },
-    );
-  }, [parentTasks]);
 
   async function loadTaskData({ showLoading = true } = {}) {
     if (showLoading) {
@@ -374,19 +376,6 @@ export function TaskPanel({ currentWorkspace }) {
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Tabs value={activeFilter} onValueChange={setActiveFilter}>
-            <TabsList>
-              {filterOptions.map((option) => (
-                <TabsTrigger key={option.value} value={option.value}>
-                  {option.label}
-                  <span className="tabular-nums text-muted-foreground">
-                    {taskCounts[option.value] ?? 0}
-                  </span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-
           {currentWorkspace && (
             <Badge variant="outline" className="w-fit">
               {currentWorkspace.name}
@@ -415,17 +404,17 @@ export function TaskPanel({ currentWorkspace }) {
         {status === 'ready' &&
           currentWorkspace &&
           visibleTasks.length > 0 &&
-          filteredParentTasks.length === 0 && (
+          parentTasks.length === 0 && (
             <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
               No tasks match this filter.
             </div>
           )}
 
-        {status === 'ready' && filteredParentTasks.length > 0 && (
+        {status === 'ready' && parentTasks.length > 0 && (
           <div className="-mx-8">
             <Table>
               <TableBody>
-                {filteredParentTasks.map((task) => {
+                {parentTasks.map((task) => {
                   const taskChildren = childrenByParentId.get(task.id) ?? [];
                   const projectName = task.projectId ? projectNameById.get(task.projectId) : null;
                   const dueDate = formatDate(task.dueDate);
