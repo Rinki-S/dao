@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { AppSidebar } from '@/components/app/AppSidebar.jsx';
 import { AppTitleBar } from '@/components/app/AppTitleBar.jsx';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
-import { surfaceComponents } from './app-surfaces.jsx';
+import { getSurfaceComponent } from './app-surfaces.jsx';
 import { CommandPalette } from './features/command-palette/components/CommandPalette.jsx';
 import { getRegisteredSidebarItems, getRegisteredSurfaces } from './extensions/registry.js';
+import { notifyActivityChanged } from './features/activities/events.js';
+import { createWorkspace, listWorkspaces } from './features/workspaces/api.js';
 
 const SIDEBAR_DEFAULT_WIDTH = 256;
 const SIDEBAR_MIN_WIDTH = 220;
@@ -27,10 +29,19 @@ function App() {
   const [activeSurfaceId, setActiveSurfaceId] = useState(() => getSurfaceIdFromHash(surfaces));
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const [workspaces, setWorkspaces] = useState([]);
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState('');
+  const [workspaceStatus, setWorkspaceStatus] = useState('loading');
+  const [workspaceError, setWorkspaceError] = useState('');
+  const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
+  const [isCreateWorkspaceDialogOpen, setIsCreateWorkspaceDialogOpen] = useState(false);
   const activeSurface = useMemo(
     () => surfaces.find((surface) => surface.id === activeSurfaceId) ?? surfaces[0],
     [activeSurfaceId, surfaces],
   );
+  const currentWorkspace = useMemo(() => {
+    return workspaces.find((workspace) => workspace.id === currentWorkspaceId) ?? null;
+  }, [workspaces, currentWorkspaceId]);
 
   useEffect(() => {
     function handleHashChange() {
@@ -43,6 +54,44 @@ function App() {
       window.removeEventListener('hashchange', handleHashChange);
     };
   }, [surfaces]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        setWorkspaceStatus('loading');
+        setWorkspaceError('');
+
+        const nextWorkspaces = await listWorkspaces();
+
+        if (cancelled) {
+          return;
+        }
+
+        setWorkspaces(nextWorkspaces);
+        setCurrentWorkspaceId((currentId) => {
+          if (nextWorkspaces.some((workspace) => workspace.id === currentId)) {
+            return currentId;
+          }
+
+          return nextWorkspaces[0]?.id ?? '';
+        });
+        setWorkspaceStatus('ready');
+      } catch (err) {
+        if (!cancelled) {
+          setWorkspaceError(err instanceof Error ? err.message : 'Failed to load workspaces');
+          setWorkspaceStatus('error');
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function handleSelectSurface(surfaceId) {
     if (!surfaces.some((surface) => surface.id === surfaceId)) {
@@ -71,6 +120,33 @@ function App() {
     setSidebarWidth(Math.min(Math.max(nextSidebarWidth, SIDEBAR_MIN_WIDTH), SIDEBAR_MAX_WIDTH));
   }
 
+  function handleCommandAction(action) {
+    if (action === 'create-workspace') {
+      setIsWorkspaceMenuOpen(false);
+      setIsCreateWorkspaceDialogOpen(true);
+      return;
+    }
+
+    if (action === 'switch-workspace') {
+      setIsCreateWorkspaceDialogOpen(false);
+      setIsSidebarOpen(true);
+      setIsWorkspaceMenuOpen(true);
+    }
+  }
+
+  async function handleCreateWorkspace(input) {
+    const createdWorkspace = await createWorkspace(input);
+    const nextWorkspaces = await listWorkspaces();
+
+    setWorkspaces(nextWorkspaces);
+    setCurrentWorkspaceId(createdWorkspace.id);
+    setWorkspaceStatus('ready');
+    setWorkspaceError('');
+    notifyActivityChanged();
+
+    return createdWorkspace;
+  }
+
   return (
     <SidebarProvider
       className="min-h-0 flex-1"
@@ -80,14 +156,24 @@ function App() {
         '--sidebar-width': `${sidebarWidth}px`,
       }}
     >
-      <CommandPalette onSelectSurface={handleSelectSurface} />
+      <CommandPalette onSelectSurface={handleSelectSurface} onRunAction={handleCommandAction} />
       <div className="flex min-h-screen w-full flex-col bg-background text-foreground">
         <AppTitleBar />
         <div className="flex min-h-0 flex-1">
           <AppSidebar
             activeSurfaceId={activeSurface?.id}
             sidebarItems={sidebarItems}
+            workspaces={workspaces}
+            currentWorkspace={currentWorkspace}
+            isWorkspaceLoading={workspaceStatus === 'loading'}
+            workspaceError={workspaceError}
+            workspaceMenuOpen={isWorkspaceMenuOpen}
+            createWorkspaceDialogOpen={isCreateWorkspaceDialogOpen}
             onSelectSurface={handleSelectSurface}
+            onSelectWorkspace={setCurrentWorkspaceId}
+            onWorkspaceMenuOpenChange={setIsWorkspaceMenuOpen}
+            onCreateWorkspaceDialogOpenChange={setIsCreateWorkspaceDialogOpen}
+            onCreateWorkspace={handleCreateWorkspace}
             onResizeSidebar={handleResizeSidebar}
             isSidebarOpen={isSidebarOpen}
             resizeMinWidth={SIDEBAR_MIN_WIDTH}
@@ -104,7 +190,7 @@ function App() {
             </header>
 
             <section className="flex-1 px-8 py-7">
-              {activeSurface ? surfaceComponents[activeSurface.id] : null}
+              {activeSurface ? getSurfaceComponent(activeSurface.id, { currentWorkspace }) : null}
             </section>
           </SidebarInset>
         </div>

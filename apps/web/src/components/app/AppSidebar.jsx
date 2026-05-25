@@ -10,11 +10,22 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { resolveSidebarIcon } from '@/extensions/sidebar-icons.js';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx';
 
 export function AppSidebar({
   activeSurfaceId,
   sidebarItems,
+  workspaces,
+  currentWorkspace,
+  isWorkspaceLoading,
+  workspaceError,
+  workspaceMenuOpen,
+  createWorkspaceDialogOpen,
   onSelectSurface,
+  onSelectWorkspace,
+  onWorkspaceMenuOpenChange,
+  onCreateWorkspaceDialogOpenChange,
+  onCreateWorkspace,
   onResizeSidebar,
   isSidebarOpen,
   resizeMinWidth,
@@ -88,14 +99,18 @@ export function AppSidebar({
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip="Dao" className="app-no-drag font-heading">
-              <span className="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-                d
-              </span>
-              <span className="truncate text-sm font-semibold tracking-normal">
-                dao<span className="text-primary">.</span>
-              </span>
-            </SidebarMenuButton>
+            <WorkspaceSwitcher
+              workspaces={workspaces}
+              currentWorkspace={currentWorkspace}
+              isLoading={isWorkspaceLoading}
+              error={workspaceError}
+              menuOpen={workspaceMenuOpen}
+              onMenuOpenChange={onWorkspaceMenuOpenChange}
+              createDialogOpen={createWorkspaceDialogOpen}
+              onCreateDialogOpenChange={onCreateWorkspaceDialogOpenChange}
+              onSelectWorkspace={onSelectWorkspace}
+              onCreateWorkspace={onCreateWorkspace}
+            />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>

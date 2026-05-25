@@ -20,14 +20,11 @@ import {
 } from '@/components/ui/select';
 import { notifyActivityChanged } from '../../activities/events.js';
 import { listProjects } from '../../projects/api.js';
-import { listWorkspaces } from '../../workspaces/api.js';
 import { createTask, listTasks } from '../api.js';
 
-export function TaskPanel() {
-  const [workspaces, setWorkspaces] = useState([]);
+export function TaskPanel({ currentWorkspace }) {
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
@@ -36,48 +33,42 @@ export function TaskPanel() {
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
-  const selectedWorkspace = useMemo(() => {
-    return workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null;
-  }, [workspaces, selectedWorkspaceId]);
-
   const workspaceProjects = useMemo(() => {
-    if (!selectedWorkspaceId) {
+    if (!currentWorkspace) {
       return [];
     }
 
-    return projects.filter((project) => project.workspaceId === selectedWorkspaceId);
-  }, [projects, selectedWorkspaceId]);
+    return projects.filter((project) => project.workspaceId === currentWorkspace.id);
+  }, [projects, currentWorkspace]);
 
   const projectNameById = useMemo(() => {
     return new Map(projects.map((project) => [project.id, project.name]));
   }, [projects]);
 
-  const visibleTasks = useMemo(() => {
-    if (!selectedWorkspaceId) {
-      return tasks;
+  const selectedWorkspaceProjectId = useMemo(() => {
+    if (workspaceProjects.some((project) => project.id === selectedProjectId)) {
+      return selectedProjectId;
     }
 
-    return tasks.filter((task) => task.workspaceId === selectedWorkspaceId);
-  }, [tasks, selectedWorkspaceId]);
+    return '';
+  }, [workspaceProjects, selectedProjectId]);
+
+  const visibleTasks = useMemo(() => {
+    if (!currentWorkspace) {
+      return [];
+    }
+
+    return tasks.filter((task) => task.workspaceId === currentWorkspace.id);
+  }, [tasks, currentWorkspace]);
 
   async function loadTaskData() {
     setStatus('loading');
     setError('');
 
-    const [nextWorkspaces, nextProjects, nextTasks] = await Promise.all([
-      listWorkspaces(),
-      listProjects(),
-      listTasks(),
-    ]);
+    const [nextProjects, nextTasks] = await Promise.all([listProjects(), listTasks()]);
 
-    setWorkspaces(nextWorkspaces);
     setProjects(nextProjects);
     setTasks(nextTasks);
-
-    if (!selectedWorkspaceId && nextWorkspaces.length > 0) {
-      setSelectedWorkspaceId(nextWorkspaces[0].id);
-    }
-
     setStatus('ready');
   }
 
@@ -89,24 +80,14 @@ export function TaskPanel() {
         setStatus('loading');
         setError('');
 
-        const [nextWorkspaces, nextProjects, nextTasks] = await Promise.all([
-          listWorkspaces(),
-          listProjects(),
-          listTasks(),
-        ]);
+        const [nextProjects, nextTasks] = await Promise.all([listProjects(), listTasks()]);
 
         if (cancelled) {
           return;
         }
 
-        setWorkspaces(nextWorkspaces);
         setProjects(nextProjects);
         setTasks(nextTasks);
-
-        if (nextWorkspaces.length > 0) {
-          setSelectedWorkspaceId(nextWorkspaces[0].id);
-        }
-
         setStatus('ready');
       } catch (err) {
         if (!cancelled) {
@@ -123,11 +104,6 @@ export function TaskPanel() {
     };
   }, []);
 
-  function handleWorkspaceChange(nextWorkspaceId) {
-    setSelectedWorkspaceId(nextWorkspaceId);
-    setSelectedProjectId('');
-  }
-
   function handleProjectChange(nextProjectId) {
     setSelectedProjectId(nextProjectId === 'none' ? '' : nextProjectId);
   }
@@ -135,7 +111,7 @@ export function TaskPanel() {
   async function handleCreateTask(event) {
     event.preventDefault();
 
-    if (!selectedWorkspaceId) {
+    if (!currentWorkspace) {
       setError('Create a workspace before adding tasks');
       return;
     }
@@ -145,8 +121,8 @@ export function TaskPanel() {
       setError('');
 
       await createTask({
-        workspaceId: selectedWorkspaceId,
-        projectId: selectedProjectId || null,
+        workspaceId: currentWorkspace.id,
+        projectId: selectedWorkspaceProjectId || null,
         title: taskTitle,
         description: taskDescription,
         priority: taskPriority,
@@ -173,37 +149,22 @@ export function TaskPanel() {
         <CardDescription>
           Create tasks for the selected workspace and optional project.
         </CardDescription>
-        {selectedWorkspace && (
+        {currentWorkspace && (
           <CardAction>
-            <Badge variant="outline">{selectedWorkspace.name}</Badge>
+            <Badge variant="outline">{currentWorkspace.name}</Badge>
           </CardAction>
         )}
       </CardHeader>
 
       <CardContent className="flex flex-col gap-5">
-        {workspaces.length > 0 && (
+        {currentWorkspace && (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">Workspace</span>
-              <Select value={selectedWorkspaceId} onValueChange={handleWorkspaceChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select workspace" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {workspaces.map((workspace) => (
-                      <SelectItem key={workspace.id} value={workspace.id}>
-                        {workspace.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </label>
-
-            <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-muted-foreground">Project</span>
-              <Select value={selectedProjectId || 'none'} onValueChange={handleProjectChange}>
+              <Select
+                value={selectedWorkspaceProjectId || 'none'}
+                onValueChange={handleProjectChange}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select project" />
                 </SelectTrigger>
@@ -231,7 +192,7 @@ export function TaskPanel() {
             value={taskTitle}
             onChange={(event) => setTaskTitle(event.target.value)}
             placeholder="Task title"
-            disabled={workspaces.length === 0}
+            disabled={!currentWorkspace}
             data-command-target="task-title"
           />
 
@@ -243,17 +204,13 @@ export function TaskPanel() {
             value={taskDescription}
             onChange={(event) => setTaskDescription(event.target.value)}
             placeholder="Description"
-            disabled={workspaces.length === 0}
+            disabled={!currentWorkspace}
           />
 
           <label className="sr-only" htmlFor="task-priority">
             Priority
           </label>
-          <Select
-            value={taskPriority}
-            onValueChange={setTaskPriority}
-            disabled={workspaces.length === 0}
-          >
+          <Select value={taskPriority} onValueChange={setTaskPriority} disabled={!currentWorkspace}>
             <SelectTrigger id="task-priority" className="w-full">
               <SelectValue placeholder="Select priority" />
             </SelectTrigger>
@@ -266,7 +223,7 @@ export function TaskPanel() {
             </SelectContent>
           </Select>
 
-          <Button className="w-fit" disabled={isCreating || workspaces.length === 0} type="submit">
+          <Button className="w-fit" disabled={isCreating || !currentWorkspace} type="submit">
             {isCreating ? 'Creating...' : 'Create task'}
           </Button>
         </form>
@@ -275,11 +232,11 @@ export function TaskPanel() {
 
         {status === 'error' && <p className="text-sm text-destructive">{error}</p>}
 
-        {status === 'ready' && workspaces.length === 0 && (
+        {status === 'ready' && !currentWorkspace && (
           <p className="text-sm text-muted-foreground">Create a workspace before adding tasks.</p>
         )}
 
-        {status === 'ready' && workspaces.length > 0 && visibleTasks.length === 0 && (
+        {status === 'ready' && currentWorkspace && visibleTasks.length === 0 && (
           <p className="text-sm text-muted-foreground">No tasks in this workspace yet.</p>
         )}
 

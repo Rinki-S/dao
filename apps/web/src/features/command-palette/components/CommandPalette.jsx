@@ -32,7 +32,12 @@ function focusCommandTarget(command, root = document) {
   }, 0);
 }
 
-function runCommand(command, onSelectSurface) {
+function runCommand(command, onSelectSurface, onRunAction) {
+  if (command.action) {
+    onRunAction?.(command.action, command);
+    return '';
+  }
+
   onSelectSurface?.(command.targetId);
 
   const target = getCommandTarget(command);
@@ -72,7 +77,7 @@ function groupCommands(commands) {
   }));
 }
 
-export function CommandPalette({ onSelectSurface }) {
+export function CommandPalette({ onSelectSurface, onRunAction }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedCommandValue, setSelectedCommandValue] = useState('');
@@ -132,7 +137,7 @@ export function CommandPalette({ onSelectSurface }) {
   }
 
   function handleRunCommand(command) {
-    const nextFeedback = runCommand(command, onSelectSurface);
+    const nextFeedback = runCommand(command, onSelectSurface, onRunAction);
 
     if (nextFeedback) {
       setFeedback(nextFeedback);

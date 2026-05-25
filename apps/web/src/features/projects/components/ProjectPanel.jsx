@@ -10,53 +10,32 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { notifyActivityChanged } from '../../activities/events.js';
-import { listWorkspaces } from '../../workspaces/api.js';
 import { createProject, listProjects } from '../api.js';
 
-export function ProjectPanel() {
-  const [workspaces, setWorkspaces] = useState([]);
+export function ProjectPanel({ currentWorkspace }) {
   const [projects, setProjects] = useState([]);
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
-  const selectedWorkspace = useMemo(() => {
-    return workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null;
-  }, [workspaces, selectedWorkspaceId]);
-
   const visibleProjects = useMemo(() => {
-    if (!selectedWorkspaceId) {
-      return projects;
+    if (!currentWorkspace) {
+      return [];
     }
 
-    return projects.filter((project) => project.workspaceId === selectedWorkspaceId);
-  }, [projects, selectedWorkspaceId]);
+    return projects.filter((project) => project.workspaceId === currentWorkspace.id);
+  }, [projects, currentWorkspace]);
 
   async function loadProjectData() {
     setStatus('loading');
     setError('');
 
-    const [nextWorkspaces, nextProjects] = await Promise.all([listWorkspaces(), listProjects()]);
+    const nextProjects = await listProjects();
 
-    setWorkspaces(nextWorkspaces);
     setProjects(nextProjects);
-
-    if (!selectedWorkspaceId && nextWorkspaces.length > 0) {
-      setSelectedWorkspaceId(nextWorkspaces[0].id);
-    }
-
     setStatus('ready');
   }
 
@@ -68,22 +47,13 @@ export function ProjectPanel() {
         setStatus('loading');
         setError('');
 
-        const [nextWorkspaces, nextProjects] = await Promise.all([
-          listWorkspaces(),
-          listProjects(),
-        ]);
+        const nextProjects = await listProjects();
 
         if (cancelled) {
           return;
         }
 
-        setWorkspaces(nextWorkspaces);
         setProjects(nextProjects);
-
-        if (nextWorkspaces.length > 0) {
-          setSelectedWorkspaceId(nextWorkspaces[0].id);
-        }
-
         setStatus('ready');
       } catch (err) {
         if (!cancelled) {
@@ -103,7 +73,7 @@ export function ProjectPanel() {
   async function handleCreateProject(event) {
     event.preventDefault();
 
-    if (!selectedWorkspaceId) {
+    if (!currentWorkspace) {
       setError('Create a workspace before adding projects');
       return;
     }
@@ -113,7 +83,7 @@ export function ProjectPanel() {
       setError('');
 
       await createProject({
-        workspaceId: selectedWorkspaceId,
+        workspaceId: currentWorkspace.id,
         name: projectName,
         description: projectDescription,
       });
@@ -135,34 +105,14 @@ export function ProjectPanel() {
       <CardHeader>
         <CardTitle>Projects</CardTitle>
         <CardDescription>Create projects inside the selected workspace.</CardDescription>
-        {selectedWorkspace && (
+        {currentWorkspace && (
           <CardAction>
-            <Badge variant="outline">{selectedWorkspace.name}</Badge>
+            <Badge variant="outline">{currentWorkspace.name}</Badge>
           </CardAction>
         )}
       </CardHeader>
 
       <CardContent className="flex flex-col gap-5">
-        {workspaces.length > 0 && (
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Workspace</span>
-            <Select value={selectedWorkspaceId} onValueChange={setSelectedWorkspaceId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select workspace" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {workspaces.map((workspace) => (
-                    <SelectItem key={workspace.id} value={workspace.id}>
-                      {workspace.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </label>
-        )}
-
         <form className="flex flex-col gap-3" onSubmit={handleCreateProject}>
           <label className="sr-only" htmlFor="project-name">
             Project name
@@ -172,7 +122,7 @@ export function ProjectPanel() {
             value={projectName}
             onChange={(event) => setProjectName(event.target.value)}
             placeholder="Project name"
-            disabled={workspaces.length === 0}
+            disabled={!currentWorkspace}
             data-command-target="project-name"
           />
 
@@ -184,10 +134,10 @@ export function ProjectPanel() {
             value={projectDescription}
             onChange={(event) => setProjectDescription(event.target.value)}
             placeholder="Description"
-            disabled={workspaces.length === 0}
+            disabled={!currentWorkspace}
           />
 
-          <Button className="w-fit" disabled={isCreating || workspaces.length === 0} type="submit">
+          <Button className="w-fit" disabled={isCreating || !currentWorkspace} type="submit">
             {isCreating ? 'Creating...' : 'Create project'}
           </Button>
         </form>
@@ -198,13 +148,13 @@ export function ProjectPanel() {
 
         {status === 'error' && <p className="text-sm text-destructive">{error}</p>}
 
-        {status === 'ready' && workspaces.length === 0 && (
+        {status === 'ready' && !currentWorkspace && (
           <p className="text-sm text-muted-foreground">
             Create a workspace before adding projects.
           </p>
         )}
 
-        {status === 'ready' && workspaces.length > 0 && visibleProjects.length === 0 && (
+        {status === 'ready' && currentWorkspace && visibleProjects.length === 0 && (
           <p className="text-sm text-muted-foreground">No projects in this workspace yet.</p>
         )}
 

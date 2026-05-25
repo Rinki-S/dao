@@ -6,7 +6,8 @@ const CommandCapabilitySchema = z.object({
   description: z.string().min(1),
   group: z.string().min(1),
   keywords: z.array(z.string().min(1)).optional(),
-  targetId: z.string().min(1),
+  targetId: z.string().min(1).optional(),
+  action: z.string().min(1).optional(),
   focusSelector: z.string().min(1).optional(),
 });
 

@@ -7,9 +7,6 @@ function renderCommandPaletteWithTargets() {
   return render(
     <>
       <CommandPalette />
-      <section id="workspaces">
-        <input data-command-target="workspace-name" aria-label="Workspace name" />
-      </section>
       <section id="projects">
         <input data-command-target="project-name" aria-label="Project name" />
       </section>
@@ -25,6 +22,10 @@ function renderCommandPaletteWithTargets() {
       <section id="settings" />
     </>,
   );
+}
+
+function renderCommandPaletteWithActions(onRunAction) {
+  return render(<CommandPalette onRunAction={onRunAction} />);
 }
 
 describe('CommandPalette', () => {
@@ -94,23 +95,43 @@ describe('CommandPalette', () => {
     renderCommandPaletteWithTargets();
 
     await user.keyboard('{Control>}{Shift>}p{/Shift}{/Control}');
-    await user.type(screen.getByPlaceholderText('Type a command'), 'open');
+    await user.type(screen.getByPlaceholderText('Type a command'), 'create');
     await user.keyboard('{ArrowDown}');
     await user.keyboard('{Enter}');
 
     expect(window.location.hash).toBe('#projects');
   });
 
-  it('runs the switch workspace command', async () => {
+  it('runs the switch workspace action command', async () => {
     const user = userEvent.setup();
+    const onRunAction = vi.fn();
 
-    renderCommandPaletteWithTargets();
+    renderCommandPaletteWithActions(onRunAction);
 
     await user.keyboard('{Control>}{Shift>}p{/Shift}{/Control}');
     await user.type(screen.getByPlaceholderText('Type a command'), 'switch workspace');
     await user.keyboard('{Enter}');
 
-    expect(window.location.hash).toBe('#workspaces');
-    expect(screen.getByLabelText('Workspace name')).toHaveFocus();
+    expect(onRunAction).toHaveBeenCalledWith(
+      'switch-workspace',
+      expect.objectContaining({ id: 'switch-workspace' }),
+    );
+    expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+  });
+
+  it('runs the create workspace action command', async () => {
+    const user = userEvent.setup();
+    const onRunAction = vi.fn();
+
+    renderCommandPaletteWithActions(onRunAction);
+
+    await user.keyboard('{Control>}{Shift>}p{/Shift}{/Control}');
+    await user.type(screen.getByPlaceholderText('Type a command'), 'create workspace');
+    await user.keyboard('{Enter}');
+
+    expect(onRunAction).toHaveBeenCalledWith(
+      'create-workspace',
+      expect.objectContaining({ id: 'create-workspace' }),
+    );
   });
 });

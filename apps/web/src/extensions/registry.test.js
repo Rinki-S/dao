@@ -27,7 +27,6 @@ describe('extension registry', () => {
     ]);
     expect(commands.map((command) => command.id)).toEqual([
       'create-workspace',
-      'open-workspaces',
       'switch-workspace',
       'create-project',
       'open-projects',
@@ -45,7 +44,6 @@ describe('extension registry', () => {
 
     expect(sidebarItems.map((item) => item.id)).toEqual([
       'dashboard',
-      'workspaces',
       'projects',
       'tasks',
       'notes',
@@ -54,7 +52,6 @@ describe('extension registry', () => {
     ]);
     expect(sidebarItems.map((item) => item.icon)).toEqual([
       { type: 'phosphor', name: 'SquaresFourIcon' },
-      { type: 'phosphor', name: 'StackIcon' },
       { type: 'phosphor', name: 'FolderOpenIcon' },
       { type: 'phosphor', name: 'CheckSquareIcon' },
       { type: 'phosphor', name: 'NotePencilIcon' },
@@ -68,7 +65,6 @@ describe('extension registry', () => {
 
     expect(surfaces.map((surface) => surface.id)).toEqual([
       'dashboard',
-      'workspaces',
       'projects',
       'tasks',
       'notes',

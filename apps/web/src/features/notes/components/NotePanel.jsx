@@ -21,7 +21,6 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { notifyActivityChanged } from '../../activities/events.js';
 import { listProjects } from '../../projects/api.js';
-import { listWorkspaces } from '../../workspaces/api.js';
 import { createNote, listNotes } from '../api.js';
 
 const noteTypeOptions = [
@@ -32,11 +31,9 @@ const noteTypeOptions = [
   { label: 'Interview', value: 'interview' },
 ];
 
-export function NotePanel() {
-  const [workspaces, setWorkspaces] = useState([]);
+export function NotePanel({ currentWorkspace }) {
   const [projects, setProjects] = useState([]);
   const [notes, setNotes] = useState([]);
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [noteTitle, setNoteTitle] = useState('');
   const [noteContent, setNoteContent] = useState('');
@@ -45,48 +42,42 @@ export function NotePanel() {
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
-  const selectedWorkspace = useMemo(() => {
-    return workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null;
-  }, [workspaces, selectedWorkspaceId]);
-
   const workspaceProjects = useMemo(() => {
-    if (!selectedWorkspaceId) {
+    if (!currentWorkspace) {
       return [];
     }
 
-    return projects.filter((project) => project.workspaceId === selectedWorkspaceId);
-  }, [projects, selectedWorkspaceId]);
+    return projects.filter((project) => project.workspaceId === currentWorkspace.id);
+  }, [projects, currentWorkspace]);
 
   const projectNameById = useMemo(() => {
     return new Map(projects.map((project) => [project.id, project.name]));
   }, [projects]);
 
-  const visibleNotes = useMemo(() => {
-    if (!selectedWorkspaceId) {
-      return notes;
+  const selectedWorkspaceProjectId = useMemo(() => {
+    if (workspaceProjects.some((project) => project.id === selectedProjectId)) {
+      return selectedProjectId;
     }
 
-    return notes.filter((note) => note.workspaceId === selectedWorkspaceId);
-  }, [notes, selectedWorkspaceId]);
+    return '';
+  }, [workspaceProjects, selectedProjectId]);
+
+  const visibleNotes = useMemo(() => {
+    if (!currentWorkspace) {
+      return [];
+    }
+
+    return notes.filter((note) => note.workspaceId === currentWorkspace.id);
+  }, [notes, currentWorkspace]);
 
   async function loadNoteData() {
     setStatus('loading');
     setError('');
 
-    const [nextWorkspaces, nextProjects, nextNotes] = await Promise.all([
-      listWorkspaces(),
-      listProjects(),
-      listNotes(),
-    ]);
+    const [nextProjects, nextNotes] = await Promise.all([listProjects(), listNotes()]);
 
-    setWorkspaces(nextWorkspaces);
     setProjects(nextProjects);
     setNotes(nextNotes);
-
-    if (!selectedWorkspaceId && nextWorkspaces.length > 0) {
-      setSelectedWorkspaceId(nextWorkspaces[0].id);
-    }
-
     setStatus('ready');
   }
 
@@ -98,24 +89,14 @@ export function NotePanel() {
         setStatus('loading');
         setError('');
 
-        const [nextWorkspaces, nextProjects, nextNotes] = await Promise.all([
-          listWorkspaces(),
-          listProjects(),
-          listNotes(),
-        ]);
+        const [nextProjects, nextNotes] = await Promise.all([listProjects(), listNotes()]);
 
         if (cancelled) {
           return;
         }
 
-        setWorkspaces(nextWorkspaces);
         setProjects(nextProjects);
         setNotes(nextNotes);
-
-        if (nextWorkspaces.length > 0) {
-          setSelectedWorkspaceId(nextWorkspaces[0].id);
-        }
-
         setStatus('ready');
       } catch (err) {
         if (!cancelled) {
@@ -132,11 +113,6 @@ export function NotePanel() {
     };
   }, []);
 
-  function handleWorkspaceChange(nextWorkspaceId) {
-    setSelectedWorkspaceId(nextWorkspaceId);
-    setSelectedProjectId('');
-  }
-
   function handleProjectChange(nextProjectId) {
     setSelectedProjectId(nextProjectId === 'none' ? '' : nextProjectId);
   }
@@ -144,7 +120,7 @@ export function NotePanel() {
   async function handleCreateNote(event) {
     event.preventDefault();
 
-    if (!selectedWorkspaceId) {
+    if (!currentWorkspace) {
       setError('Create a workspace before adding notes');
       return;
     }
@@ -154,8 +130,8 @@ export function NotePanel() {
       setError('');
 
       await createNote({
-        workspaceId: selectedWorkspaceId,
-        projectId: selectedProjectId || null,
+        workspaceId: currentWorkspace.id,
+        projectId: selectedWorkspaceProjectId || null,
         title: noteTitle,
         content: noteContent,
         contentType: 'markdown',
@@ -180,37 +156,22 @@ export function NotePanel() {
       <CardHeader>
         <CardTitle>Notes</CardTitle>
         <CardDescription>Capture technical notes in the selected workspace.</CardDescription>
-        {selectedWorkspace && (
+        {currentWorkspace && (
           <CardAction>
-            <Badge variant="outline">{selectedWorkspace.name}</Badge>
+            <Badge variant="outline">{currentWorkspace.name}</Badge>
           </CardAction>
         )}
       </CardHeader>
 
       <CardContent className="flex flex-col gap-5">
-        {workspaces.length > 0 && (
+        {currentWorkspace && (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">Workspace</span>
-              <Select value={selectedWorkspaceId} onValueChange={handleWorkspaceChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select workspace" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {workspaces.map((workspace) => (
-                      <SelectItem key={workspace.id} value={workspace.id}>
-                        {workspace.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </label>
-
-            <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-muted-foreground">Project</span>
-              <Select value={selectedProjectId || 'none'} onValueChange={handleProjectChange}>
+              <Select
+                value={selectedWorkspaceProjectId || 'none'}
+                onValueChange={handleProjectChange}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select project" />
                 </SelectTrigger>
@@ -238,14 +199,14 @@ export function NotePanel() {
             value={noteTitle}
             onChange={(event) => setNoteTitle(event.target.value)}
             placeholder="Note title"
-            disabled={workspaces.length === 0}
+            disabled={!currentWorkspace}
             data-command-target="note-title"
           />
 
           <label className="sr-only" htmlFor="note-type">
             Note type
           </label>
-          <Select value={noteType} onValueChange={setNoteType} disabled={workspaces.length === 0}>
+          <Select value={noteType} onValueChange={setNoteType} disabled={!currentWorkspace}>
             <SelectTrigger id="note-type" className="w-full">
               <SelectValue placeholder="Select note type" />
             </SelectTrigger>
@@ -269,10 +230,10 @@ export function NotePanel() {
             value={noteContent}
             onChange={(event) => setNoteContent(event.target.value)}
             placeholder="Write a note..."
-            disabled={workspaces.length === 0}
+            disabled={!currentWorkspace}
           />
 
-          <Button className="w-fit" disabled={isCreating || workspaces.length === 0} type="submit">
+          <Button className="w-fit" disabled={isCreating || !currentWorkspace} type="submit">
             {isCreating ? 'Creating...' : 'Create note'}
           </Button>
         </form>
@@ -281,11 +242,11 @@ export function NotePanel() {
 
         {status === 'error' && <p className="text-sm text-destructive">{error}</p>}
 
-        {status === 'ready' && workspaces.length === 0 && (
+        {status === 'ready' && !currentWorkspace && (
           <p className="text-sm text-muted-foreground">Create a workspace before adding notes.</p>
         )}
 
-        {status === 'ready' && workspaces.length > 0 && visibleNotes.length === 0 && (
+        {status === 'ready' && currentWorkspace && visibleNotes.length === 0 && (
           <p className="text-sm text-muted-foreground">No notes in this workspace yet.</p>
         )}
 

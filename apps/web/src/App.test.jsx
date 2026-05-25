@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import App from './App.jsx';
 
@@ -13,8 +13,33 @@ function renderApp() {
 }
 
 describe('App', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (path) => {
+        if (path === '/api/workspaces') {
+          return Response.json([
+            {
+              id: 'workspace-1',
+              name: 'Personal',
+              description: '',
+              createdAt: '2026-05-25T00:00:00Z',
+              updatedAt: '2026-05-25T00:00:00Z',
+              deletedAt: null,
+              version: 1,
+              syncStatus: 'synced',
+            },
+          ]);
+        }
+
+        return Response.json([]);
+      }),
+    );
+  });
+
   afterEach(() => {
     window.history.replaceState(null, '', '/');
+    vi.unstubAllGlobals();
   });
 
   it('renders only the active surface from the sidebar', async () => {

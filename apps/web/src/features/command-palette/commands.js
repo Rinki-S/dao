@@ -17,6 +17,10 @@ export function filterCommands(commands, query) {
 }
 
 export function getCommandTarget(command, root = document) {
+  if (!command.targetId) {
+    return null;
+  }
+
   return root.getElementById(command.targetId);
 }
 
