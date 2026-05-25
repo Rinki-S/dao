@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/rinki-s/dao/apps/local-service/internal/files"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 )
 
@@ -20,7 +21,7 @@ func NewRepository(db *sql.DB, activity *activities.Repository) *Repository {
 
 func (r *Repository) List() ([]Workspace, error) {
 	rows, err := r.db.Query(`
-		SELECT id, name, description, created_at, updated_at, deleted_at, version, sync_status
+		SELECT id, name, description, root_path, created_at, updated_at, deleted_at, version, sync_status
 		FROM workspaces
 		WHERE deleted_at IS NULL
 		ORDER BY created_at DESC
@@ -39,6 +40,7 @@ func (r *Repository) List() ([]Workspace, error) {
 			&workspace.ID,
 			&workspace.Name,
 			&workspace.Description,
+			&workspace.RootPath,
 			&workspace.CreatedAt,
 			&workspace.UpdatedAt,
 			&workspace.DeletedAt,
@@ -57,16 +59,25 @@ func (r *Repository) List() ([]Workspace, error) {
 func (r *Repository) Create(req CreateWorkspaceRequest) (Workspace, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id := ulid.Make().String()
+	rootPath, err := files.WorkspaceFolderPath(req.Name, id)
+	if err != nil {
+		return Workspace{}, err
+	}
 
 	workspace := Workspace{
 		ID:          id,
 		Name:        req.Name,
 		Description: req.Description,
+		RootPath:    rootPath,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 		DeletedAt:   nil,
 		Version:     1,
 		SyncStatus:  "local",
+	}
+
+	if err := files.EnsureDir(workspace.RootPath); err != nil {
+		return Workspace{}, err
 	}
 
 	tx, err := r.db.Begin()
@@ -77,12 +88,13 @@ func (r *Repository) Create(req CreateWorkspaceRequest) (Workspace, error) {
 
 	_, err = tx.Exec(`
 		INSERT INTO workspaces (
-			id, name, description, created_at, updated_at, deleted_at, version, sync_status
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			id, name, description, root_path, created_at, updated_at, deleted_at, version, sync_status
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		workspace.ID,
 		workspace.Name,
 		workspace.Description,
+		workspace.RootPath,
 		workspace.CreatedAt,
 		workspace.UpdatedAt,
 		workspace.DeletedAt,

@@ -4,6 +4,7 @@ type Workspace struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
+	RootPath    string  `json:"rootPath"`
 	CreatedAt   string  `json:"createdAt"`
 	UpdatedAt   string  `json:"updatedAt"`
 	DeletedAt   *string `json:"deletedAt"`

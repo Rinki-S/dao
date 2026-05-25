@@ -4,6 +4,7 @@ export const WorkspaceSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
+  rootPath: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
   deletedAt: z.string().nullable(),

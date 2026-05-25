@@ -5,6 +5,7 @@ type Project struct {
 	WorkspaceID string  `json:"workspaceId"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
+	FolderPath  string  `json:"folderPath"`
 	Status      string  `json:"status"`
 	StartedAt   *string `json:"startedAt"`
 	EndedAt     *string `json:"endedAt"`

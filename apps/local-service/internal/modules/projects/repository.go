@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/rinki-s/dao/apps/local-service/internal/files"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
@@ -23,7 +24,7 @@ func NewRepository(db *sql.DB, indexer search.Indexer, activity *activities.Repo
 func (r *Repository) List() ([]Project, error) {
 	rows, err := r.db.Query(`
 		SELECT
-			id, workspace_id, name, description, status, started_at, ended_at, created_at, updated_at, deleted_at, version, sync_status
+			id, workspace_id, name, description, folder_path, status, started_at, ended_at, created_at, updated_at, deleted_at, version, sync_status
 		FROM projects
 		WHERE deleted_at IS NULL
 		ORDER BY created_at DESC
@@ -43,6 +44,7 @@ func (r *Repository) List() ([]Project, error) {
 			&project.WorkspaceID,
 			&project.Name,
 			&project.Description,
+			&project.FolderPath,
 			&project.Status,
 			&project.StartedAt,
 			&project.EndedAt,
@@ -63,12 +65,25 @@ func (r *Repository) List() ([]Project, error) {
 
 func (r *Repository) Create(req CreateProjectRequest) (Project, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
+	id := ulid.Make().String()
+
+	var workspaceRootPath string
+	if err := r.db.QueryRow(`
+		SELECT root_path
+		FROM workspaces
+		WHERE id = ? AND deleted_at IS NULL
+	`, req.WorkspaceID).Scan(&workspaceRootPath); err != nil {
+		return Project{}, err
+	}
+
+	folderPath := files.ProjectFolderPath(workspaceRootPath, req.Name, id)
 
 	project := Project{
-		ID:          ulid.Make().String(),
+		ID:          id,
 		WorkspaceID: req.WorkspaceID,
 		Name:        req.Name,
 		Description: req.Description,
+		FolderPath:  folderPath,
 		Status:      "active",
 		StartedAt:   nil,
 		EndedAt:     nil,
@@ -79,6 +94,10 @@ func (r *Repository) Create(req CreateProjectRequest) (Project, error) {
 		SyncStatus:  "local",
 	}
 
+	if err := files.EnsureDir(project.FolderPath); err != nil {
+		return Project{}, err
+	}
+
 	tx, err := r.db.Begin()
 	if err != nil {
 		return Project{}, err
@@ -87,16 +106,17 @@ func (r *Repository) Create(req CreateProjectRequest) (Project, error) {
 
 	_, err = tx.Exec(`
 			INSERT INTO projects (
-				id, workspace_id, name, description, status, started_at, ended_at, created_at, updated_at, deleted_at, version, sync_status
+				id, workspace_id, name, description, folder_path, status, started_at, ended_at, created_at, updated_at, deleted_at, version, sync_status
 			)
 			VALUES (
-				?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+				?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 			)
 		`,
 		project.ID,
 		project.WorkspaceID,
 		project.Name,
 		project.Description,
+		project.FolderPath,
 		project.Status,
 		project.StartedAt,
 		project.EndedAt,

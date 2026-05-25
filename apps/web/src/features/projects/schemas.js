@@ -5,6 +5,7 @@ export const ProjectSchema = z.object({
   workspaceId: z.string(),
   name: z.string(),
   description: z.string(),
+  folderPath: z.string(),
   status: z.enum(['active', 'paused', 'completed', 'archived']),
   startedAt: z.string().nullable(),
   endedAt: z.string().nullable(),
