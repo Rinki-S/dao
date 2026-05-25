@@ -93,6 +93,11 @@ body {
   -webkit-app-region: no-drag;
 }
 
+.app-sidebar-resizing [data-slot='sidebar-gap'],
+.app-sidebar-resizing [data-slot='sidebar-container'] {
+  transition: none !important;
+}
+
 @theme inline {
   --font-sans: 'Funnel Sans Variable', sans-serif;
   --font-heading: 'Outfit Variable', sans-serif;

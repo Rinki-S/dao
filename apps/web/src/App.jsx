@@ -6,6 +6,11 @@ import { surfaceComponents } from './app-surfaces.jsx';
 import { CommandPalette } from './features/command-palette/components/CommandPalette.jsx';
 import { getRegisteredSidebarItems, getRegisteredSurfaces } from './extensions/registry.js';
 
+const SIDEBAR_DEFAULT_WIDTH = 256;
+const SIDEBAR_MIN_WIDTH = 220;
+const SIDEBAR_MAX_WIDTH = 340;
+const SIDEBAR_COLLAPSE_THRESHOLD = 160;
+
 function getSurfaceIdFromHash(surfaces) {
   const hashSurfaceId = window.location.hash.replace(/^#/, '');
 
@@ -20,6 +25,8 @@ function App() {
   const sidebarItems = getRegisteredSidebarItems();
   const surfaces = getRegisteredSurfaces();
   const [activeSurfaceId, setActiveSurfaceId] = useState(() => getSurfaceIdFromHash(surfaces));
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const activeSurface = useMemo(
     () => surfaces.find((surface) => surface.id === activeSurfaceId) ?? surfaces[0],
     [activeSurfaceId, surfaces],
@@ -46,8 +53,33 @@ function App() {
     window.history.replaceState(null, '', `#${surfaceId}`);
   }
 
+  function handleSidebarOpenChange(nextIsSidebarOpen) {
+    setIsSidebarOpen(nextIsSidebarOpen);
+
+    if (nextIsSidebarOpen) {
+      setSidebarWidth((currentWidth) => Math.max(currentWidth, SIDEBAR_DEFAULT_WIDTH));
+    }
+  }
+
+  function handleResizeSidebar(nextSidebarWidth) {
+    if (nextSidebarWidth < SIDEBAR_COLLAPSE_THRESHOLD) {
+      setIsSidebarOpen(false);
+      return;
+    }
+
+    setIsSidebarOpen(true);
+    setSidebarWidth(Math.min(Math.max(nextSidebarWidth, SIDEBAR_MIN_WIDTH), SIDEBAR_MAX_WIDTH));
+  }
+
   return (
-    <SidebarProvider className="min-h-0 flex-1">
+    <SidebarProvider
+      className="min-h-0 flex-1"
+      open={isSidebarOpen}
+      onOpenChange={handleSidebarOpenChange}
+      style={{
+        '--sidebar-width': `${sidebarWidth}px`,
+      }}
+    >
       <CommandPalette onSelectSurface={handleSelectSurface} />
       <div className="flex min-h-screen w-full flex-col bg-background text-foreground">
         <AppTitleBar />
@@ -56,6 +88,11 @@ function App() {
             activeSurfaceId={activeSurface?.id}
             sidebarItems={sidebarItems}
             onSelectSurface={handleSelectSurface}
+            onResizeSidebar={handleResizeSidebar}
+            isSidebarOpen={isSidebarOpen}
+            resizeMinWidth={SIDEBAR_MIN_WIDTH}
+            resizeMaxWidth={SIDEBAR_MAX_WIDTH}
+            resizeCollapseThreshold={SIDEBAR_COLLAPSE_THRESHOLD}
           />
           <SidebarInset className="min-h-0 bg-sidebar">
             <header className="flex h-14 shrink-0 items-center border-b border-border px-6">

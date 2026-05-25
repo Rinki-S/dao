@@ -8,11 +8,78 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
 } from '@/components/ui/sidebar';
 import { resolveSidebarIcon } from '@/extensions/sidebar-icons.js';
 
-export function AppSidebar({ activeSurfaceId, sidebarItems, onSelectSurface }) {
+export function AppSidebar({
+  activeSurfaceId,
+  sidebarItems,
+  onSelectSurface,
+  onResizeSidebar,
+  isSidebarOpen,
+  resizeMinWidth,
+  resizeMaxWidth,
+  resizeCollapseThreshold,
+}) {
+  function handleResizePointerDown(event) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const sidebarWrapper = event.currentTarget.closest('[data-slot="sidebar-wrapper"]');
+
+    if (!sidebarWrapper) {
+      return;
+    }
+
+    let latestClientX = event.clientX;
+    let isCollapsedDuringResize = !isSidebarOpen;
+
+    sidebarWrapper.classList.add('app-sidebar-resizing');
+
+    function stopResize() {
+      sidebarWrapper.classList.remove('app-sidebar-resizing');
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    }
+
+    function handlePointerMove(moveEvent) {
+      latestClientX = moveEvent.clientX;
+
+      if (moveEvent.clientX < resizeCollapseThreshold) {
+        if (!isCollapsedDuringResize) {
+          isCollapsedDuringResize = true;
+          onResizeSidebar(moveEvent.clientX);
+        }
+
+        return;
+      }
+
+      const nextSidebarWidth = Math.min(
+        Math.max(moveEvent.clientX, resizeMinWidth),
+        resizeMaxWidth,
+      );
+
+      sidebarWrapper.style.setProperty('--sidebar-width', `${nextSidebarWidth}px`);
+
+      if (isCollapsedDuringResize) {
+        isCollapsedDuringResize = false;
+        onResizeSidebar(nextSidebarWidth);
+      }
+    }
+
+    function handlePointerUp() {
+      stopResize();
+
+      onResizeSidebar(latestClientX);
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+  }
+
   return (
     <Sidebar
       collapsible="icon"
@@ -69,7 +136,13 @@ export function AppSidebar({ activeSurfaceId, sidebarItems, onSelectSurface }) {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarRail />
+      <div
+        aria-label="Resize sidebar"
+        className="app-no-drag absolute top-0 right-0 z-30 hidden h-full w-2 translate-x-1/2 cursor-col-resize bg-transparent hover:bg-border md:block"
+        role="separator"
+        tabIndex={0}
+        onPointerDown={handleResizePointerDown}
+      />
     </Sidebar>
   );
 }
