@@ -1,19 +1,29 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Add, CalendarToday, TaskAlt } from '@nine-thirty-five/material-symbols-react/rounded';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Add,
+  CalendarToday,
+  KeyboardArrowRight,
+  TaskAlt,
+} from '@nine-thirty-five/material-symbols-react/rounded';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { notifyActivityChanged } from '../../activities/events.js';
@@ -25,6 +35,12 @@ const priorityLabels = {
   medium: 'Medium',
   high: 'High',
 };
+
+const priorityOptions = [
+  { label: 'High', value: 'high' },
+  { label: 'Medium', value: 'medium' },
+  { label: 'Low', value: 'low' },
+];
 
 const statusSortOrder = {
   todo: 0,
@@ -82,10 +98,14 @@ export function TaskPanel({ currentWorkspace }) {
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const [updatingTaskIds, setUpdatingTaskIds] = useState(() => new Set());
   const [childTaskParentId, setChildTaskParentId] = useState('');
   const [childTaskTitle, setChildTaskTitle] = useState('');
   const [isCreatingChild, setIsCreatingChild] = useState(false);
+  const [collapsedTaskIds, setCollapsedTaskIds] = useState(() => new Set());
+  const taskTitleInputRef = useRef(null);
 
   const workspaceProjects = useMemo(() => {
     if (!currentWorkspace) {
@@ -194,6 +214,11 @@ export function TaskPanel({ currentWorkspace }) {
       return;
     }
 
+    if (taskTitle.trim() === '') {
+      setError('Task title is required');
+      return;
+    }
+
     try {
       setIsCreating(true);
       setError('');
@@ -210,14 +235,33 @@ export function TaskPanel({ currentWorkspace }) {
       setTaskTitle('');
       setTaskDescription('');
       setTaskPriority('medium');
+      setIsDescriptionOpen(false);
       await loadTaskData();
       notifyActivityChanged();
+      window.requestAnimationFrame(() => {
+        taskTitleInputRef.current?.focus();
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create task');
       setStatus('error');
     } finally {
       setIsCreating(false);
     }
+  }
+
+  function handleQuickAddKeyDown(event) {
+    if (event.key !== 'Escape') {
+      return;
+    }
+
+    event.preventDefault();
+    setTaskTitle('');
+    setTaskDescription('');
+    setTaskPriority('medium');
+    setIsDescriptionOpen(false);
+    setIsQuickAddOpen(false);
+    setError('');
+    taskTitleInputRef.current?.blur();
   }
 
   async function handleToggleTaskDone(task) {
@@ -245,6 +289,11 @@ export function TaskPanel({ currentWorkspace }) {
   }
 
   function openChildTaskForm(parentTaskId) {
+    setCollapsedTaskIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      nextIds.delete(parentTaskId);
+      return nextIds;
+    });
     setChildTaskParentId(parentTaskId);
     setChildTaskTitle('');
     setError('');
@@ -295,96 +344,147 @@ export function TaskPanel({ currentWorkspace }) {
     return task.status === 'done';
   }
 
+  function toggleTaskCollapse(taskId) {
+    setCollapsedTaskIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+
+      if (nextIds.has(taskId)) {
+        nextIds.delete(taskId);
+      } else {
+        nextIds.add(taskId);
+      }
+
+      return nextIds;
+    });
+  }
+
   return (
     <section id="tasks" className="flex flex-col gap-6">
-      <form className="flex flex-col gap-3" onSubmit={handleCreateTask}>
+      <form
+        className="-mx-8 flex flex-col gap-3 px-8"
+        onSubmit={handleCreateTask}
+        onKeyDown={handleQuickAddKeyDown}
+      >
         <FieldGroup className="gap-3">
           <Field>
-            <FieldLabel htmlFor="task-title">New task</FieldLabel>
-            <div className="flex flex-col gap-2 lg:flex-row">
-              <Input
-                id="task-title"
-                className="h-9 flex-1"
-                value={taskTitle}
-                onChange={(event) => setTaskTitle(event.target.value)}
-                placeholder="Capture a task..."
-                disabled={!currentWorkspace || isCreating}
-                data-command-target="task-title"
-              />
-
-              <div className="flex flex-col gap-2 sm:flex-row lg:w-auto">
-                <Select
-                  value={selectedWorkspaceProjectId || 'none'}
-                  onValueChange={handleProjectChange}
+            <FieldLabel className="sr-only" htmlFor="task-title">
+              Task title
+            </FieldLabel>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <InputGroup className="h-9">
+                <InputGroupInput
+                  id="task-title"
+                  ref={taskTitleInputRef}
+                  value={taskTitle}
+                  onChange={(event) => setTaskTitle(event.target.value)}
+                  onFocus={() => setIsQuickAddOpen(true)}
+                  placeholder="Add a task..."
                   disabled={!currentWorkspace || isCreating}
-                >
-                  <SelectTrigger className="w-full sm:w-44">
-                    <SelectValue placeholder="Project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="none">No project</SelectItem>
-                      {workspaceProjects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                  data-command-target="task-title"
+                />
 
-                <Select
-                  value={taskPriority}
-                  onValueChange={setTaskPriority}
-                  disabled={!currentWorkspace || isCreating}
-                >
-                  <SelectTrigger className="w-full sm:w-36">
-                    <SelectValue placeholder="Priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                {isQuickAddOpen && (
+                  <InputGroupAddon align="inline-end" className="gap-1">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <InputGroupButton
+                          aria-label="Select project"
+                          disabled={!currentWorkspace || isCreating}
+                        >
+                          {selectedWorkspaceProjectId
+                            ? (projectNameById.get(selectedWorkspaceProjectId) ?? 'Project')
+                            : 'No project'}
+                        </InputGroupButton>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuRadioGroup
+                          value={selectedWorkspaceProjectId || 'none'}
+                          onValueChange={handleProjectChange}
+                        >
+                          <DropdownMenuGroup>
+                            <DropdownMenuRadioItem value="none">No project</DropdownMenuRadioItem>
+                            {workspaceProjects.map((project) => (
+                              <DropdownMenuRadioItem key={project.id} value={project.id}>
+                                {project.name}
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </DropdownMenuGroup>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
 
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <InputGroupButton
+                          aria-label="Select priority"
+                          disabled={!currentWorkspace || isCreating}
+                        >
+                          {priorityLabels[taskPriority]}
+                        </InputGroupButton>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-36">
+                        <DropdownMenuRadioGroup
+                          value={taskPriority}
+                          onValueChange={setTaskPriority}
+                        >
+                          <DropdownMenuGroup>
+                            {priorityOptions.map((option) => (
+                              <DropdownMenuRadioItem key={option.value} value={option.value}>
+                                {option.label}
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </DropdownMenuGroup>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </InputGroupAddon>
+                )}
+              </InputGroup>
+
+              {isQuickAddOpen && (
                 <Button disabled={isCreating || !currentWorkspace} type="submit">
-                  {isCreating ? 'Adding...' : 'Add task'}
+                  {isCreating ? 'Adding...' : 'Add'}
                 </Button>
-              </div>
+              )}
             </div>
           </Field>
 
-          <Field>
-            <FieldLabel className="sr-only" htmlFor="task-description">
-              Description
-            </FieldLabel>
-            <Input
-              id="task-description"
-              value={taskDescription}
-              onChange={(event) => setTaskDescription(event.target.value)}
-              placeholder="Description"
-              disabled={!currentWorkspace || isCreating}
-            />
-          </Field>
+          {isQuickAddOpen && (
+            <>
+              <div className="flex">
+                <Button
+                  className="w-fit"
+                  disabled={!currentWorkspace || isCreating}
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setIsDescriptionOpen((isOpen) => !isOpen)}
+                >
+                  {isDescriptionOpen ? 'Hide description' : 'Add description'}
+                </Button>
+              </div>
+
+              {isDescriptionOpen && (
+                <Field>
+                  <FieldLabel className="sr-only" htmlFor="task-description">
+                    Description
+                  </FieldLabel>
+                  <Input
+                    id="task-description"
+                    value={taskDescription}
+                    onChange={(event) => setTaskDescription(event.target.value)}
+                    placeholder="Description"
+                    disabled={!currentWorkspace || isCreating}
+                  />
+                </Field>
+              )}
+            </>
+          )}
 
           {error && <FieldError>{error}</FieldError>}
         </FieldGroup>
       </form>
 
       <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {currentWorkspace && (
-            <Badge variant="outline" className="w-fit">
-              {currentWorkspace.name}
-            </Badge>
-          )}
-        </div>
-
-        <Separator />
-
         {status === 'loading' && <p className="text-sm text-muted-foreground">Loading tasks...</p>}
 
         {status === 'ready' && !currentWorkspace && (
@@ -412,7 +512,7 @@ export function TaskPanel({ currentWorkspace }) {
 
         {status === 'ready' && parentTasks.length > 0 && (
           <div className="-mx-8">
-            <Table>
+            <Table className={'border-t border-b'}>
               <TableBody>
                 {parentTasks.map((task) => {
                   const taskChildren = childrenByParentId.get(task.id) ?? [];
@@ -421,11 +521,31 @@ export function TaskPanel({ currentWorkspace }) {
                   const isDone = task.status === 'done';
                   const isUpdating = updatingTaskIds.has(task.id);
                   const isAddingChild = childTaskParentId === task.id;
+                  const hasChildren = taskChildren.length > 0;
+                  const isCollapsed = collapsedTaskIds.has(task.id);
 
                   return (
                     <Fragment key={task.id}>
                       <TableRow key={task.id}>
-                        <TableCell className="pl-8">
+                        <TableCell className="relative pl-8">
+                          {hasChildren ? (
+                            <Button
+                              aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${task.title}`}
+                              className="absolute top-1/2 left-1 -translate-y-1/2 active:not-aria-[haspopup]:-translate-y-1/2"
+                              size="icon-xs"
+                              type="button"
+                              variant="ghost"
+                              onClick={() => toggleTaskCollapse(task.id)}
+                            >
+                              <KeyboardArrowRight
+                                aria-hidden="true"
+                                className={cn(
+                                  'size-[18px] shrink-0 transition-transform',
+                                  !isCollapsed && 'rotate-90',
+                                )}
+                              />
+                            </Button>
+                          ) : null}
                           <div className="flex min-w-0 items-center gap-3">
                             <Checkbox
                               aria-label={`Toggle ${task.title}`}
@@ -489,7 +609,7 @@ export function TaskPanel({ currentWorkspace }) {
                         </TableCell>
                       </TableRow>
 
-                      {isAddingChild && (
+                      {isAddingChild && !isCollapsed && (
                         <TableRow key={`${task.id}-child-form`}>
                           <TableCell className="pl-16" colSpan={3}>
                             <form
@@ -523,56 +643,57 @@ export function TaskPanel({ currentWorkspace }) {
                         </TableRow>
                       )}
 
-                      {taskChildren.map((childTask) => {
-                        const childProjectName = childTask.projectId
-                          ? projectNameById.get(childTask.projectId)
-                          : null;
-                        const childDueDate = formatDate(childTask.dueDate);
-                        const isChildDone = childTask.status === 'done';
-                        const isChildUpdating = updatingTaskIds.has(childTask.id);
+                      {!isCollapsed &&
+                        taskChildren.map((childTask) => {
+                          const childProjectName = childTask.projectId
+                            ? projectNameById.get(childTask.projectId)
+                            : null;
+                          const childDueDate = formatDate(childTask.dueDate);
+                          const isChildDone = childTask.status === 'done';
+                          const isChildUpdating = updatingTaskIds.has(childTask.id);
 
-                        return (
-                          <TableRow key={childTask.id}>
-                            <TableCell className="pl-16">
-                              <div className="flex min-w-0 items-center gap-3">
-                                <Checkbox
-                                  aria-label={`Toggle ${childTask.title}`}
-                                  checked={getCheckboxState(childTask)}
-                                  disabled={isChildUpdating}
-                                  onCheckedChange={() => {
-                                    void handleToggleTaskDone(childTask);
-                                  }}
-                                />
+                          return (
+                            <TableRow key={childTask.id}>
+                              <TableCell className="pl-16">
+                                <div className="flex min-w-0 items-center gap-3">
+                                  <Checkbox
+                                    aria-label={`Toggle ${childTask.title}`}
+                                    checked={getCheckboxState(childTask)}
+                                    disabled={isChildUpdating}
+                                    onCheckedChange={() => {
+                                      void handleToggleTaskDone(childTask);
+                                    }}
+                                  />
 
-                                <div className="min-w-0 flex-1">
-                                  <div
-                                    className={cn(
-                                      'min-w-0 truncate text-sm font-medium text-foreground',
-                                      isChildDone && 'text-muted-foreground line-through',
-                                    )}
-                                  >
-                                    {childTask.title}
-                                    {childProjectName && (
-                                      <span className="font-normal text-muted-foreground">
-                                        /{childProjectName}
-                                      </span>
-                                    )}
+                                  <div className="min-w-0 flex-1">
+                                    <div
+                                      className={cn(
+                                        'min-w-0 truncate text-sm font-medium text-foreground',
+                                        isChildDone && 'text-muted-foreground line-through',
+                                      )}
+                                    >
+                                      {childTask.title}
+                                      {childProjectName && (
+                                        <span className="font-normal text-muted-foreground">
+                                          /{childProjectName}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="w-28 text-muted-foreground">
-                              {childDueDate && (
-                                <span className="flex items-center justify-end gap-1 text-xs">
-                                  <CalendarToday aria-hidden="true" className="size-3 shrink-0" />
-                                  {childDueDate}
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className="w-12 pr-8" />
-                          </TableRow>
-                        );
-                      })}
+                              </TableCell>
+                              <TableCell className="w-28 text-muted-foreground">
+                                {childDueDate && (
+                                  <span className="flex items-center justify-end gap-1 text-xs">
+                                    <CalendarToday aria-hidden="true" className="size-3 shrink-0" />
+                                    {childDueDate}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="w-12 pr-8" />
+                            </TableRow>
+                          );
+                        })}
                     </Fragment>
                   );
                 })}
