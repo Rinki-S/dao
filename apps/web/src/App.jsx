@@ -24,7 +24,9 @@ function getSurfaceIdFromHash(surfaces) {
 }
 
 function App() {
-  const sidebarItems = getRegisteredSidebarItems();
+  const registeredSidebarItems = getRegisteredSidebarItems();
+  const sidebarItems = registeredSidebarItems.filter((item) => item.id !== 'settings');
+  const footerSidebarItems = registeredSidebarItems.filter((item) => item.id === 'settings');
   const surfaces = getRegisteredSurfaces();
   const [activeSurfaceId, setActiveSurfaceId] = useState(() => getSurfaceIdFromHash(surfaces));
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -131,6 +133,13 @@ function App() {
       setIsCreateWorkspaceDialogOpen(false);
       setIsSidebarOpen(true);
       setIsWorkspaceMenuOpen(true);
+      return;
+    }
+
+    if (action === 'focus-search') {
+      window.setTimeout(() => {
+        document.querySelector('[data-command-target="search-query"]')?.focus();
+      }, 0);
     }
   }
 
@@ -163,6 +172,7 @@ function App() {
           <AppSidebar
             activeSurfaceId={activeSurface?.id}
             sidebarItems={sidebarItems}
+            footerSidebarItems={footerSidebarItems}
             workspaces={workspaces}
             currentWorkspace={currentWorkspace}
             isWorkspaceLoading={workspaceStatus === 'loading'}

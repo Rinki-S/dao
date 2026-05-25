@@ -2,35 +2,14 @@ export const searchExtension = {
   id: 'search',
   name: 'Search',
   capabilities: {
-    surfaces: [
-      {
-        id: 'search',
-        label: 'Search',
-        anchorId: 'search',
-        order: 60,
-      },
-    ],
-    sidebarItems: [
-      {
-        id: 'search',
-        label: 'Search',
-        href: '#search',
-        icon: {
-          type: 'material-symbol',
-          name: 'search',
-        },
-        order: 60,
-      },
-    ],
     commands: [
       {
         id: 'open-search',
         title: 'Search All',
-        description: 'Jump to local search',
+        description: 'Focus local search',
         group: 'Navigate',
         keywords: ['open search', 'find'],
-        targetId: 'search',
-        focusSelector: '[data-command-target="search-query"]',
+        action: 'focus-search',
       },
     ],
   },

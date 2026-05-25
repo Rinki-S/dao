@@ -145,6 +145,10 @@ export function CommandPalette({ onSelectSurface, onRunAction }) {
     }
 
     handleClose();
+
+    if (command.focusSelector) {
+      focusCommandTarget(command);
+    }
   }
 
   function handleQueryChange(nextQuery) {

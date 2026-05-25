@@ -1,6 +1,7 @@
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -15,6 +16,7 @@ import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx';
 export function AppSidebar({
   activeSurfaceId,
   sidebarItems,
+  footerSidebarItems,
   workspaces,
   currentWorkspace,
   isWorkspaceLoading,
@@ -150,6 +152,40 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      {footerSidebarItems.length > 0 && (
+        <SidebarFooter>
+          <SidebarMenu>
+            {footerSidebarItems.map((item) => {
+              const surfaceId = item.href.replace(/^#/, '');
+              const Icon = resolveSidebarIcon(item.icon);
+
+              return (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={surfaceId === activeSurfaceId}
+                    tooltip={item.label}
+                  >
+                    <a
+                      className="app-no-drag"
+                      href={item.href}
+                      aria-label={item.label}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onSelectSurface(surfaceId);
+                      }}
+                    >
+                      <Icon aria-hidden="true" />
+                      <span className="sr-only">{item.label}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarFooter>
+      )}
 
       <div
         aria-label="Resize sidebar"

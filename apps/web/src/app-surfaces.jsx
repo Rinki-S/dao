@@ -2,7 +2,6 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { ActivityMetricsPanel } from './features/activities/components/ActivityMetricsPanel.jsx';
 import { NotePanel } from './features/notes/components/NotePanel.jsx';
 import { ProjectPanel } from './features/projects/components/ProjectPanel.jsx';
-import { SearchPanel } from './features/search/components/SearchPanel.jsx';
 import { TaskPanel } from './features/tasks/components/TaskPanel.jsx';
 
 export function getSurfaceComponent(surfaceId, { currentWorkspace }) {
@@ -15,7 +14,6 @@ export function getSurfaceComponent(surfaceId, { currentWorkspace }) {
     projects: <ProjectPanel currentWorkspace={currentWorkspace} />,
     tasks: <TaskPanel currentWorkspace={currentWorkspace} />,
     notes: <NotePanel currentWorkspace={currentWorkspace} />,
-    search: <SearchPanel />,
     settings: (
       <Card id="settings" className="mt-6 max-w-3xl">
         <CardHeader>

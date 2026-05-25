@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CommandPalette } from './CommandPalette.jsx';
@@ -15,9 +15,6 @@ function renderCommandPaletteWithTargets() {
       </section>
       <section id="notes">
         <input data-command-target="note-title" aria-label="Note title" />
-      </section>
-      <section id="search">
-        <input data-command-target="search-query" aria-label="Search query" />
       </section>
       <section id="settings" />
     </>,
@@ -75,17 +72,19 @@ describe('CommandPalette', () => {
     expect(screen.queryByText('Other Commands')).not.toBeInTheDocument();
   });
 
-  it('runs the selected command on Enter', async () => {
+  it('runs the selected surface command on Enter', async () => {
     const user = userEvent.setup();
 
     renderCommandPaletteWithTargets();
 
     await user.keyboard('{Control>}{Shift>}p{/Shift}{/Control}');
-    await user.type(screen.getByPlaceholderText('Type a command'), 'search');
+    await user.type(screen.getByPlaceholderText('Type a command'), 'create note');
     await user.keyboard('{Enter}');
 
-    expect(window.location.hash).toBe('#search');
-    expect(screen.getByLabelText('Search query')).toHaveFocus();
+    expect(window.location.hash).toBe('#notes');
+    await waitFor(() => {
+      expect(screen.getByLabelText('Note title')).toHaveFocus();
+    });
     expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
   });
 
@@ -132,6 +131,22 @@ describe('CommandPalette', () => {
     expect(onRunAction).toHaveBeenCalledWith(
       'create-workspace',
       expect.objectContaining({ id: 'create-workspace' }),
+    );
+  });
+
+  it('runs the search action command', async () => {
+    const user = userEvent.setup();
+    const onRunAction = vi.fn();
+
+    renderCommandPaletteWithActions(onRunAction);
+
+    await user.keyboard('{Control>}{Shift>}p{/Shift}{/Control}');
+    await user.type(screen.getByPlaceholderText('Type a command'), 'search');
+    await user.keyboard('{Enter}');
+
+    expect(onRunAction).toHaveBeenCalledWith(
+      'focus-search',
+      expect.objectContaining({ id: 'open-search' }),
     );
   });
 });

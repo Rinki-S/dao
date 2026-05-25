@@ -47,7 +47,6 @@ describe('extension registry', () => {
       'projects',
       'tasks',
       'notes',
-      'search',
       'settings',
     ]);
     expect(sidebarItems.map((item) => item.icon)).toEqual([
@@ -55,7 +54,6 @@ describe('extension registry', () => {
       { type: 'material-symbol', name: 'folder_open' },
       { type: 'material-symbol', name: 'task_alt' },
       { type: 'material-symbol', name: 'edit_note' },
-      { type: 'material-symbol', name: 'search' },
       { type: 'material-symbol', name: 'settings' },
     ]);
   });
@@ -68,7 +66,6 @@ describe('extension registry', () => {
       'projects',
       'tasks',
       'notes',
-      'search',
       'settings',
     ]);
   });
