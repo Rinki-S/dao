@@ -20,12 +20,12 @@ function getSurfaceIdFromHash(surfaces) {
     return hashSurfaceId;
   }
 
-  return surfaces[0]?.id ?? '';
+  return surfaces.find((surface) => surface.id === 'tasks')?.id ?? surfaces[0]?.id ?? '';
 }
 
 function App() {
   const registeredSidebarItems = getRegisteredSidebarItems();
-  const sidebarItems = registeredSidebarItems.filter((item) => item.id !== 'settings');
+  const sidebarItems = registeredSidebarItems.filter((item) => item.id === 'tasks');
   const footerSidebarItems = registeredSidebarItems.filter((item) => item.id === 'settings');
   const surfaces = getRegisteredSurfaces();
   const [activeSurfaceId, setActiveSurfaceId] = useState(() => getSurfaceIdFromHash(surfaces));

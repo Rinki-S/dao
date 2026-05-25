@@ -42,13 +42,7 @@ describe('extension registry', () => {
   it('registers sidebar items by order', () => {
     const sidebarItems = getRegisteredSidebarItems();
 
-    expect(sidebarItems.map((item) => item.id)).toEqual([
-      'dashboard',
-      'projects',
-      'tasks',
-      'notes',
-      'settings',
-    ]);
+    expect(sidebarItems.map((item) => item.id)).toEqual(['tasks', 'settings']);
     expect(sidebarItems.every((item) => typeof item.icon === 'function')).toBe(true);
   });
 

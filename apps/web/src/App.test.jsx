@@ -47,14 +47,14 @@ describe('App', () => {
 
     renderApp();
 
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Tasks' })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('link', { name: 'Tasks' }));
-
-    expect(window.location.hash).toBe('#tasks');
     expect(screen.getByRole('heading', { name: 'Tasks' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Settings' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Settings' }));
+
+    expect(window.location.hash).toBe('#settings');
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Tasks' })).not.toBeInTheDocument();
   });
 
   it('switches surfaces from the command palette', async () => {

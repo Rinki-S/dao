@@ -11,6 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { ProjectTree } from './ProjectTree.jsx';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx';
 
 export function AppSidebar({
@@ -151,6 +152,8 @@ export function AppSidebar({
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <ProjectTree currentWorkspace={currentWorkspace} />
       </SidebarContent>
 
       {footerSidebarItems.length > 0 && (
