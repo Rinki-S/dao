@@ -5,7 +5,7 @@ export function MaterialSymbol({ name, className, ...props }) {
     <span
       aria-hidden="true"
       className={cn(
-        'material-symbols-rounded inline-block size-4.5 shrink-0 overflow-hidden text-center text-[18px] leading-4.5 select-none',
+        'material-symbols-rounded inline-block size-4 shrink-0 overflow-hidden text-center text-[16px] leading-4 select-none',
         className,
       )}
       data-slot="material-symbol"
