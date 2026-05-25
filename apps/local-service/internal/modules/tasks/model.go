@@ -4,6 +4,7 @@ type Task struct {
 	ID          string  `json:"id"`
 	WorkspaceID string  `json:"workspaceId"`
 	ProjectID   *string `json:"projectId"`
+	ParentID    *string `json:"parentId"`
 	Title       string  `json:"title"`
 	Description string  `json:"description"`
 	Status      string  `json:"status"`
@@ -19,6 +20,7 @@ type Task struct {
 type CreateTaskRequest struct {
 	WorkspaceID string  `json:"workspaceId"`
 	ProjectID   *string `json:"projectId"`
+	ParentID    *string `json:"parentId"`
 	Title       string  `json:"title"`
 	Description string  `json:"description"`
 	Priority    string  `json:"priority"`

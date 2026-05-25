@@ -16,11 +16,9 @@ var allowedPriorities = map[string]struct{}{
 	"high":   {},
 }
 
-var allowedStatuses = map[string]struct{}{
-	"todo":     {},
-	"doing":    {},
-	"done":     {},
-	"archived": {},
+var allowedStatusUpdates = map[string]struct{}{
+	"todo": {},
+	"done": {},
 }
 
 type Handler struct {
@@ -60,6 +58,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	req.Description = strings.TrimSpace(req.Description)
 	req.Priority = strings.TrimSpace(req.Priority)
 	req.ProjectID = trimOptionalString(req.ProjectID)
+	req.ParentID = trimOptionalString(req.ParentID)
 	req.DueDate = trimOptionalString(req.DueDate)
 
 	if req.WorkspaceID == "" {
@@ -81,6 +80,11 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.repo.Create(req)
 	if err != nil {
+		if errors.Is(err, ErrInvalidParentTask) {
+			httpx.Error(w, http.StatusBadRequest, "parent task is invalid")
+			return
+		}
+
 		httpx.Error(w, http.StatusInternalServerError, "failed to create task")
 		return
 	}
@@ -102,7 +106,7 @@ func (h *Handler) updateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.Status = strings.TrimSpace(req.Status)
-	if _, ok := allowedStatuses[req.Status]; !ok {
+	if _, ok := allowedStatusUpdates[req.Status]; !ok {
 		httpx.Error(w, http.StatusBadRequest, "task status is invalid")
 		return
 	}

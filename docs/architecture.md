@@ -338,6 +338,7 @@ sync_status
 id
 workspace_id
 project_id
+parent_id
 title
 description
 status
@@ -349,6 +350,21 @@ deleted_at
 version
 sync_status
 ```
+
+Task nesting is intentionally shallow in the MVP:
+
+- `parent_id = NULL` means a top-level todo.
+- `parent_id != NULL` means a child todo.
+- Child todos cannot have their own children.
+- A child todo must belong to the same workspace as its parent.
+
+Parent task status is derived from child completion when children exist:
+
+- no child is done -> `todo`
+- some children are done -> `doing`
+- all children are done -> `done`
+
+For parent tasks with children, checking the parent marks every child as `done`; unchecking it marks every child as `todo`.
 
 ### notes
 

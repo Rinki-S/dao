@@ -221,6 +221,16 @@ done
 archived
 ```
 
+For a task without child todos, the checkbox toggles directly between `todo` and `done`.
+
+For a task with child todos, the parent status is derived from child completion:
+
+- no child todo completed: `todo`
+- some child todos completed: `doing`
+- all child todos completed: `done`
+
+Checking a parent task marks all child todos as `done`; unchecking it marks all child todos as `todo`.
+
 ### Task priority
 
 ```txt

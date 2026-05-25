@@ -17,6 +17,8 @@ type Repository struct {
 	activity *activities.Repository
 }
 
+var ErrInvalidParentTask = errors.New("invalid parent task")
+
 func (r *Repository) UpdateStatus(id string, req UpdateTaskStatusRequest) (Task, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
@@ -26,36 +28,39 @@ func (r *Repository) UpdateStatus(id string, req UpdateTaskStatusRequest) (Task,
 	}
 	defer tx.Rollback()
 
-	result, err := tx.Exec(`
-		UPDATE tasks
-		SET status = ?, updated_at = ?, version = version + 1, sync_status = 'local'
-		WHERE id = ? AND deleted_at IS NULL
-	`, req.Status, now, id)
-	if err != nil {
-		return Task{}, err
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return Task{}, err
-	}
-
-	if rowsAffected == 0 {
-		return Task{}, sql.ErrNoRows
-	}
-
 	task, err := scanTaskRow(tx.QueryRow(`
 		SELECT
-			id, workspace_id, project_id, title, description, status, priority, due_date,
+			id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
+			created_at, updated_at, deleted_at, version, sync_status
+		FROM tasks
+		WHERE id = ? AND deleted_at IS NULL
+	`, id))
+	if err != nil {
+		return Task{}, err
+	}
+
+	if task.ParentID == nil {
+		if err := r.updateParentStatusTx(tx, task.ID, req.Status, now); err != nil {
+			return Task{}, err
+		}
+	} else {
+		if err := r.updateSingleTaskStatusTx(tx, task.ID, req.Status, now); err != nil {
+			return Task{}, err
+		}
+
+		if err := r.recalculateParentStatusTx(tx, *task.ParentID, now); err != nil {
+			return Task{}, err
+		}
+	}
+
+	updatedTask, err := scanTaskRow(tx.QueryRow(`
+		SELECT
+			id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
 			created_at, updated_at, deleted_at, version, sync_status
 		FROM tasks
 		WHERE id = ?
 	`, id))
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return Task{}, err
-		}
-
 		return Task{}, err
 	}
 
@@ -63,7 +68,101 @@ func (r *Repository) UpdateStatus(id string, req UpdateTaskStatusRequest) (Task,
 		return Task{}, err
 	}
 
-	return task, nil
+	return updatedTask, nil
+}
+
+func (r *Repository) updateParentStatusTx(tx *sql.Tx, id string, status string, now string) error {
+	childCount, err := r.countChildrenTx(tx, id)
+	if err != nil {
+		return err
+	}
+
+	if childCount == 0 {
+		return r.updateSingleTaskStatusTx(tx, id, status, now)
+	}
+
+	childStatus := "todo"
+	parentStatus := "todo"
+	if status == "done" {
+		childStatus = "done"
+		parentStatus = "done"
+	}
+
+	if err := r.updateChildrenStatusTx(tx, id, childStatus, now); err != nil {
+		return err
+	}
+
+	return r.updateSingleTaskStatusTx(tx, id, parentStatus, now)
+}
+
+func (r *Repository) updateSingleTaskStatusTx(tx *sql.Tx, id string, status string, now string) error {
+	result, err := tx.Exec(`
+		UPDATE tasks
+		SET status = ?, updated_at = ?, version = version + 1, sync_status = 'local'
+		WHERE id = ? AND deleted_at IS NULL
+	`, status, now, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+func (r *Repository) updateChildrenStatusTx(tx *sql.Tx, parentID string, status string, now string) error {
+	_, err := tx.Exec(`
+		UPDATE tasks
+		SET status = ?, updated_at = ?, version = version + 1, sync_status = 'local'
+		WHERE parent_id = ? AND deleted_at IS NULL
+	`, status, now, parentID)
+
+	return err
+}
+
+func (r *Repository) recalculateParentStatusTx(tx *sql.Tx, parentID string, now string) error {
+	var totalCount int
+	var doneCount int
+
+	if err := tx.QueryRow(`
+		SELECT COUNT(*), COALESCE(SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END), 0)
+		FROM tasks
+		WHERE parent_id = ? AND deleted_at IS NULL
+	`, parentID).Scan(&totalCount, &doneCount); err != nil {
+		return err
+	}
+
+	if totalCount == 0 {
+		return nil
+	}
+
+	nextStatus := "doing"
+	if doneCount == 0 {
+		nextStatus = "todo"
+	} else if doneCount == totalCount {
+		nextStatus = "done"
+	}
+
+	return r.updateSingleTaskStatusTx(tx, parentID, nextStatus, now)
+}
+
+func (r *Repository) countChildrenTx(tx *sql.Tx, parentID string) (int, error) {
+	var count int
+
+	err := tx.QueryRow(`
+		SELECT COUNT(*)
+		FROM tasks
+		WHERE parent_id = ? AND deleted_at IS NULL
+	`, parentID).Scan(&count)
+
+	return count, err
 }
 
 type taskScanner interface {
@@ -77,6 +176,7 @@ func scanTaskRow(row taskScanner) (Task, error) {
 		&task.ID,
 		&task.WorkspaceID,
 		&task.ProjectID,
+		&task.ParentID,
 		&task.Title,
 		&task.Description,
 		&task.Status,
@@ -101,7 +201,7 @@ func NewRepository(db *sql.DB, indexer search.Indexer, activity *activities.Repo
 func (r *Repository) List() ([]Task, error) {
 	rows, err := r.db.Query(`
 		SELECT
-			id, workspace_id, project_id, title, description, status, priority, due_date,
+			id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
 			created_at, updated_at, deleted_at, version, sync_status
 		FROM tasks
 		WHERE deleted_at IS NULL
@@ -121,6 +221,7 @@ func (r *Repository) List() ([]Task, error) {
 			&task.ID,
 			&task.WorkspaceID,
 			&task.ProjectID,
+			&task.ParentID,
 			&task.Title,
 			&task.Description,
 			&task.Status,
@@ -152,6 +253,7 @@ func (r *Repository) Create(req CreateTaskRequest) (Task, error) {
 		ID:          ulid.Make().String(),
 		WorkspaceID: req.WorkspaceID,
 		ProjectID:   req.ProjectID,
+		ParentID:    req.ParentID,
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      "todo",
@@ -170,18 +272,44 @@ func (r *Repository) Create(req CreateTaskRequest) (Task, error) {
 	}
 	defer tx.Rollback()
 
+	if task.ParentID != nil {
+		parent, err := scanTaskRow(tx.QueryRow(`
+			SELECT
+				id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
+				created_at, updated_at, deleted_at, version, sync_status
+			FROM tasks
+			WHERE id = ? AND deleted_at IS NULL
+		`, *task.ParentID))
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return Task{}, ErrInvalidParentTask
+			}
+
+			return Task{}, err
+		}
+
+		if parent.WorkspaceID != task.WorkspaceID || parent.ParentID != nil {
+			return Task{}, ErrInvalidParentTask
+		}
+
+		if task.ProjectID == nil {
+			task.ProjectID = parent.ProjectID
+		}
+	}
+
 	_, err = tx.Exec(`
 		INSERT INTO tasks (
-			id, workspace_id, project_id, title, description, status, priority, due_date,
+			id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
 			created_at, updated_at, deleted_at, version, sync_status
 		)
 		VALUES (
-			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 		)
 	`,
 		task.ID,
 		task.WorkspaceID,
 		task.ProjectID,
+		task.ParentID,
 		task.Title,
 		task.Description,
 		task.Status,
@@ -227,6 +355,12 @@ func (r *Repository) Create(req CreateTaskRequest) (Task, error) {
 		MetadataJSON: string(metadata),
 	}); err != nil {
 		return Task{}, err
+	}
+
+	if task.ParentID != nil {
+		if err := r.recalculateParentStatusTx(tx, *task.ParentID, now); err != nil {
+			return Task{}, err
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
