@@ -338,29 +338,29 @@ sync_status
 
 Dao workspaces and projects are backed by real folders on the user's disk.
 
-The first filesystem root is:
+Dao does not hard-code a root such as `~/Documents/Dao`. On first launch, if no working directory is configured, the React renderer must show an onboarding step that asks the user to choose a working directory.
 
 ```txt
-~/Documents/Dao
+{working-directory}
 ```
 
-Workspace folders are created under this root:
+Workspace folders are created under the selected working directory:
 
 ```txt
-~/Documents/Dao/{workspace-slug}-{workspace-id}
+{working-directory}/{workspace-slug}-{workspace-id}
 ```
 
 Project folders are created inside their workspace folder:
 
 ```txt
-~/Documents/Dao/{workspace-slug}-{workspace-id}/{project-slug}-{project-id}
+{working-directory}/{workspace-slug}-{workspace-id}/{project-slug}-{project-id}
 ```
 
 Examples:
 
 ```txt
-~/Documents/Dao/my-workspace-01JABCDEF123
-~/Documents/Dao/my-workspace-01JABCDEF123/compiler-notes-01JXYZ987654
+/Users/rinki/Documents/Dao/my-workspace-01JABCDEF123
+/Users/rinki/Documents/Dao/my-workspace-01JABCDEF123/compiler-notes-01JXYZ987654
 ```
 
 The folder slug is derived from the entity name for readability. The ULID suffix is required to avoid collisions when names repeat, when names are later changed, or when sanitized names become identical.
@@ -369,13 +369,53 @@ SQLite remains the source of truth for entity metadata. The filesystem is the du
 
 Responsibilities:
 
-- Go local service owns all filesystem path generation and directory creation.
+- Electron owns native directory selection through a minimal preload bridge.
+- Go local service validates and stores the selected working directory.
+- Go local service owns workspace/project path generation and directory creation after the working directory is configured.
 - React must not construct workspace or project paths.
+- React may ask Electron to open a native directory picker during onboarding.
+- React must send the selected path to the Go local service as a setting before workspace creation is allowed.
 - `workspaces.root_path` stores the absolute workspace folder path.
 - `projects.folder_path` stores the absolute project folder path.
+- Workspace folders must always live inside the configured working directory.
+- Project folders must always live inside their workspace root.
 - Creating a workspace must create its folder before committing the workspace row.
 - Creating a project must create its folder before committing the project row.
-- Project folders must always live inside their workspace root.
+
+The working directory should be stored as app-level local configuration, not as React state. The first implementation should use a small settings API:
+
+```txt
+GET /api/settings/working-directory
+PUT /api/settings/working-directory
+```
+
+Recommended durable storage:
+
+```txt
+app_settings
+key
+value
+updated_at
+```
+
+The working directory value should be stored under:
+
+```txt
+working_directory
+```
+
+Startup behavior:
+
+```txt
+1. React loads.
+2. React calls GET /api/settings/working-directory.
+3. If no working directory is configured, React shows onboarding.
+4. Onboarding calls the Electron preload directory picker.
+5. React sends the selected absolute path to PUT /api/settings/working-directory.
+6. Go validates the directory, creates it when needed, stores it, and future workspace/project creation uses it.
+```
+
+Workspace creation must fail with a clear API error if no working directory is configured.
 
 Current development-stage migration policy:
 
@@ -387,7 +427,7 @@ Current development-stage migration policy:
 rm -f apps/local-service/data/dao.db
 ```
 
-- To reset generated workspace folders:
+- To reset generated workspace folders, remove the previously selected working directory or its generated Dao folders manually. Example when the old root was `~/Documents/Dao`:
 
 ```bash
 rm -rf ~/Documents/Dao

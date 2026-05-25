@@ -158,10 +158,12 @@ Examples:
 - rename workspace
 - delete workspace
 
-Each workspace is backed by a real folder on disk under:
+Each workspace is backed by a real folder on disk under a user-selected working directory.
+
+On first launch, if Dao has no working directory configured, the app should show onboarding and ask the user to choose one.
 
 ```txt
-~/Documents/Dao
+{working-directory}/{workspace-slug}-{workspace-id}
 ```
 
 The folder name should be readable and collision-resistant:
@@ -171,6 +173,8 @@ The folder name should be readable and collision-resistant:
 ```
 
 This makes future markdown notes, PDFs, imported files, and integration data easier to store, inspect, and back up.
+
+The selected working directory is app-level local configuration. Users should choose it through the desktop app's native folder picker, not by typing a path into a normal form field.
 
 ### Future features
 
@@ -197,7 +201,7 @@ A project can contain:
 Each project is backed by a subfolder inside its workspace folder:
 
 ```txt
-~/Documents/Dao/{workspace-slug}-{workspace-id}/{project-slug}-{project-id}
+{working-directory}/{workspace-slug}-{workspace-id}/{project-slug}-{project-id}
 ```
 
 Dao should store the absolute folder path in project metadata, while the Go local service owns folder creation and path safety.
