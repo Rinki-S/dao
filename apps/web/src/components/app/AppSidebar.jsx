@@ -141,7 +141,7 @@ export function AppSidebar({
                           onSelectSurface(surfaceId);
                         }}
                       >
-                        <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+                        <Icon aria-hidden="true" className="size-4 shrink-0" />
                         <span>{item.label}</span>
                       </a>
                     </SidebarMenuButton>
