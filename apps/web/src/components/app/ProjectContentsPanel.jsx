@@ -161,7 +161,7 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
       </div>
 
       <div className="-mx-8">
-        <Table>
+        <Table className={'border-b'}>
           <TableHeader>
             <TableRow>
               <TableHead className="pl-8">Name</TableHead>
@@ -186,7 +186,7 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
               return (
                 <TableRow key={row.id}>
                   <TableCell className="max-w-sm pl-8">
-                    <div className="flex min-w-0 items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-4">
                       <ContentIcon
                         aria-hidden="true"
                         className="size-[18px] shrink-0 translate-y-px"
