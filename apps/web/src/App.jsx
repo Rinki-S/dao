@@ -202,7 +202,7 @@ function App() {
             resizeCollapseThreshold={SIDEBAR_COLLAPSE_THRESHOLD}
           />
           <SidebarInset className="min-h-0 bg-sidebar">
-            <header className="flex h-14 shrink-0 items-center border-b border-border px-6">
+            <header className="flex h-14 shrink-0 items-center border-b border-border px-8">
               <div className="min-w-0">
                 <h1 className="truncate text-lg font-heading font-semibold tracking-normal text-foreground">
                   {activeSurfaceId === 'project-contents'

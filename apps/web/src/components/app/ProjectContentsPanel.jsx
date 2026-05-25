@@ -159,48 +159,50 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Source</TableHead>
-            <TableHead>Updated</TableHead>
-            <TableHead>Format</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {contentRows.length === 0 && (
+      <div className="-mx-8">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                Add project content from the sidebar to start building this workspace.
-              </TableCell>
+              <TableHead className="pl-8">Name</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Source</TableHead>
+              <TableHead>Updated</TableHead>
+              <TableHead className="pr-8">Format</TableHead>
             </TableRow>
-          )}
+          </TableHeader>
+          <TableBody>
+            {contentRows.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 px-8 text-center text-muted-foreground">
+                  Add project content from the sidebar to start building this workspace.
+                </TableCell>
+              </TableRow>
+            )}
 
-          {contentRows.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell className="max-w-sm">
-                <div className="flex min-w-0 items-center gap-2">
-                  <EditNote aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-foreground">{row.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">{row.summary}</div>
+            {contentRows.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell className="max-w-sm pl-8">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <EditNote aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-foreground">{row.name}</div>
+                      <div className="truncate text-xs text-muted-foreground">{row.summary}</div>
+                    </div>
                   </div>
-                </div>
-              </TableCell>
-              <TableCell>{row.type}</TableCell>
-              <TableCell>
-                <Badge variant="secondary">{row.source}</Badge>
-              </TableCell>
-              <TableCell>{formatUpdatedAt(row.updatedAt)}</TableCell>
-              <TableCell>
-                <Badge variant="outline">{row.format}</Badge>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                </TableCell>
+                <TableCell>{row.type}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{row.source}</Badge>
+                </TableCell>
+                <TableCell>{formatUpdatedAt(row.updatedAt)}</TableCell>
+                <TableCell className="pr-8">
+                  <Badge variant="outline">{row.format}</Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </section>
   );
 }
