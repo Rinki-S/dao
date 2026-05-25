@@ -17,12 +17,20 @@ describe('App', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (path) => {
+        if (path === '/api/settings/working-directory') {
+          return Response.json({
+            path: '/tmp/dao-test',
+            configured: true,
+          });
+        }
+
         if (path === '/api/workspaces') {
           return Response.json([
             {
               id: 'workspace-1',
               name: 'Personal',
               description: '',
+              rootPath: '/tmp/dao-test/personal-workspace-1',
               createdAt: '2026-05-25T00:00:00Z',
               updatedAt: '2026-05-25T00:00:00Z',
               deletedAt: null,
@@ -47,7 +55,7 @@ describe('App', () => {
 
     renderApp();
 
-    expect(screen.getByRole('heading', { name: 'Tasks' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Tasks' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Settings' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Settings' }));

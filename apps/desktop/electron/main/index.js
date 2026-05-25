@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServiceConfig, startLocalService, stopLocalService, waitForServiceHealth } from './service-manager.js'
@@ -9,9 +9,10 @@ const __dirname = path.dirname(__filename)
 let localService = null
 let serviceConfig = null
 let isStoppingLocalService = false
+let mainWindow = null
 
 function createWindow() {
-    const mainWindow = new BrowserWindow({
+    mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
         minWidth: 900,
@@ -32,7 +33,24 @@ function createWindow() {
 
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
+
+    mainWindow.on('closed', () => {
+        mainWindow = null
+    })
 }
+
+ipcMain.handle('dao:select-working-directory', async () => {
+    const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+        title: 'Choose working directory',
+        properties: ['openDirectory', 'createDirectory'],
+    })
+
+    if (result.canceled || result.filePaths.length === 0) {
+        return { canceled: true, path: '' }
+    }
+
+    return { canceled: false, path: result.filePaths[0] }
+})
 
 app.whenReady().then(async () => {
     serviceConfig = createServiceConfig()

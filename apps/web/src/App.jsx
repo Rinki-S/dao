@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { AppSidebar } from '@/components/app/AppSidebar.jsx';
 import { AppTitleBar } from '@/components/app/AppTitleBar.jsx';
 import { ProjectContentsPanel } from '@/components/app/ProjectContentsPanel.jsx';
+import { WorkingDirectoryOnboarding } from '@/components/app/WorkingDirectoryOnboarding.jsx';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { getSurfaceComponent } from './app-surfaces.jsx';
 import { CommandPalette } from './features/command-palette/components/CommandPalette.jsx';
 import { getRegisteredSidebarItems, getRegisteredSurfaces } from './extensions/registry.js';
 import { notifyActivityChanged } from './features/activities/events.js';
+import { getWorkingDirectory, updateWorkingDirectory } from './features/settings/api.js';
 import { createWorkspace, listWorkspaces } from './features/workspaces/api.js';
 
 const SIDEBAR_DEFAULT_WIDTH = 256;
@@ -39,6 +41,9 @@ function App() {
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const [isCreateWorkspaceDialogOpen, setIsCreateWorkspaceDialogOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [workingDirectoryStatus, setWorkingDirectoryStatus] = useState('loading');
+  const [workingDirectoryError, setWorkingDirectoryError] = useState('');
+  const [workingDirectory, setWorkingDirectory] = useState(null);
   const activeSurface = useMemo(
     () => surfaces.find((surface) => surface.id === activeSurfaceId) ?? null,
     [activeSurfaceId, surfaces],
@@ -64,6 +69,24 @@ function App() {
 
     async function load() {
       try {
+        setWorkingDirectoryStatus('loading');
+        setWorkingDirectoryError('');
+
+        const nextWorkingDirectory = await getWorkingDirectory();
+
+        if (cancelled) {
+          return;
+        }
+
+        setWorkingDirectory(nextWorkingDirectory);
+
+        if (!nextWorkingDirectory.configured) {
+          setWorkingDirectoryStatus('unconfigured');
+          setWorkspaceStatus('idle');
+          return;
+        }
+
+        setWorkingDirectoryStatus('ready');
         setWorkspaceStatus('loading');
         setWorkspaceError('');
 
@@ -84,7 +107,10 @@ function App() {
         setWorkspaceStatus('ready');
       } catch (err) {
         if (!cancelled) {
-          setWorkspaceError(err instanceof Error ? err.message : 'Failed to load workspaces');
+          setWorkingDirectoryError(
+            err instanceof Error ? err.message : 'Failed to load working directory',
+          );
+          setWorkingDirectoryStatus('error');
           setWorkspaceStatus('error');
         }
       }
@@ -96,6 +122,25 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  async function handleWorkingDirectoryComplete(path) {
+    const nextWorkingDirectory = await updateWorkingDirectory({ path });
+    const nextWorkspaces = await listWorkspaces();
+
+    setWorkingDirectory(nextWorkingDirectory);
+    setWorkingDirectoryStatus('ready');
+    setWorkingDirectoryError('');
+    setWorkspaces(nextWorkspaces);
+    setCurrentWorkspaceId((currentId) => {
+      if (nextWorkspaces.some((workspace) => workspace.id === currentId)) {
+        return currentId;
+      }
+
+      return nextWorkspaces[0]?.id ?? '';
+    });
+    setWorkspaceStatus('ready');
+    setWorkspaceError('');
+  }
 
   function handleSelectSurface(surfaceId) {
     if (!surfaces.some((surface) => surface.id === surfaceId)) {
@@ -163,6 +208,26 @@ function App() {
     notifyActivityChanged();
 
     return createdWorkspace;
+  }
+
+  if (workingDirectoryStatus === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Loading Dao...
+      </div>
+    );
+  }
+
+  if (workingDirectoryStatus === 'error') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-6 text-sm text-destructive">
+        {workingDirectoryError}
+      </div>
+    );
+  }
+
+  if (workingDirectoryStatus === 'unconfigured' || !workingDirectory?.configured) {
+    return <WorkingDirectoryOnboarding onComplete={handleWorkingDirectoryComplete} />;
   }
 
   return (

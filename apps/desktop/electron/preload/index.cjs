@@ -1,4 +1,4 @@
-const { contextBridge } = require('electron')
+const { contextBridge, ipcRenderer } = require('electron')
 
 function readArg(name) {
     const prefix = `--${name}=`
@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld('dao', {
         baseUrl: readArg('dao-api-base-url'),
         sessionToken: readArg('dao-session-token'),
     },
+    selectWorkingDirectory: () => ipcRenderer.invoke('dao:select-working-directory'),
 })
