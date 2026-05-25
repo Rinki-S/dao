@@ -1,37 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  AddLink,
-  Code,
-  EditNote,
-  Folder,
-  Link,
-} from '@nine-thirty-five/material-symbols-react/rounded';
+import { EditNote, Folder } from '@nine-thirty-five/material-symbols-react/rounded';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { subscribeToActivityChanged } from '@/features/activities/events.js';
 import { listNotes } from '@/features/notes/api.js';
 import { listProjects } from '@/features/projects/api.js';
 
-const futureContentTypes = [
-  {
-    id: 'github',
-    label: 'GitHub',
-    description: 'Repository context will appear here after the integration exists.',
-    icon: Code,
-  },
-  {
-    id: 'website',
-    label: 'Website',
-    description: 'Saved technical references and pages will live under the project.',
-    icon: Link,
-  },
-  {
-    id: 'leetcode',
-    label: 'LeetCode',
-    description: 'Problem records can be grouped with the project later.',
-    icon: AddLink,
-  },
-];
+function formatUpdatedAt(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown';
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+}
 
 export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
   const [projects, setProjects] = useState([]);
@@ -61,6 +56,18 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
       (note) => note.workspaceId === currentWorkspace.id && note.projectId === selectedProject.id,
     );
   }, [currentWorkspace, notes, selectedProject]);
+
+  const contentRows = useMemo(() => {
+    return projectNotes.map((note) => ({
+      id: note.id,
+      name: note.title,
+      summary: note.content || 'No content',
+      type: 'Note',
+      source: note.noteType,
+      format: note.contentType,
+      updatedAt: note.updatedAt,
+    }));
+  }, [projectNotes]);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,86 +149,58 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
           <Folder aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
           <span>{currentWorkspace.name}</span>
         </div>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="truncate font-heading text-xl font-semibold text-foreground">
-              {selectedProject.name}
-            </h2>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground text-pretty">
-              {selectedProject.description || 'No description'}
-            </p>
-          </div>
-          <Badge variant="secondary">{selectedProject.status}</Badge>
+        <div className="min-w-0">
+          <h2 className="truncate font-heading text-xl font-semibold text-foreground">
+            {selectedProject.name}
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground text-pretty">
+            {selectedProject.description || 'No description'}
+          </p>
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Notes</CardTitle>
-            <CardDescription>{projectNotes.length} linked notes</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Integrations</CardTitle>
-            <CardDescription>Ready for future project sources</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Activity</CardTitle>
-            <CardDescription>Project activity context is tracked locally</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-2">
-        {projectNotes.map((note) => (
-          <Card key={note.id} size="sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <EditNote aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
-                <span className="truncate">{note.title}</span>
-              </CardTitle>
-              <CardDescription className="line-clamp-2">
-                {note.content || 'No content'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex gap-2">
-              <Badge variant="secondary">{note.noteType}</Badge>
-              <Badge variant="outline">{note.contentType}</Badge>
-            </CardContent>
-          </Card>
-        ))}
-
-        {projectNotes.length === 0 && (
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle>No notes yet</CardTitle>
-              <CardDescription>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Source</TableHead>
+            <TableHead>Updated</TableHead>
+            <TableHead>Format</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {contentRows.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                 Add project content from the sidebar to start building this workspace.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        )}
+              </TableCell>
+            </TableRow>
+          )}
 
-        {futureContentTypes.map((contentType) => {
-          const Icon = contentType.icon;
-
-          return (
-            <Card key={contentType.id} size="sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
-                  <span>{contentType.label}</span>
-                </CardTitle>
-                <CardDescription>{contentType.description}</CardDescription>
-              </CardHeader>
-            </Card>
-          );
-        })}
-      </div>
+          {contentRows.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell className="max-w-sm">
+                <div className="flex min-w-0 items-center gap-2">
+                  <EditNote aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-foreground">{row.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">{row.summary}</div>
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell>{row.type}</TableCell>
+              <TableCell>
+                <Badge variant="secondary">{row.source}</Badge>
+              </TableCell>
+              <TableCell>{formatUpdatedAt(row.updatedAt)}</TableCell>
+              <TableCell>
+                <Badge variant="outline">{row.format}</Badge>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </section>
   );
 }
