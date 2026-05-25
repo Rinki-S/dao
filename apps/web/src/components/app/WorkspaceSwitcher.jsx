@@ -1,11 +1,4 @@
 import { useState } from 'react';
-import {
-  CaretDownIcon,
-  CheckIcon,
-  PlusIcon,
-  StackIcon,
-  WarningCircleIcon,
-} from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -25,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { MaterialSymbol } from '@/components/ui/material-symbol.jsx';
 import { SidebarMenuButton } from '@/components/ui/sidebar';
 
 export function WorkspaceSwitcher({
@@ -76,7 +70,7 @@ export function WorkspaceSwitcher({
             className="app-no-drag font-heading"
           >
             <span className="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-              <StackIcon aria-hidden="true" />
+              <MaterialSymbol name="stacks" />
             </span>
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-semibold tracking-normal">
@@ -86,7 +80,7 @@ export function WorkspaceSwitcher({
                 {isLoading ? 'Loading...' : 'Workspace'}
               </span>
             </span>
-            <CaretDownIcon aria-hidden="true" />
+            <MaterialSymbol name="keyboard_arrow_down" />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
 
@@ -96,7 +90,7 @@ export function WorkspaceSwitcher({
             {workspaces.map((workspace) => (
               <DropdownMenuItem key={workspace.id} onSelect={() => onSelectWorkspace(workspace.id)}>
                 <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
-                {workspace.id === currentWorkspace?.id && <CheckIcon aria-hidden="true" />}
+                {workspace.id === currentWorkspace?.id && <MaterialSymbol name="check" />}
               </DropdownMenuItem>
             ))}
 
@@ -109,7 +103,7 @@ export function WorkspaceSwitcher({
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem disabled>
-                <WarningCircleIcon aria-hidden="true" />
+                <MaterialSymbol name="error" />
                 <span className="truncate">{error}</span>
               </DropdownMenuItem>
             </>
@@ -123,7 +117,7 @@ export function WorkspaceSwitcher({
                 onCreateDialogOpenChange(true);
               }}
             >
-              <PlusIcon aria-hidden="true" />
+              <MaterialSymbol name="add" />
               <span>Create workspace</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>

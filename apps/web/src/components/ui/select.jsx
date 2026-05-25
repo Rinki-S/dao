@@ -1,7 +1,7 @@
 import { Select as SelectPrimitive } from 'radix-ui';
 
 import { cn } from '@/lib/utils';
-import { CaretDownIcon, CheckIcon, CaretUpIcon } from '@phosphor-icons/react';
+import { MaterialSymbol } from '@/components/ui/material-symbol.jsx';
 
 function Select({ ...props }) {
   return <SelectPrimitive.Root data-slot="select" {...props} />;
@@ -34,7 +34,10 @@ function SelectTrigger({ className, size = 'default', children, ...props }) {
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <CaretDownIcon className="pointer-events-none size-4 text-muted-foreground" />
+        <MaterialSymbol
+          name="keyboard_arrow_down"
+          className="pointer-events-none text-muted-foreground"
+        />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
@@ -100,7 +103,7 @@ function SelectItem({ className, children, ...props }) {
     >
       <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
         <SelectPrimitive.ItemIndicator>
-          <CheckIcon className="pointer-events-none" />
+          <MaterialSymbol name="check" className="pointer-events-none" />
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
@@ -128,7 +131,7 @@ function SelectScrollUpButton({ className, ...props }) {
       )}
       {...props}
     >
-      <CaretUpIcon />
+      <MaterialSymbol name="keyboard_arrow_up" />
     </SelectPrimitive.ScrollUpButton>
   );
 }
@@ -143,7 +146,7 @@ function SelectScrollDownButton({ className, ...props }) {
       )}
       {...props}
     >
-      <CaretDownIcon />
+      <MaterialSymbol name="keyboard_arrow_down" />
     </SelectPrimitive.ScrollDownButton>
   );
 }

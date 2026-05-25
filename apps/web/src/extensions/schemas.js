@@ -11,16 +11,16 @@ const CommandCapabilitySchema = z.object({
   focusSelector: z.string().min(1).optional(),
 });
 
-const PhosphorIconSchema = z.object({
-  type: z.literal('phosphor'),
-  name: z.string().regex(/^[A-Z][A-Za-z0-9]*Icon$/),
+const MaterialSymbolIconSchema = z.object({
+  type: z.literal('material-symbol'),
+  name: z.string().regex(/^[a-z][a-z0-9_]*$/),
 });
 
 const SidebarItemCapabilitySchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
   href: z.string().min(1),
-  icon: PhosphorIconSchema.optional(),
+  icon: MaterialSymbolIconSchema.optional(),
   order: z.number(),
 });
 

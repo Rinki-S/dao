@@ -16,8 +16,8 @@ export const notesExtension = {
         label: 'Notes',
         href: '#notes',
         icon: {
-          type: 'phosphor',
-          name: 'NotePencilIcon',
+          type: 'material-symbol',
+          name: 'edit_note',
         },
         order: 50,
       },

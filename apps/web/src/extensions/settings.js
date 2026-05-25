@@ -16,8 +16,8 @@ export const settingsExtension = {
         label: 'Settings',
         href: '#settings',
         icon: {
-          type: 'phosphor',
-          name: 'GearSixIcon',
+          type: 'material-symbol',
+          name: 'settings',
         },
         order: 90,
       },

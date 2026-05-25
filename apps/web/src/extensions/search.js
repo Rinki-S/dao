@@ -16,8 +16,8 @@ export const searchExtension = {
         label: 'Search',
         href: '#search',
         icon: {
-          type: 'phosphor',
-          name: 'MagnifyingGlassIcon',
+          type: 'material-symbol',
+          name: 'search',
         },
         order: 60,
       },

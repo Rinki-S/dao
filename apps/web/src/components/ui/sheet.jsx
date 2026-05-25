@@ -2,7 +2,7 @@ import { Dialog as SheetPrimitive } from 'radix-ui';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { XIcon } from '@phosphor-icons/react';
+import { MaterialSymbol } from '@/components/ui/material-symbol.jsx';
 
 function Sheet({ ...props }) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -50,7 +50,7 @@ function SheetContent({ className, children, side = 'right', showCloseButton = t
         {showCloseButton && (
           <SheetPrimitive.Close data-slot="sheet-close" asChild>
             <Button variant="ghost" className="absolute top-3 right-3" size="icon-sm">
-              <XIcon />
+              <MaterialSymbol name="close" />
               <span className="sr-only">Close</span>
             </Button>
           </SheetPrimitive.Close>

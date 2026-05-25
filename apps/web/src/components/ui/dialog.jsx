@@ -4,7 +4,7 @@ import { Dialog as DialogPrimitive } from 'radix-ui';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { XIcon } from '@phosphor-icons/react';
+import { MaterialSymbol } from '@/components/ui/material-symbol.jsx';
 
 function Dialog({ ...props }) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -51,7 +51,7 @@ function DialogContent({ className, children, showCloseButton = true, ...props }
         {showCloseButton && (
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <Button variant="ghost" className="absolute top-2 right-2" size="icon-sm">
-              <XIcon />
+              <MaterialSymbol name="close" />
               <span className="sr-only">Close</span>
             </Button>
           </DialogPrimitive.Close>

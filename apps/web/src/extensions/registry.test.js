@@ -51,12 +51,12 @@ describe('extension registry', () => {
       'settings',
     ]);
     expect(sidebarItems.map((item) => item.icon)).toEqual([
-      { type: 'phosphor', name: 'SquaresFourIcon' },
-      { type: 'phosphor', name: 'FolderOpenIcon' },
-      { type: 'phosphor', name: 'CheckSquareIcon' },
-      { type: 'phosphor', name: 'NotePencilIcon' },
-      { type: 'phosphor', name: 'MagnifyingGlassIcon' },
-      { type: 'phosphor', name: 'GearSixIcon' },
+      { type: 'material-symbol', name: 'dashboard' },
+      { type: 'material-symbol', name: 'folder_open' },
+      { type: 'material-symbol', name: 'task_alt' },
+      { type: 'material-symbol', name: 'edit_note' },
+      { type: 'material-symbol', name: 'search' },
+      { type: 'material-symbol', name: 'settings' },
     ]);
   });
 

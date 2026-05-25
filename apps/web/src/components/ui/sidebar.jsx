@@ -14,9 +14,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { MaterialSymbol } from '@/components/ui/material-symbol.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { SidebarIcon } from '@phosphor-icons/react';
 
 const SIDEBAR_COOKIE_NAME = 'sidebar_state';
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -235,7 +235,7 @@ function SidebarTrigger({ className, onClick, ...props }) {
       }}
       {...props}
     >
-      <SidebarIcon />
+      <MaterialSymbol name="dock_to_left" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );

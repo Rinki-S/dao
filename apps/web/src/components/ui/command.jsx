@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { InputGroup, InputGroupAddon } from '@/components/ui/input-group';
-import { MagnifyingGlassIcon, CheckIcon } from '@phosphor-icons/react';
+import { MaterialSymbol } from '@/components/ui/material-symbol.jsx';
 
 function Command({ className, ...props }) {
   return (
@@ -63,7 +63,7 @@ function CommandInput({ className, ...props }) {
           {...props}
         />
         <InputGroupAddon>
-          <MagnifyingGlassIcon className="size-4 shrink-0 opacity-50" />
+          <MaterialSymbol name="search" className="opacity-50" />
         </InputGroupAddon>
       </InputGroup>
     </div>
@@ -127,7 +127,10 @@ function CommandItem({ className, children, ...props }) {
       {...props}
     >
       {children}
-      <CheckIcon className="ml-auto opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
+      <MaterialSymbol
+        name="check"
+        className="ml-auto opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100"
+      />
     </CommandPrimitive.Item>
   );
 }

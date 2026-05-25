@@ -16,8 +16,8 @@ export const tasksExtension = {
         label: 'Tasks',
         href: '#tasks',
         icon: {
-          type: 'phosphor',
-          name: 'CheckSquareIcon',
+          type: 'material-symbol',
+          name: 'task_alt',
         },
         order: 40,
       },
