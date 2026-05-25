@@ -123,23 +123,19 @@ function App() {
     };
   }, []);
 
-  async function handleWorkingDirectoryComplete(path) {
+  async function handleWorkingDirectoryComplete({ path, workspace }) {
     const nextWorkingDirectory = await updateWorkingDirectory({ path });
+    const createdWorkspace = await createWorkspace(workspace);
     const nextWorkspaces = await listWorkspaces();
 
     setWorkingDirectory(nextWorkingDirectory);
     setWorkingDirectoryStatus('ready');
     setWorkingDirectoryError('');
     setWorkspaces(nextWorkspaces);
-    setCurrentWorkspaceId((currentId) => {
-      if (nextWorkspaces.some((workspace) => workspace.id === currentId)) {
-        return currentId;
-      }
-
-      return nextWorkspaces[0]?.id ?? '';
-    });
+    setCurrentWorkspaceId(createdWorkspace.id);
     setWorkspaceStatus('ready');
     setWorkspaceError('');
+    notifyActivityChanged();
   }
 
   function handleSelectSurface(surfaceId) {
