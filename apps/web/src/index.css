@@ -100,7 +100,7 @@ body {
 }
 
 .material-symbols-rounded {
-  font-size: 1rem;
+  font-size: 18px;
   font-variation-settings:
     'FILL' var(--symbol-fill, 0),
     'wght' var(--symbol-weight, 400),
