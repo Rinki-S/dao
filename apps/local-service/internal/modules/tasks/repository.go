@@ -3,6 +3,7 @@ package tasks
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -14,6 +15,83 @@ type Repository struct {
 	db       *sql.DB
 	indexer  search.Indexer
 	activity *activities.Repository
+}
+
+func (r *Repository) UpdateStatus(id string, req UpdateTaskStatusRequest) (Task, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return Task{}, err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.Exec(`
+		UPDATE tasks
+		SET status = ?, updated_at = ?, version = version + 1, sync_status = 'local'
+		WHERE id = ? AND deleted_at IS NULL
+	`, req.Status, now, id)
+	if err != nil {
+		return Task{}, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return Task{}, err
+	}
+
+	if rowsAffected == 0 {
+		return Task{}, sql.ErrNoRows
+	}
+
+	task, err := scanTaskRow(tx.QueryRow(`
+		SELECT
+			id, workspace_id, project_id, title, description, status, priority, due_date,
+			created_at, updated_at, deleted_at, version, sync_status
+		FROM tasks
+		WHERE id = ?
+	`, id))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Task{}, err
+		}
+
+		return Task{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return Task{}, err
+	}
+
+	return task, nil
+}
+
+type taskScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanTaskRow(row taskScanner) (Task, error) {
+	var task Task
+
+	if err := row.Scan(
+		&task.ID,
+		&task.WorkspaceID,
+		&task.ProjectID,
+		&task.Title,
+		&task.Description,
+		&task.Status,
+		&task.Priority,
+		&task.DueDate,
+		&task.CreatedAt,
+		&task.UpdatedAt,
+		&task.DeletedAt,
+		&task.Version,
+		&task.SyncStatus,
+	); err != nil {
+		return Task{}, err
+	}
+
+	return task, nil
 }
 
 func NewRepository(db *sql.DB, indexer search.Indexer, activity *activities.Repository) *Repository {

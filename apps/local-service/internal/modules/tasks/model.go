@@ -24,3 +24,7 @@ type CreateTaskRequest struct {
 	Priority    string  `json:"priority"`
 	DueDate     *string `json:"dueDate"`
 }
+
+type UpdateTaskStatusRequest struct {
+	Status string `json:"status"`
+}

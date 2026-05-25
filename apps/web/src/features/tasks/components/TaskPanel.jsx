@@ -18,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { notifyActivityChanged } from '../../activities/events.js';
 import { listProjects } from '../../projects/api.js';
-import { createTask, listTasks } from '../api.js';
+import { createTask, listTasks, updateTaskStatus } from '../api.js';
 
 const filterOptions = [
   { label: 'All', value: 'all' },
@@ -68,6 +68,7 @@ export function TaskPanel({ currentWorkspace }) {
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [updatingTaskIds, setUpdatingTaskIds] = useState(() => new Set());
 
   const workspaceProjects = useMemo(() => {
     if (!currentWorkspace) {
@@ -194,6 +195,35 @@ export function TaskPanel({ currentWorkspace }) {
       setStatus('error');
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function handleToggleTaskDone(task) {
+    const nextStatus = task.status === 'done' ? 'todo' : 'done';
+
+    setUpdatingTaskIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      nextIds.add(task.id);
+      return nextIds;
+    });
+    setError('');
+
+    try {
+      const updatedTask = await updateTaskStatus(task.id, { status: nextStatus });
+
+      setTasks((currentTasks) =>
+        currentTasks.map((currentTask) =>
+          currentTask.id === updatedTask.id ? updatedTask : currentTask,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update task');
+    } finally {
+      setUpdatingTaskIds((currentIds) => {
+        const nextIds = new Set(currentIds);
+        nextIds.delete(task.id);
+        return nextIds;
+      });
     }
   }
 
@@ -331,6 +361,7 @@ export function TaskPanel({ currentWorkspace }) {
               const isDone = task.status === 'done';
               const projectName = task.projectId ? projectNameById.get(task.projectId) : null;
               const dueDate = formatDate(task.dueDate);
+              const isUpdating = updatingTaskIds.has(task.id);
 
               return (
                 <li key={task.id} className="border-b border-border py-3 first:pt-0">
@@ -338,8 +369,11 @@ export function TaskPanel({ currentWorkspace }) {
                     <Checkbox
                       aria-label={`Mark ${task.title} as done`}
                       checked={isDone}
-                      disabled
+                      disabled={isUpdating}
                       className="mt-0.5"
+                      onCheckedChange={() => {
+                        void handleToggleTaskDone(task);
+                      }}
                     />
 
                     <div className="min-w-0 flex-1">

@@ -26,3 +26,7 @@ export const CreateTaskInputSchema = z.object({
   priority: z.enum(['low', 'medium', 'high']).default('medium'),
   dueDate: z.string().trim().nullable(),
 });
+
+export const UpdateTaskStatusInputSchema = z.object({
+  status: z.enum(['todo', 'doing', 'done', 'archived']),
+});
