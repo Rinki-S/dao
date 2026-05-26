@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { getNote, updateNoteContent } from '../api.js';
 
@@ -34,6 +34,16 @@ export function NoteEditorPanel({ noteId }) {
   useEffect(() => {
     latestContentRef.current = content;
   }, [content]);
+
+  const flushPendingSave = useCallback((noteIdToSave) => {
+    const contentToSave = latestContentRef.current;
+
+    if (!noteIdToSave || contentToSave === savedContentRef.current) {
+      return;
+    }
+
+    void updateNoteContent(noteIdToSave, { content: contentToSave }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!noteId) {
@@ -72,9 +82,10 @@ export function NoteEditorPanel({ noteId }) {
     load();
 
     return () => {
+      flushPendingSave(noteId);
       cancelled = true;
     };
-  }, [noteId]);
+  }, [flushPendingSave, noteId]);
 
   useEffect(() => {
     if (loadStatus !== 'ready' || !noteId || content === savedContentRef.current) {
@@ -156,7 +167,10 @@ export function NoteEditorPanel({ noteId }) {
         aria-label="Markdown note content"
         className="min-h-0 flex-1 resize-none rounded-none border-0 bg-transparent p-0 font-mono text-sm leading-6 shadow-none focus-visible:ring-0"
         value={content}
-        onChange={(event) => setContent(event.target.value)}
+        onChange={(event) => {
+          latestContentRef.current = event.target.value;
+          setContent(event.target.value);
+        }}
         placeholder="Write markdown..."
         spellCheck={false}
       />
