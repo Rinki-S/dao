@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { notifyActivityChanged } from '@/features/activities/events.js';
 import { getNote, updateNote, updateNoteContent } from '../api.js';
-import { MarkdownEditor } from './MarkdownEditor.jsx';
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -245,13 +245,16 @@ export function NoteEditorPanel({ noteId }) {
 
       {error && saveStatus === 'failed' && <p className="text-sm text-destructive">{error}</p>}
 
-      <MarkdownEditor
+      <Textarea
+        aria-label="Markdown note content"
+        className="min-h-0 flex-1 resize-none rounded-none border-0 bg-transparent p-0 font-mono text-sm leading-6 shadow-none focus-visible:ring-0"
         value={content}
-        onChange={(nextContent) => {
-          latestContentRef.current = nextContent;
-          setContent(nextContent);
+        onChange={(event) => {
+          latestContentRef.current = event.target.value;
+          setContent(event.target.value);
         }}
         placeholder="Write markdown..."
+        spellCheck={false}
       />
     </section>
   );
