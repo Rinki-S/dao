@@ -1,6 +1,7 @@
 package notes
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -31,6 +32,7 @@ func NewHandler(repo *Repository) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/notes", h.list)
 	mux.HandleFunc("POST /api/notes", h.create)
+	mux.HandleFunc("GET /api/notes/{id}", h.get)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +43,27 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.JSON(w, http.StatusOK, notes)
+}
+
+func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		httpx.Error(w, http.StatusBadRequest, "note id is required")
+		return
+	}
+
+	note, err := h.repo.Get(id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			httpx.Error(w, http.StatusNotFound, "note not found")
+			return
+		}
+
+		httpx.Error(w, http.StatusInternalServerError, "failed to get note")
+		return
+	}
+
+	httpx.JSON(w, http.StatusOK, note)
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {

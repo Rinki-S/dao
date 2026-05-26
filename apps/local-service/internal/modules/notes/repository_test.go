@@ -2,6 +2,9 @@ package notes
 
 import (
 	"database/sql"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -80,6 +83,97 @@ func TestRepositoryCreateWritesUnassignedMarkdownFileToWorkspaceRoot(t *testing.
 	}
 
 	assertFileContent(t, note.FilePath, "- Designing Data-Intensive Applications")
+}
+
+func TestRepositoryGetReadsMarkdownFileContent(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+
+	createdNote, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		ProjectID:   nil,
+		Title:       "Editor Plan",
+		Content:     "# Editor Plan\n\nAutosave first.",
+		ContentType: "markdown",
+		NoteType:    "general",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	note, err := repo.Get(createdNote.ID)
+	if err != nil {
+		t.Fatalf("get note: %v", err)
+	}
+
+	if note.Content != "# Editor Plan\n\nAutosave first." {
+		t.Fatalf("Content = %q", note.Content)
+	}
+}
+
+func TestHandlerGetNote(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+	createdNote, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		ProjectID:   nil,
+		Title:       "Handler Note",
+		Content:     "Handler content",
+		ContentType: "markdown",
+		NoteType:    "general",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/notes/"+createdNote.ID, nil)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var note Note
+	if err := json.NewDecoder(rec.Body).Decode(&note); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if note.ID != createdNote.ID {
+		t.Fatalf("ID = %q, want %q", note.ID, createdNote.ID)
+	}
+
+	if note.Content != "Handler content" {
+		t.Fatalf("Content = %q", note.Content)
+	}
+}
+
+func TestHandlerGetNoteNotFound(t *testing.T) {
+	db := openNotesTestDB(t)
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/notes/missing-note", nil)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
 }
 
 type captureIndexer struct {

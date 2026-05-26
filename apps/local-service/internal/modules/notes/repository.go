@@ -22,11 +22,15 @@ func NewRepository(db *sql.DB, indexer search.Indexer, activity *activities.Repo
 	return &Repository{db: db, indexer: indexer, activity: activity}
 }
 
+const noteSelectColumns = `
+	id, workspace_id, project_id, title, file_path, content_type, note_type,
+	created_at, updated_at, deleted_at, version, sync_status
+`
+
 func (r *Repository) List() ([]Note, error) {
 	rows, err := r.db.Query(`
 		SELECT
-			id, workspace_id, project_id, title, file_path, content_type, note_type,
-			created_at, updated_at, deleted_at, version, sync_status
+			` + noteSelectColumns + `
 		FROM notes
 		WHERE deleted_at IS NULL
 		ORDER BY created_at DESC
@@ -39,22 +43,8 @@ func (r *Repository) List() ([]Note, error) {
 	notes := []Note{}
 
 	for rows.Next() {
-		var note Note
-
-		if err := rows.Scan(
-			&note.ID,
-			&note.WorkspaceID,
-			&note.ProjectID,
-			&note.Title,
-			&note.FilePath,
-			&note.ContentType,
-			&note.NoteType,
-			&note.CreatedAt,
-			&note.UpdatedAt,
-			&note.DeletedAt,
-			&note.Version,
-			&note.SyncStatus,
-		); err != nil {
+		note, err := scanNote(rows)
+		if err != nil {
 			return nil, err
 		}
 
@@ -62,6 +52,27 @@ func (r *Repository) List() ([]Note, error) {
 	}
 
 	return notes, rows.Err()
+}
+
+func (r *Repository) Get(id string) (Note, error) {
+	note, err := scanNote(r.db.QueryRow(`
+		SELECT
+			`+noteSelectColumns+`
+		FROM notes
+		WHERE id = ? AND deleted_at IS NULL
+	`, id))
+	if err != nil {
+		return Note{}, err
+	}
+
+	content, err := os.ReadFile(note.FilePath)
+	if err != nil {
+		return Note{}, err
+	}
+
+	note.Content = string(content)
+
+	return note, nil
 }
 
 func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
@@ -208,4 +219,31 @@ func (r *Repository) noteParentDir(workspaceID string, projectID *string) (strin
 	}
 
 	return rootPath, nil
+}
+
+type noteScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanNote(scanner noteScanner) (Note, error) {
+	var note Note
+
+	if err := scanner.Scan(
+		&note.ID,
+		&note.WorkspaceID,
+		&note.ProjectID,
+		&note.Title,
+		&note.FilePath,
+		&note.ContentType,
+		&note.NoteType,
+		&note.CreatedAt,
+		&note.UpdatedAt,
+		&note.DeletedAt,
+		&note.Version,
+		&note.SyncStatus,
+	); err != nil {
+		return Note{}, err
+	}
+
+	return note, nil
 }

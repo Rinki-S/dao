@@ -12,6 +12,17 @@ export async function listNotes() {
   return NoteListSchema.parse(data);
 }
 
+export async function getNote(id) {
+  const response = await apiFetch(`/api/notes/${encodeURIComponent(id)}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to get note: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return NoteSchema.parse(data);
+}
+
 export async function createNote(input) {
   const payload = CreateNoteInputSchema.parse(input);
 
