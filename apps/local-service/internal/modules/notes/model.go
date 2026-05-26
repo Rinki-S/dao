@@ -6,6 +6,7 @@ type Note struct {
 	ProjectID   *string `json:"projectId"`
 	Title       string  `json:"title"`
 	Content     string  `json:"content"`
+	FilePath    string  `json:"filePath"`
 	ContentType string  `json:"contentType"`
 	NoteType    string  `json:"noteType"`
 	CreatedAt   string  `json:"createdAt"`

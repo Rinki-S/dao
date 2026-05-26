@@ -6,6 +6,7 @@ export const NoteSchema = z.object({
   projectId: z.string().nullable(),
   title: z.string(),
   content: z.string(),
+  filePath: z.string().default(''),
   contentType: z.enum(['markdown']),
   noteType: z.enum(['general', 'project', 'learning', 'daily', 'interview']),
   createdAt: z.string(),

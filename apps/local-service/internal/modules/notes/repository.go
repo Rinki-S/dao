@@ -3,9 +3,11 @@ package notes
 import (
 	"database/sql"
 	"encoding/json"
+	"os"
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/rinki-s/dao/apps/local-service/internal/files"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
@@ -23,7 +25,7 @@ func NewRepository(db *sql.DB, indexer search.Indexer, activity *activities.Repo
 func (r *Repository) List() ([]Note, error) {
 	rows, err := r.db.Query(`
 		SELECT
-			id, workspace_id, project_id, title, content, content_type, note_type,
+			id, workspace_id, project_id, title, file_path, content_type, note_type,
 			created_at, updated_at, deleted_at, version, sync_status
 		FROM notes
 		WHERE deleted_at IS NULL
@@ -44,7 +46,7 @@ func (r *Repository) List() ([]Note, error) {
 			&note.WorkspaceID,
 			&note.ProjectID,
 			&note.Title,
-			&note.Content,
+			&note.FilePath,
 			&note.ContentType,
 			&note.NoteType,
 			&note.CreatedAt,
@@ -64,6 +66,7 @@ func (r *Repository) List() ([]Note, error) {
 
 func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
+	id := ulid.Make().String()
 	contentType := req.ContentType
 	if contentType == "" {
 		contentType = "markdown"
@@ -74,12 +77,31 @@ func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 		noteType = "general"
 	}
 
+	parentDir, err := r.noteParentDir(req.WorkspaceID, req.ProjectID)
+	if err != nil {
+		return Note{}, err
+	}
+
+	filePath := files.MarkdownNoteFilePath(parentDir, req.Title, id)
+
+	if err := os.WriteFile(filePath, []byte(req.Content), 0644); err != nil {
+		return Note{}, err
+	}
+
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.Remove(filePath)
+		}
+	}()
+
 	note := Note{
-		ID:          ulid.Make().String(),
+		ID:          id,
 		WorkspaceID: req.WorkspaceID,
 		ProjectID:   req.ProjectID,
 		Title:       req.Title,
-		Content:     req.Content,
+		Content:     "",
+		FilePath:    filePath,
 		ContentType: contentType,
 		NoteType:    noteType,
 		CreatedAt:   now,
@@ -97,7 +119,7 @@ func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 
 	_, err = tx.Exec(`
 		INSERT INTO notes (
-			id, workspace_id, project_id, title, content, content_type, note_type,
+			id, workspace_id, project_id, title, file_path, content_type, note_type,
 			created_at, updated_at, deleted_at, version, sync_status
 		)
 		VALUES (
@@ -108,7 +130,7 @@ func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 		note.WorkspaceID,
 		note.ProjectID,
 		note.Title,
-		note.Content,
+		note.FilePath,
 		note.ContentType,
 		note.NoteType,
 		note.CreatedAt,
@@ -127,7 +149,7 @@ func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 		WorkspaceID: note.WorkspaceID,
 		ProjectID:   note.ProjectID,
 		Title:       note.Title,
-		Body:        note.Content,
+		Body:        req.Content,
 		CreatedAt:   note.CreatedAt,
 		UpdatedAt:   note.UpdatedAt,
 	}); err != nil {
@@ -157,5 +179,33 @@ func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 		return Note{}, err
 	}
 
+	committed = true
+
 	return note, nil
+}
+
+func (r *Repository) noteParentDir(workspaceID string, projectID *string) (string, error) {
+	if projectID != nil {
+		var folderPath string
+		if err := r.db.QueryRow(`
+			SELECT folder_path
+			FROM projects
+			WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL
+		`, *projectID, workspaceID).Scan(&folderPath); err != nil {
+			return "", err
+		}
+
+		return folderPath, nil
+	}
+
+	var rootPath string
+	if err := r.db.QueryRow(`
+		SELECT root_path
+		FROM workspaces
+		WHERE id = ? AND deleted_at IS NULL
+	`, workspaceID).Scan(&rootPath); err != nil {
+		return "", err
+	}
+
+	return rootPath, nil
 }

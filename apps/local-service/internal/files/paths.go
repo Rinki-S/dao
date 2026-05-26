@@ -15,6 +15,10 @@ func ProjectFolderPath(workspaceRoot string, name string, id string) string {
 	return filepath.Join(workspaceRoot, EntityFolderName(name, id))
 }
 
+func MarkdownNoteFilePath(parentDir string, title string, id string) string {
+	return filepath.Join(parentDir, EntityFolderName(title, id)+".md")
+}
+
 func EntityFolderName(name string, id string) string {
 	return SlugifyName(name) + "-" + id
 }
