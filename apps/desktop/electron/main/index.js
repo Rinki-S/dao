@@ -1,7 +1,13 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createServiceConfig, startLocalService, stopLocalService, waitForServiceHealth } from './service-manager.js'
+import {
+    createServiceConfig,
+    startLocalService,
+    stopLocalService,
+    waitForLocalServiceExit,
+    waitForServiceHealth,
+} from './service-manager.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -9,6 +15,7 @@ const __dirname = path.dirname(__filename)
 let localService = null
 let serviceConfig = null
 let isStoppingLocalService = false
+let restartLocalServicePromise = null
 let mainWindow = null
 
 function createWindow() {
@@ -52,6 +59,26 @@ ipcMain.handle('dao:select-working-directory', async () => {
     return { canceled: false, path: result.filePaths[0] }
 })
 
+ipcMain.handle('dao:restart-local-service', async () => {
+    if (!serviceConfig) {
+        return { ok: false, error: 'Local service is not configured' }
+    }
+
+    if (!restartLocalServicePromise) {
+        restartLocalServicePromise = restartLocalService()
+            .then(() => ({ ok: true, error: '' }))
+            .catch((error) => ({
+                ok: false,
+                error: error instanceof Error ? error.message : 'Failed to restart local service',
+            }))
+            .finally(() => {
+                restartLocalServicePromise = null
+            })
+    }
+
+    return restartLocalServicePromise
+})
+
 app.whenReady().then(async () => {
     serviceConfig = createServiceConfig()
     localService = startLocalService(serviceConfig)
@@ -84,6 +111,16 @@ function stopServiceOnce() {
 
     isStoppingLocalService = true
     stopLocalService(localService)
+}
+
+async function restartLocalService() {
+    const currentService = localService
+
+    stopLocalService(currentService)
+    await waitForLocalServiceExit(currentService)
+
+    localService = startLocalService(serviceConfig)
+    await waitForServiceHealth(serviceConfig.baseUrl)
 }
 
 process.on('exit', stopServiceOnce)

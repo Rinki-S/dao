@@ -14,4 +14,5 @@ contextBridge.exposeInMainWorld('dao', {
         sessionToken: readArg('dao-session-token'),
     },
     selectWorkingDirectory: () => ipcRenderer.invoke('dao:select-working-directory'),
+    restartLocalService: () => ipcRenderer.invoke('dao:restart-local-service'),
 })

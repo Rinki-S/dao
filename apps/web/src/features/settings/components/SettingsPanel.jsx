@@ -1,6 +1,34 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
+  const [restartStatus, setRestartStatus] = useState('idle');
+  const [restartError, setRestartError] = useState('');
+
+  async function handleRestartLocalService() {
+    if (!window.dao?.restartLocalService) {
+      setRestartStatus('failed');
+      setRestartError('Restart is only available in the desktop app.');
+      return;
+    }
+
+    try {
+      setRestartStatus('restarting');
+      setRestartError('');
+
+      const result = await window.dao.restartLocalService();
+
+      if (!result?.ok) {
+        throw new Error(result?.error || 'Failed to restart Go service');
+      }
+
+      setRestartStatus('restarted');
+    } catch (err) {
+      setRestartStatus('failed');
+      setRestartError(err instanceof Error ? err.message : 'Failed to restart Go service');
+    }
+  }
+
   return (
     <section id="settings" className="flex w-full flex-col gap-7">
       <section className="flex flex-col gap-2">
@@ -32,6 +60,37 @@ export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
             </div>
             <Button type="button" variant="outline" onClick={onReplayOnboarding}>
               Open
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Debug
+        </h2>
+
+        <div className="overflow-hidden rounded-xl border border-border bg-background">
+          <div className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium text-foreground">Restart Go Service</h3>
+              <p className="mt-0.5 text-sm text-muted-foreground text-pretty">
+                Stop and start the local backend process for development debugging.
+              </p>
+              {restartStatus === 'restarted' && (
+                <p className="mt-1 text-sm text-muted-foreground">Go service restarted.</p>
+              )}
+              {restartStatus === 'failed' && restartError && (
+                <p className="mt-1 text-sm text-destructive">{restartError}</p>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={restartStatus === 'restarting'}
+              onClick={handleRestartLocalService}
+            >
+              {restartStatus === 'restarting' ? 'Restarting...' : 'Restart'}
             </Button>
           </div>
         </div>

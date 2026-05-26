@@ -64,8 +64,39 @@ export async function waitForServiceHealth(baseUrl, options = {}) {
     throw new Error(`Timed out waiting for local service at ${baseUrl}`);
 }
 
+export async function waitForLocalServiceExit(child, options = {}) {
+    if (!child || child.exitCode !== null || child.signalCode !== null) {
+        return
+    }
+
+    const timeoutMs = options.timeoutMs ?? 5_000
+
+    await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            cleanup()
+            reject(new Error('Timed out waiting for local service to stop'))
+        }, timeoutMs)
+
+        function cleanup() {
+            clearTimeout(timeoutId)
+            child.off('exit', handleExit)
+        }
+
+        function handleExit() {
+            cleanup()
+            resolve()
+        }
+
+        child.once('exit', handleExit)
+
+        if (child.exitCode !== null || child.signalCode !== null) {
+            handleExit()
+        }
+    })
+}
+
 export function stopLocalService(child) {
-    if (!child || child.killed) {
+    if (!child || child.killed || child.exitCode !== null || child.signalCode !== null) {
         return
     }
 
