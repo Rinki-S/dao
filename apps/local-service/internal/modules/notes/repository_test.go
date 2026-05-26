@@ -170,6 +170,68 @@ func TestRepositoryUpdateContentWritesMarkdownFileAndReplacesIndex(t *testing.T)
 	}
 }
 
+func TestRepositoryUpdateChangesMetadataAndReplacesIndex(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	indexer := &captureIndexer{}
+	repo := NewRepository(db, indexer, activities.NewRepository(db))
+
+	createdNote, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		ProjectID:   nil,
+		Title:       "Draft Title",
+		Content:     "Markdown body",
+		ContentType: "markdown",
+		NoteType:    "general",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	title := "Published Title"
+	noteType := "learning"
+	updatedNote, err := repo.Update(createdNote.ID, UpdateNoteRequest{
+		Title:    &title,
+		NoteType: &noteType,
+	})
+	if err != nil {
+		t.Fatalf("update note: %v", err)
+	}
+
+	if updatedNote.Title != "Published Title" {
+		t.Fatalf("Title = %q", updatedNote.Title)
+	}
+
+	if updatedNote.NoteType != "learning" {
+		t.Fatalf("NoteType = %q", updatedNote.NoteType)
+	}
+
+	if updatedNote.Content != "Markdown body" {
+		t.Fatalf("Content = %q", updatedNote.Content)
+	}
+
+	if updatedNote.Version != createdNote.Version+1 {
+		t.Fatalf("Version = %d, want %d", updatedNote.Version, createdNote.Version+1)
+	}
+
+	assertFileContent(t, createdNote.FilePath, "Markdown body")
+
+	if len(indexer.replacedEntries) != 1 {
+		t.Fatalf("len(indexer.replacedEntries) = %d, want 1", len(indexer.replacedEntries))
+	}
+
+	if indexer.replacedEntries[0].Title != "Published Title" {
+		t.Fatalf("replaced title = %q", indexer.replacedEntries[0].Title)
+	}
+
+	if indexer.replacedEntries[0].Body != "Markdown body" {
+		t.Fatalf("replaced body = %q", indexer.replacedEntries[0].Body)
+	}
+}
+
 func TestHandlerGetNote(t *testing.T) {
 	db := openNotesTestDB(t)
 	workspaceRoot := t.TempDir()
@@ -212,6 +274,99 @@ func TestHandlerGetNote(t *testing.T) {
 
 	if note.Content != "Handler content" {
 		t.Fatalf("Content = %q", note.Content)
+	}
+}
+
+func TestHandlerUpdateNote(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+	createdNote, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		ProjectID:   nil,
+		Title:       "Handler Draft",
+		Content:     "Handler body",
+		ContentType: "markdown",
+		NoteType:    "general",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/notes/"+createdNote.ID,
+		bytes.NewBufferString(`{"title":"Handler Published","noteType":"learning"}`),
+	)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var note Note
+	if err := json.NewDecoder(rec.Body).Decode(&note); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if note.Title != "Handler Published" {
+		t.Fatalf("Title = %q", note.Title)
+	}
+
+	if note.NoteType != "learning" {
+		t.Fatalf("NoteType = %q", note.NoteType)
+	}
+
+	if note.Content != "Handler body" {
+		t.Fatalf("Content = %q", note.Content)
+	}
+}
+
+func TestHandlerUpdateNoteRejectsEmptyTitle(t *testing.T) {
+	db := openNotesTestDB(t)
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/notes/note-1",
+		bytes.NewBufferString(`{"title":"   "}`),
+	)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandlerUpdateNoteNotFound(t *testing.T) {
+	db := openNotesTestDB(t)
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/notes/missing-note",
+		bytes.NewBufferString(`{"title":"Missing Note"}`),
+	)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 }
 

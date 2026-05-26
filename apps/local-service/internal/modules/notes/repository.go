@@ -274,6 +274,79 @@ func (r *Repository) UpdateContent(id string, content string) (Note, error) {
 	return note, nil
 }
 
+func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	note, err := scanNote(r.db.QueryRow(`
+		SELECT
+			`+noteSelectColumns+`
+		FROM notes
+		WHERE id = ? AND deleted_at IS NULL
+	`, id))
+	if err != nil {
+		return Note{}, err
+	}
+
+	if req.Title != nil {
+		note.Title = *req.Title
+	}
+	if req.NoteType != nil {
+		note.NoteType = *req.NoteType
+	}
+
+	content, err := os.ReadFile(note.FilePath)
+	if err != nil {
+		return Note{}, err
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return Note{}, err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.Exec(`
+		UPDATE notes
+		SET title = ?, note_type = ?, updated_at = ?, version = version + 1, sync_status = 'local'
+		WHERE id = ? AND deleted_at IS NULL
+	`, note.Title, note.NoteType, now, id)
+	if err != nil {
+		return Note{}, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return Note{}, err
+	}
+	if rowsAffected == 0 {
+		return Note{}, sql.ErrNoRows
+	}
+
+	note.UpdatedAt = now
+	note.Version += 1
+	note.SyncStatus = "local"
+	note.Content = string(content)
+
+	if err := r.indexer.ReplaceTx(tx, search.IndexEntry{
+		EntityType:  "note",
+		EntityID:    note.ID,
+		WorkspaceID: note.WorkspaceID,
+		ProjectID:   note.ProjectID,
+		Title:       note.Title,
+		Body:        note.Content,
+		CreatedAt:   note.CreatedAt,
+		UpdatedAt:   note.UpdatedAt,
+	}); err != nil {
+		return Note{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return Note{}, err
+	}
+
+	return note, nil
+}
+
 func (r *Repository) noteParentDir(workspaceID string, projectID *string) (string, error) {
 	if projectID != nil {
 		var folderPath string

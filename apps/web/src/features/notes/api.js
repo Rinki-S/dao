@@ -3,6 +3,7 @@ import {
   CreateNoteInputSchema,
   NoteListSchema,
   NoteSchema,
+  UpdateNoteInputSchema,
   UpdateNoteContentInputSchema,
 } from './schemas.js';
 
@@ -60,6 +61,25 @@ export async function updateNoteContent(id, input) {
 
   if (!response.ok) {
     throw new Error(`Failed to update note content: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return NoteSchema.parse(data);
+}
+
+export async function updateNote(id, input) {
+  const payload = UpdateNoteInputSchema.parse(input);
+
+  const response = await apiFetch(`/api/notes/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update note: ${response.status}`);
   }
 
   const data = await response.json();

@@ -1,11 +1,16 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getNote, updateNoteContent } from '../api.js';
+import { getNote, updateNote, updateNoteContent } from '../api.js';
 import { NoteEditorPanel } from './NoteEditorPanel.jsx';
 
 vi.mock('../api.js', () => ({
   getNote: vi.fn(),
+  updateNote: vi.fn(),
   updateNoteContent: vi.fn(),
+}));
+
+vi.mock('@/features/activities/events.js', () => ({
+  notifyActivityChanged: vi.fn(),
 }));
 
 function makeNote(overrides = {}) {
@@ -30,6 +35,7 @@ function makeNote(overrides = {}) {
 describe('NoteEditorPanel', () => {
   beforeEach(() => {
     getNote.mockResolvedValue(makeNote());
+    updateNote.mockResolvedValue(makeNote({ title: 'Updated title', version: 2 }));
     updateNoteContent.mockResolvedValue(makeNote({ content: 'Updated content', version: 2 }));
   });
 
@@ -41,8 +47,27 @@ describe('NoteEditorPanel', () => {
     render(<NoteEditorPanel noteId="note-1" />);
 
     expect(await screen.findByDisplayValue('Initial content')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Editor Plan' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Editor Plan')).toBeInTheDocument();
     expect(getNote).toHaveBeenCalledWith('note-1');
+  });
+
+  it('autosaves edited note title after a debounce', async () => {
+    render(<NoteEditorPanel noteId="note-1" />);
+
+    const titleInput = await screen.findByLabelText('Note title');
+    fireEvent.change(titleInput, { target: { value: 'Updated title' } });
+
+    expect(screen.getByText('Saving...')).toBeInTheDocument();
+
+    await waitFor(
+      () => {
+        expect(updateNote).toHaveBeenCalledWith('note-1', { title: 'Updated title' });
+      },
+      { timeout: 2000 },
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Saved')).toBeInTheDocument();
+    });
   });
 
   it('autosaves edited markdown after a debounce', async () => {
@@ -86,5 +111,29 @@ describe('NoteEditorPanel', () => {
       expect(updateNoteContent).toHaveBeenCalledWith('note-1', { content: 'Unsaved draft' });
     });
     expect(await screen.findByDisplayValue('Second content')).toBeInTheDocument();
+  });
+
+  it('flushes pending title changes when switching notes', async () => {
+    getNote.mockImplementation((noteId) =>
+      Promise.resolve(
+        makeNote({
+          id: noteId,
+          title: noteId === 'note-1' ? 'First Note' : 'Second Note',
+          content: noteId === 'note-1' ? 'First content' : 'Second content',
+        }),
+      ),
+    );
+
+    const { rerender } = render(<NoteEditorPanel noteId="note-1" />);
+
+    const titleInput = await screen.findByLabelText('Note title');
+    fireEvent.change(titleInput, { target: { value: 'Renamed Note' } });
+
+    rerender(<NoteEditorPanel noteId="note-2" />);
+
+    await waitFor(() => {
+      expect(updateNote).toHaveBeenCalledWith('note-1', { title: 'Renamed Note' });
+    });
+    expect(await screen.findByDisplayValue('Second Note')).toBeInTheDocument();
   });
 });

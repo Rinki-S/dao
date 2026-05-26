@@ -30,3 +30,12 @@ export const CreateNoteInputSchema = z.object({
 export const UpdateNoteContentInputSchema = z.object({
   content: z.string(),
 });
+
+export const UpdateNoteInputSchema = z
+  .object({
+    title: z.string().trim().min(1, { error: 'Note title is required' }).optional(),
+    noteType: z.enum(['general', 'project', 'learning', 'daily', 'interview']).optional(),
+  })
+  .refine((input) => input.title !== undefined || input.noteType !== undefined, {
+    error: 'Note update payload is required',
+  });
