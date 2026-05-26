@@ -86,7 +86,9 @@ function MetricValue({ label, value }) {
   return (
     <div className="rounded-md border border-border px-3 py-3">
       <span className="block text-xs font-medium text-muted-foreground">{label}</span>
-      <span className="mt-2 block font-mono text-2xl font-semibold text-foreground">{value}</span>
+      <span className="mt-2 block font-mono text-2xl font-semibold tabular-nums text-foreground">
+        {value}
+      </span>
     </div>
   );
 }

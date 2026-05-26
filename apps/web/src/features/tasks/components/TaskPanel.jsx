@@ -554,7 +554,7 @@ export function TaskPanel({ currentWorkspace }) {
                           {hasChildren ? (
                             <Button
                               aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${task.title}`}
-                              className="absolute top-1/2 left-1 -translate-y-1/2 active:not-aria-[haspopup]:-translate-y-1/2"
+                              className="absolute top-1/2 left-1 -translate-y-1/2"
                               size="icon-xs"
                               type="button"
                               variant="ghost"
@@ -603,7 +603,7 @@ export function TaskPanel({ currentWorkspace }) {
                         </TableCell>
                         <TableCell className="w-28 text-muted-foreground">
                           {dueDate && (
-                            <span className="flex items-center justify-end gap-1 text-xs">
+                            <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
                               <CalendarToday aria-hidden="true" className="size-3 shrink-0" />
                               {dueDate}
                             </span>
@@ -737,7 +737,7 @@ export function TaskPanel({ currentWorkspace }) {
                                 </TableCell>
                                 <TableCell className="w-28 text-muted-foreground">
                                   {childDueDate && (
-                                    <span className="flex items-center justify-end gap-1 text-xs">
+                                    <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
                                       <CalendarToday
                                         aria-hidden="true"
                                         className="size-3 shrink-0"

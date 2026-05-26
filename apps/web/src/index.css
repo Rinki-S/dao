@@ -147,10 +147,18 @@ body {
   }
   body {
     @apply font-sans bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
     font-size: 18px;
     line-height: 145%;
   }
   html {
     @apply font-sans;
+  }
+  :where(h1, h2, h3, h4, h5, h6, [data-slot='card-title']) {
+    text-wrap: balance;
+  }
+  :where(p, li, [data-slot='card-description']) {
+    text-wrap: pretty;
   }
 }
