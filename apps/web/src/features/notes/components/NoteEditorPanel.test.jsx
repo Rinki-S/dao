@@ -13,6 +13,16 @@ vi.mock('@/features/activities/events.js', () => ({
   notifyActivityChanged: vi.fn(),
 }));
 
+vi.mock('./MarkdownEditor.jsx', () => ({
+  MarkdownEditor: ({ value, onChange }) => (
+    <textarea
+      aria-label="Markdown note content"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  ),
+}));
+
 function makeNote(overrides = {}) {
   return {
     id: 'note-1',
