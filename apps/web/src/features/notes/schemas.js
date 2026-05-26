@@ -26,3 +26,7 @@ export const CreateNoteInputSchema = z.object({
   contentType: z.enum(['markdown']).default('markdown'),
   noteType: z.enum(['general', 'project', 'learning', 'daily', 'interview']).default('general'),
 });
+
+export const UpdateNoteContentInputSchema = z.object({
+  content: z.string(),
+});

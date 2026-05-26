@@ -1,5 +1,10 @@
 import { apiFetch } from '../../lib/api-client.js';
-import { CreateNoteInputSchema, NoteListSchema, NoteSchema } from './schemas.js';
+import {
+  CreateNoteInputSchema,
+  NoteListSchema,
+  NoteSchema,
+  UpdateNoteContentInputSchema,
+} from './schemas.js';
 
 export async function listNotes() {
   const response = await apiFetch('/api/notes');
@@ -36,6 +41,25 @@ export async function createNote(input) {
 
   if (!response.ok) {
     throw new Error(`Failed to create note: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return NoteSchema.parse(data);
+}
+
+export async function updateNoteContent(id, input) {
+  const payload = UpdateNoteContentInputSchema.parse(input);
+
+  const response = await apiFetch(`/api/notes/${encodeURIComponent(id)}/content`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update note content: ${response.status}`);
   }
 
   const data = await response.json();

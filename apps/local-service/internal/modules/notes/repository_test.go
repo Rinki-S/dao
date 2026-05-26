@@ -1,6 +1,7 @@
 package notes
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -115,6 +116,60 @@ func TestRepositoryGetReadsMarkdownFileContent(t *testing.T) {
 	}
 }
 
+func TestRepositoryUpdateContentWritesMarkdownFileAndReplacesIndex(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	indexer := &captureIndexer{}
+	repo := NewRepository(db, indexer, activities.NewRepository(db))
+
+	createdNote, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		ProjectID:   nil,
+		Title:       "Autosave Plan",
+		Content:     "Initial content",
+		ContentType: "markdown",
+		NoteType:    "general",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	updatedNote, err := repo.UpdateContent(createdNote.ID, "Updated content")
+	if err != nil {
+		t.Fatalf("update content: %v", err)
+	}
+
+	if updatedNote.Content != "Updated content" {
+		t.Fatalf("updated Content = %q", updatedNote.Content)
+	}
+
+	if updatedNote.Version != createdNote.Version+1 {
+		t.Fatalf("updated Version = %d, want %d", updatedNote.Version, createdNote.Version+1)
+	}
+
+	assertFileContent(t, createdNote.FilePath, "Updated content")
+
+	readNote, err := repo.Get(createdNote.ID)
+	if err != nil {
+		t.Fatalf("get updated note: %v", err)
+	}
+
+	if readNote.Content != "Updated content" {
+		t.Fatalf("read Content = %q", readNote.Content)
+	}
+
+	if len(indexer.replacedEntries) != 1 {
+		t.Fatalf("len(indexer.replacedEntries) = %d, want 1", len(indexer.replacedEntries))
+	}
+
+	if indexer.replacedEntries[0].Body != "Updated content" {
+		t.Fatalf("replaced body = %q", indexer.replacedEntries[0].Body)
+	}
+}
+
 func TestHandlerGetNote(t *testing.T) {
 	db := openNotesTestDB(t)
 	workspaceRoot := t.TempDir()
@@ -160,6 +215,73 @@ func TestHandlerGetNote(t *testing.T) {
 	}
 }
 
+func TestHandlerUpdateNoteContent(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+	createdNote, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		ProjectID:   nil,
+		Title:       "Handler Update Note",
+		Content:     "Initial handler content",
+		ContentType: "markdown",
+		NoteType:    "general",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/notes/"+createdNote.ID+"/content",
+		bytes.NewBufferString(`{"content":"Updated handler content"}`),
+	)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var note Note
+	if err := json.NewDecoder(rec.Body).Decode(&note); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if note.Content != "Updated handler content" {
+		t.Fatalf("Content = %q", note.Content)
+	}
+
+	assertFileContent(t, createdNote.FilePath, "Updated handler content")
+}
+
+func TestHandlerUpdateNoteContentNotFound(t *testing.T) {
+	db := openNotesTestDB(t)
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/notes/missing-note/content",
+		bytes.NewBufferString(`{"content":"Updated content"}`),
+	)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
 func TestHandlerGetNoteNotFound(t *testing.T) {
 	db := openNotesTestDB(t)
 	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
@@ -177,11 +299,17 @@ func TestHandlerGetNoteNotFound(t *testing.T) {
 }
 
 type captureIndexer struct {
-	entries []search.IndexEntry
+	entries         []search.IndexEntry
+	replacedEntries []search.IndexEntry
 }
 
 func (i *captureIndexer) IndexTx(_ *sql.Tx, entry search.IndexEntry) error {
 	i.entries = append(i.entries, entry)
+	return nil
+}
+
+func (i *captureIndexer) ReplaceTx(_ *sql.Tx, entry search.IndexEntry) error {
+	i.replacedEntries = append(i.replacedEntries, entry)
 	return nil
 }
 

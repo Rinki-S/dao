@@ -33,6 +33,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/notes", h.list)
 	mux.HandleFunc("POST /api/notes", h.create)
 	mux.HandleFunc("GET /api/notes/{id}", h.get)
+	mux.HandleFunc("PUT /api/notes/{id}/content", h.updateContent)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +112,33 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.JSON(w, http.StatusCreated, note)
+}
+
+func (h *Handler) updateContent(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		httpx.Error(w, http.StatusBadRequest, "note id is required")
+		return
+	}
+
+	var req UpdateNoteContentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	note, err := h.repo.UpdateContent(id, req.Content)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			httpx.Error(w, http.StatusNotFound, "note not found")
+			return
+		}
+
+		httpx.Error(w, http.StatusInternalServerError, "failed to update note content")
+		return
+	}
+
+	httpx.JSON(w, http.StatusOK, note)
 }
 
 func trimOptionalString(value *string) *string {

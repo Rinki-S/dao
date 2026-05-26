@@ -24,3 +24,7 @@ type CreateNoteRequest struct {
 	ContentType string  `json:"contentType"`
 	NoteType    string  `json:"noteType"`
 }
+
+type UpdateNoteContentRequest struct {
+	Content string `json:"content"`
+}
