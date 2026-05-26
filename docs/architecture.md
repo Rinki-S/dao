@@ -413,7 +413,7 @@ Rules:
 - A note with `project_id = NULL` is stored directly in the workspace root.
 - A note with `project_id != NULL` is stored inside that project folder.
 - `notes.file_path` stores the absolute markdown file path.
-- `notes.content` should be removed or ignored during the markdown-file migration. It is not the source of truth.
+- `notes.content` has been removed. SQLite stores note metadata only; the markdown file is the source of truth for note body text.
 - If Dao needs note body text for search, preview snippets, or AI context, Go should read the markdown file and write derived rows to the relevant index/cache.
 
 The working directory should be stored as app-level local configuration, not as React state. The first implementation should use a small settings API:

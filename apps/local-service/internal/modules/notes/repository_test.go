@@ -513,7 +513,6 @@ func openNotesTestDB(t *testing.T) *sql.DB {
 			workspace_id TEXT NOT NULL,
 			project_id TEXT,
 			title TEXT NOT NULL,
-			content TEXT NOT NULL DEFAULT '',
 			file_path TEXT NOT NULL DEFAULT '',
 			content_type TEXT NOT NULL DEFAULT 'markdown',
 			note_type TEXT NOT NULL DEFAULT 'general',
