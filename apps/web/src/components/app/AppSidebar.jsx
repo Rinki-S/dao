@@ -21,12 +21,14 @@ export function AppSidebar({
   workspaces,
   currentWorkspace,
   selectedProjectId,
+  selectedNoteId,
   isWorkspaceLoading,
   workspaceError,
   workspaceMenuOpen,
   createWorkspaceDialogOpen,
   onSelectSurface,
   onSelectProject,
+  onSelectNote,
   onSelectWorkspace,
   onWorkspaceMenuOpenChange,
   onCreateWorkspaceDialogOpenChange,
@@ -158,7 +160,9 @@ export function AppSidebar({
         <ProjectTree
           currentWorkspace={currentWorkspace}
           selectedProjectId={selectedProjectId}
+          selectedNoteId={selectedNoteId}
           onSelectProject={onSelectProject}
+          onSelectNote={onSelectNote}
         />
       </SidebarContent>
 

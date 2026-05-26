@@ -4,6 +4,7 @@ import { AppTitleBar } from '@/components/app/AppTitleBar.jsx';
 import { ProjectContentsPanel } from '@/components/app/ProjectContentsPanel.jsx';
 import { WorkingDirectoryOnboarding } from '@/components/app/WorkingDirectoryOnboarding.jsx';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { NoteEditorPanel } from '@/features/notes/components/NoteEditorPanel.jsx';
 import { getSurfaceComponent } from './app-surfaces.jsx';
 import { CommandPalette } from './features/command-palette/components/CommandPalette.jsx';
 import { getRegisteredSidebarItems, getRegisteredSurfaces } from './extensions/registry.js';
@@ -41,6 +42,7 @@ function App() {
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const [isCreateWorkspaceDialogOpen, setIsCreateWorkspaceDialogOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [selectedNoteId, setSelectedNoteId] = useState('');
   const [workingDirectoryStatus, setWorkingDirectoryStatus] = useState('loading');
   const [workingDirectoryError, setWorkingDirectoryError] = useState('');
   const [workingDirectory, setWorkingDirectory] = useState(null);
@@ -158,14 +160,23 @@ function App() {
     }
 
     setSelectedProjectId('');
+    setSelectedNoteId('');
     setActiveSurfaceId(surfaceId);
     window.history.replaceState(null, '', `#${surfaceId}`);
   }
 
   function handleSelectProject(projectId) {
     setSelectedProjectId(projectId);
+    setSelectedNoteId('');
     setActiveSurfaceId('project-contents');
     window.history.replaceState(null, '', '#project-contents');
+  }
+
+  function handleSelectNote(noteId) {
+    setSelectedNoteId(noteId);
+    setSelectedProjectId('');
+    setActiveSurfaceId('note-editor');
+    window.history.replaceState(null, '', '#note-editor');
   }
 
   function handleSidebarOpenChange(nextIsSidebarOpen) {
@@ -275,12 +286,14 @@ function App() {
             workspaces={workspaces}
             currentWorkspace={currentWorkspace}
             selectedProjectId={selectedProjectId}
+            selectedNoteId={selectedNoteId}
             isWorkspaceLoading={workspaceStatus === 'loading'}
             workspaceError={workspaceError}
             workspaceMenuOpen={isWorkspaceMenuOpen}
             createWorkspaceDialogOpen={isCreateWorkspaceDialogOpen}
             onSelectSurface={handleSelectSurface}
             onSelectProject={handleSelectProject}
+            onSelectNote={handleSelectNote}
             onSelectWorkspace={setCurrentWorkspaceId}
             onWorkspaceMenuOpenChange={setIsWorkspaceMenuOpen}
             onCreateWorkspaceDialogOpenChange={setIsCreateWorkspaceDialogOpen}
@@ -297,7 +310,9 @@ function App() {
                 <h1 className="truncate text-lg font-heading font-semibold tracking-normal text-foreground">
                   {activeSurfaceId === 'project-contents'
                     ? 'Project'
-                    : (activeSurface?.label ?? 'Dao')}
+                    : activeSurfaceId === 'note-editor'
+                      ? 'Note'
+                      : (activeSurface?.label ?? 'Dao')}
                 </h1>
               </div>
             </header>
@@ -316,6 +331,8 @@ function App() {
                     selectedProjectId={selectedProjectId}
                   />
                 </div>
+              ) : activeSurfaceId === 'note-editor' ? (
+                <NoteEditorPanel noteId={selectedNoteId} />
               ) : activeSurfaceId === 'tasks' && activeSurface ? (
                 getSurfaceComponent(activeSurface.id, {
                   currentWorkspace,

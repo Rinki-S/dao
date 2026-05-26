@@ -50,7 +50,9 @@ const noteTypeOptions = [
 export function ProjectTree({
   currentWorkspace,
   selectedProjectId,
+  selectedNoteId,
   onSelectProject,
+  onSelectNote,
   onContentCreated,
 }) {
   const [projects, setProjects] = useState([]);
@@ -231,7 +233,7 @@ export function ProjectTree({
       setIsCreatingContent(true);
       setError('');
 
-      await createNote({
+      const createdNote = await createNote({
         workspaceId: currentWorkspace.id,
         projectId: contentProjectId === 'none' ? null : contentProjectId,
         title: noteTitle,
@@ -246,7 +248,6 @@ export function ProjectTree({
       setIsContentDialogOpen(false);
 
       if (contentProjectId !== 'none') {
-        onSelectProject(contentProjectId);
         setExpandedProjectIds((currentProjectIds) => {
           const nextProjectIds = new Set(currentProjectIds);
           nextProjectIds.add(contentProjectId);
@@ -255,6 +256,7 @@ export function ProjectTree({
       }
 
       await loadTreeData();
+      onSelectNote(createdNote.id);
       notifyActivityChanged();
       onContentCreated?.();
     } catch (err) {
@@ -349,8 +351,12 @@ export function ProjectTree({
 
                       return (
                         <SidebarMenuSubItem key={note.id}>
-                          <SidebarMenuSubButton className="app-no-drag" asChild>
-                            <button type="button">
+                          <SidebarMenuSubButton
+                            className="app-no-drag"
+                            isActive={note.id === selectedNoteId}
+                            asChild
+                          >
+                            <button type="button" onClick={() => onSelectNote(note.id)}>
                               <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
                               <span>{note.title}</span>
                             </button>
@@ -370,8 +376,13 @@ export function ProjectTree({
 
               return (
                 <SidebarMenuItem key={note.id}>
-                  <SidebarMenuButton className="app-no-drag" tooltip={note.title} asChild>
-                    <button type="button">
+                  <SidebarMenuButton
+                    className="app-no-drag"
+                    isActive={note.id === selectedNoteId}
+                    tooltip={note.title}
+                    asChild
+                  >
+                    <button type="button" onClick={() => onSelectNote(note.id)}>
                       <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
                       <span>{note.title}</span>
                     </button>
