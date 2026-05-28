@@ -1,3 +1,4 @@
+import { Tooltip } from '@heroui/react';
 import { useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
@@ -24,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { SidebarMenuButton } from '@/components/ui/sidebar';
+import { cn } from '@/lib/utils.js';
 
 export function WorkspaceSwitcher({
   workspaces,
@@ -32,6 +33,7 @@ export function WorkspaceSwitcher({
   isLoading,
   error,
   menuOpen,
+  isSidebarOpen = true,
   onMenuOpenChange,
   createDialogOpen,
   onCreateDialogOpenChange,
@@ -69,18 +71,25 @@ export function WorkspaceSwitcher({
     <>
       <DropdownMenu open={menuOpen} onOpenChange={onMenuOpenChange}>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuButton
-            size="lg"
-            tooltip={currentWorkspace?.name ?? 'Workspace'}
-            className="app-no-drag font-heading"
+          <button
+            className={cn(
+              'app-no-drag flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left font-heading text-sm ring-sidebar-ring outline-hidden transition-[background-color,color,width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground',
+              !isSidebarOpen && 'size-8 justify-center p-0',
+            )}
+            type="button"
           >
-            <span className="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-              <HugeiconsIcon
-                icon={SquareStackIcon}
-                className="size-[18px] shrink-0 translate-y-px"
-              />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col">
+            <Tooltip delay={0} isDisabled={isSidebarOpen}>
+              <span className="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+                <HugeiconsIcon
+                  icon={SquareStackIcon}
+                  className="size-[18px] shrink-0 translate-y-px"
+                />
+              </span>
+              <Tooltip.Content placement="right">
+                {currentWorkspace?.name ?? 'Workspace'}
+              </Tooltip.Content>
+            </Tooltip>
+            <span className={cn('flex min-w-0 flex-1 flex-col', !isSidebarOpen && 'sr-only')}>
               <span className="truncate text-sm font-semibold tracking-normal">
                 {currentWorkspace?.name ?? 'No workspace'}
               </span>
@@ -90,9 +99,9 @@ export function WorkspaceSwitcher({
             </span>
             <HugeiconsIcon
               icon={ArrowDown01Icon}
-              className="size-[18px] shrink-0 translate-y-px"
+              className={cn('size-[18px] shrink-0 translate-y-px', !isSidebarOpen && 'hidden')}
             />
-          </SidebarMenuButton>
+          </button>
         </DropdownMenuTrigger>
 
         <DropdownMenuContent className="w-64" align="start">

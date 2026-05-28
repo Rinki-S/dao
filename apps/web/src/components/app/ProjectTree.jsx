@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Tooltip } from '@heroui/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
 import Folder01Icon from '@hugeicons/core-free-icons/Folder01Icon';
@@ -22,21 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
-} from '@/components/ui/sidebar';
 import { Textarea } from '@/components/ui/textarea';
 import { getContentFormatIcon } from '@/extensions/registry.js';
 import { notifyActivityChanged, subscribeToActivityChanged } from '@/features/activities/events.js';
 import { createNote, listNotes } from '@/features/notes/api.js';
 import { createProject, listProjects } from '@/features/projects/api.js';
+import { cn } from '@/lib/utils.js';
 
 const noteTypeOptions = [
   { label: 'General', value: 'general' },
@@ -50,6 +42,7 @@ export function ProjectTree({
   currentWorkspace,
   selectedProjectId,
   selectedNoteId,
+  isSidebarOpen = true,
   onSelectProject,
   onSelectNote,
   onContentCreated,
@@ -267,8 +260,13 @@ export function ProjectTree({
   }
 
   return (
-    <SidebarGroup>
-      <div className="flex h-8 items-center justify-between gap-2 px-2 text-xs font-medium text-sidebar-foreground/70 group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0">
+    <section className="relative flex w-full min-w-0 flex-col p-2">
+      <div
+        className={cn(
+          'flex h-8 items-center justify-between gap-2 px-2 text-xs font-medium text-sidebar-foreground/70 transition-[margin,opacity] duration-200 ease-linear',
+          !isSidebarOpen && '-mt-8 opacity-0',
+        )}
+      >
         <span>Projects</span>
         <div className="flex items-center gap-1">
           <Button
@@ -306,24 +304,24 @@ export function ProjectTree({
           </Button>
         </div>
       </div>
-      <SidebarGroupContent>
-        <SidebarMenu>
+      <div className="w-full text-sm">
+        <ul className="flex w-full min-w-0 flex-col gap-0">
           {status === 'loading' && (
-            <SidebarMenuItem>
+            <li className="relative">
               <span className="block px-2 py-1 text-xs text-muted-foreground">Loading...</span>
-            </SidebarMenuItem>
+            </li>
           )}
 
           {status === 'error' && (
-            <SidebarMenuItem>
+            <li className="relative">
               <span className="block px-2 py-1 text-xs text-destructive">{error}</span>
-            </SidebarMenuItem>
+            </li>
           )}
 
           {status === 'ready' && workspaceProjects.length === 0 && unassignedNotes.length === 0 && (
-            <SidebarMenuItem>
+            <li className="relative">
               <span className="block px-2 py-1 text-xs text-muted-foreground">No projects</span>
-            </SidebarMenuItem>
+            </li>
           )}
 
           {workspaceProjects.map((project) => {
@@ -332,52 +330,48 @@ export function ProjectTree({
             const projectIcon = isExpanded ? FolderOpenIcon : Folder01Icon;
 
             return (
-              <SidebarMenuItem key={project.id}>
-                <SidebarMenuButton
-                  className="app-no-drag"
+              <li key={project.id} className="relative">
+                <ProjectTreeButton
+                  icon={projectIcon}
                   isActive={project.id === selectedProjectId}
-                  tooltip={project.name}
+                  isSidebarOpen={isSidebarOpen}
+                  label={project.name}
                   onClick={() => toggleProject(project.id)}
-                >
-                  <HugeiconsIcon
-                    icon={projectIcon}
-                    aria-hidden="true"
-                    className="size-[18px] shrink-0"
-                  />
-                  <span>{project.name}</span>
-                </SidebarMenuButton>
+                />
 
-                {isExpanded && (
-                  <SidebarMenuSub>
+                {isExpanded && isSidebarOpen && (
+                  <ul className="mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5">
                     {projectNotes.length === 0 && (
-                      <SidebarMenuSubItem>
+                      <li className="relative">
                         <span className="block px-2 py-1 text-xs text-muted-foreground">
                           No notes
                         </span>
-                      </SidebarMenuSubItem>
+                      </li>
                     )}
 
                     {projectNotes.map((note) => {
                       const ContentIcon = getContentFormatIcon(note.contentType);
 
                       return (
-                        <SidebarMenuSubItem key={note.id}>
-                          <SidebarMenuSubButton
-                            className="app-no-drag"
-                            isActive={note.id === selectedNoteId}
-                            asChild
+                        <li key={note.id} className="relative">
+                          <button
+                            className={cn(
+                              'app-no-drag flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sm text-sidebar-foreground ring-sidebar-ring outline-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2',
+                              note.id === selectedNoteId &&
+                                'bg-sidebar-accent text-sidebar-accent-foreground',
+                            )}
+                            type="button"
+                            onClick={() => onSelectNote(note.id)}
                           >
-                            <button type="button" onClick={() => onSelectNote(note.id)}>
-                              <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
-                              <span>{note.title}</span>
-                            </button>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
+                            <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
+                            <span className="truncate">{note.title}</span>
+                          </button>
+                        </li>
                       );
                     })}
-                  </SidebarMenuSub>
+                  </ul>
                 )}
-              </SidebarMenuItem>
+              </li>
             );
           })}
 
@@ -386,23 +380,19 @@ export function ProjectTree({
               const ContentIcon = getContentFormatIcon(note.contentType);
 
               return (
-                <SidebarMenuItem key={note.id}>
-                  <SidebarMenuButton
-                    className="app-no-drag"
+                <li key={note.id} className="relative">
+                  <ProjectTreeButton
+                    icon={ContentIcon}
                     isActive={note.id === selectedNoteId}
-                    tooltip={note.title}
-                    asChild
-                  >
-                    <button type="button" onClick={() => onSelectNote(note.id)}>
-                      <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
-                      <span>{note.title}</span>
-                    </button>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                    isSidebarOpen={isSidebarOpen}
+                    label={note.title}
+                    onClick={() => onSelectNote(note.id)}
+                  />
+                </li>
               );
             })}
-        </SidebarMenu>
-      </SidebarGroupContent>
+        </ul>
+      </div>
 
       <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
         <DialogContent>
@@ -546,6 +536,34 @@ export function ProjectTree({
           </form>
         </DialogContent>
       </Dialog>
-    </SidebarGroup>
+    </section>
+  );
+}
+
+function ProjectTreeButton({ icon: Icon, isActive, isSidebarOpen, label, onClick }) {
+  const button = (
+    <button
+      className={cn(
+        'app-no-drag flex h-8 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[background-color,color,width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2',
+        !isSidebarOpen && 'size-8 justify-center p-2',
+        isActive && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground',
+      )}
+      type="button"
+      onClick={onClick}
+    >
+      <Icon aria-hidden="true" className="size-[18px] shrink-0" />
+      <span className={cn('truncate', !isSidebarOpen && 'sr-only')}>{label}</span>
+    </button>
+  );
+
+  if (isSidebarOpen) {
+    return button;
+  }
+
+  return (
+    <Tooltip delay={0}>
+      {button}
+      <Tooltip.Content placement="right">{label}</Tooltip.Content>
+    </Tooltip>
   );
 }

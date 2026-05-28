@@ -3,7 +3,6 @@ import { AppSidebar } from '@/components/app/AppSidebar.jsx';
 import { AppTitleBar } from '@/components/app/AppTitleBar.jsx';
 import { ProjectContentsPanel } from '@/components/app/ProjectContentsPanel.jsx';
 import { WorkingDirectoryOnboarding } from '@/components/app/WorkingDirectoryOnboarding.jsx';
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { NoteEditorPanel } from '@/features/notes/components/NoteEditorPanel.jsx';
 import { getSurfaceComponent } from './app-surfaces.jsx';
 import { CommandPalette } from './features/command-palette/components/CommandPalette.jsx';
@@ -267,17 +266,21 @@ function App() {
   }
 
   return (
-    <SidebarProvider
+    <div
       className="h-dvh min-h-0 overflow-hidden"
-      open={isSidebarOpen}
-      onOpenChange={handleSidebarOpenChange}
+      data-sidebar-state={isSidebarOpen ? 'expanded' : 'collapsed'}
+      data-slot="sidebar-wrapper"
       style={{
         '--sidebar-width': `${sidebarWidth}px`,
+        '--sidebar-width-icon': '3rem',
       }}
     >
       <CommandPalette onSelectSurface={handleSelectSurface} onRunAction={handleCommandAction} />
       <div className="flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-background text-foreground">
-        <AppTitleBar />
+        <AppTitleBar
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={() => handleSidebarOpenChange(!isSidebarOpen)}
+        />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <AppSidebar
             activeSurfaceId={activeSurface?.id}
@@ -304,7 +307,7 @@ function App() {
             resizeMaxWidth={SIDEBAR_MAX_WIDTH}
             resizeCollapseThreshold={SIDEBAR_COLLAPSE_THRESHOLD}
           />
-          <SidebarInset className="min-h-0 overflow-hidden bg-sidebar">
+          <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-sidebar">
             <header className="flex h-14 shrink-0 items-center border-b border-border px-8">
               <div className="min-w-0">
                 <h1 className="truncate text-lg font-heading font-semibold tracking-normal text-foreground">
@@ -349,10 +352,10 @@ function App() {
                 </div>
               ) : null}
             </section>
-          </SidebarInset>
+          </main>
         </div>
       </div>
-    </SidebarProvider>
+    </div>
   );
 }
 

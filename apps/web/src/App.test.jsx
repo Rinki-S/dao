@@ -1,15 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import App from './App.jsx';
 
 function renderApp() {
-  return render(
-    <TooltipProvider>
-      <App />
-    </TooltipProvider>,
-  );
+  return render(<App />);
+}
+
+async function readSource(path) {
+  return await fetch(new URL(path, import.meta.url)).then((response) => response.text());
 }
 
 describe('App', () => {
@@ -77,5 +76,24 @@ describe('App', () => {
     expect(window.location.hash).toBe('#notes');
     expect(screen.getByRole('heading', { name: 'Notes' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+  });
+
+  it('does not depend on the legacy shadcn sidebar provider in the app shell', async () => {
+    const [appSource, titleBarSource, sidebarSource, projectTreeSource, workspaceSwitcherSource] =
+      await Promise.all([
+        readSource('./App.jsx'),
+        readSource('./components/app/AppTitleBar.jsx'),
+        readSource('./components/app/AppSidebar.jsx'),
+        readSource('./components/app/ProjectTree.jsx'),
+        readSource('./components/app/WorkspaceSwitcher.jsx'),
+      ]);
+
+    expect(appSource).not.toContain('@/components/ui/sidebar');
+    expect(appSource).not.toContain('SidebarProvider');
+    expect(appSource).not.toContain('SidebarInset');
+    expect(titleBarSource).not.toContain('@/components/ui/sidebar');
+    expect(sidebarSource).not.toContain('@/components/ui/sidebar');
+    expect(projectTreeSource).not.toContain('@/components/ui/sidebar');
+    expect(workspaceSwitcherSource).not.toContain('@/components/ui/sidebar');
   });
 });
