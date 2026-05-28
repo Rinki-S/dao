@@ -98,6 +98,17 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).not.toContain('@/components/ui/textarea');
   });
 
+  it('keeps the quick add input group full width while the add button stays fixed', () => {
+    const source = fs.readFileSync(taskPanelPath, 'utf8');
+
+    expect(source).toContain('className="flex w-full flex-col gap-3"');
+    expect(source).toContain('className="w-full min-w-0"');
+    expect(source).toContain('fullWidth');
+    expect(source).toContain('className="flex w-full min-w-0 flex-col gap-2 sm:flex-row"');
+    expect(source).toContain('<InputGroup className="w-full min-w-0 flex-1" fullWidth>');
+    expect(source).toContain('className="h-9 shrink-0"');
+  });
+
   it('renders task rows through the HeroUI task table', async () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 

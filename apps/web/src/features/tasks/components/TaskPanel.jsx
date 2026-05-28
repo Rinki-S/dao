@@ -375,9 +375,10 @@ export function TaskPanel({ currentWorkspace }) {
         onSubmit={handleCreateTask}
         onKeyDown={handleQuickAddKeyDown}
       >
-        <div className="flex flex-col gap-3">
+        <div className="flex w-full flex-col gap-3">
           <TextField
-            className="min-w-0 flex-1"
+            className="w-full min-w-0"
+            fullWidth
             isDisabled={!currentWorkspace || isCreating}
             name="task-title"
             value={taskTitle}
@@ -386,8 +387,8 @@ export function TaskPanel({ currentWorkspace }) {
             <Label className="sr-only" htmlFor="task-title">
               Task title
             </Label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <InputGroup>
+            <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row">
+              <InputGroup className="w-full min-w-0 flex-1" fullWidth>
                 <InputGroup.Input
                   id="task-title"
                   ref={taskTitleInputRef}
@@ -513,7 +514,7 @@ export function TaskPanel({ currentWorkspace }) {
 
               {isQuickAddOpen && (
                 <Button
-                  className="h-9"
+                  className="h-9 shrink-0"
                   isDisabled={isCreating || !currentWorkspace}
                   isPending={isCreating}
                   type="submit"
