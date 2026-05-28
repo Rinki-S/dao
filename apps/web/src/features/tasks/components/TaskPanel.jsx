@@ -7,6 +7,7 @@ import MoreHorizontalIcon from '@hugeicons/core-free-icons/MoreHorizontalIcon';
 import TaskDone01Icon from '@hugeicons/core-free-icons/TaskDone01Icon';
 import {
   Button,
+  Checkbox,
   Chip,
   Dropdown,
   FieldError,
@@ -17,9 +18,6 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
-import { Button as LegacyButton } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input as LegacyInput } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { notifyActivityChanged } from '../../activities/events.js';
 import { listProjects } from '../../projects/api.js';
@@ -52,6 +50,9 @@ const prioritySortOrder = {
 
 const quickAddAccessoryButtonClassName =
   '[--button-fg:var(--field-placeholder)] hover:[--button-fg:var(--field-foreground)] focus-visible:[--button-fg:var(--field-foreground)]';
+
+const taskRowIconButtonClassName =
+  'size-7 min-w-0 p-0 [--button-fg:var(--muted)] hover:[--button-fg:var(--foreground)] focus-visible:[--button-fg:var(--foreground)]';
 
 function compareTasks(firstTask, secondTask) {
   const statusDifference =
@@ -341,6 +342,26 @@ export function TaskPanel({ currentWorkspace }) {
     return task.status === 'done';
   }
 
+  function renderTaskCheckbox(task, isDisabled) {
+    const checkboxState = getCheckboxState(task);
+
+    return (
+      <Checkbox
+        aria-label={`Toggle ${task.title}`}
+        isDisabled={isDisabled}
+        isIndeterminate={checkboxState === 'indeterminate'}
+        isSelected={checkboxState === true}
+        onChange={() => {
+          void handleToggleTaskDone(task);
+        }}
+      >
+        <Checkbox.Control>
+          <Checkbox.Indicator />
+        </Checkbox.Control>
+      </Checkbox>
+    );
+  }
+
   function toggleTaskCollapse(taskId) {
     setCollapsedTaskIds((currentIds) => {
       const nextIds = new Set(currentIds);
@@ -500,7 +521,7 @@ export function TaskPanel({ currentWorkspace }) {
                           value={taskDescription}
                           onChange={(event) => setTaskDescription(event.target.value)}
                           placeholder="Add details..."
-                          disabled={!currentWorkspace || isCreating}
+                          isDisabled={!currentWorkspace || isCreating}
                           variant="secondary"
                         />
                       </Popover.Dialog>
@@ -591,13 +612,17 @@ export function TaskPanel({ currentWorkspace }) {
                           >
                             <Table.Cell className="relative pl-8">
                               {hasChildren ? (
-                                <LegacyButton
+                                <Button
                                   aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${task.title}`}
-                                  className="absolute top-1/2 left-1 -translate-y-1/2"
-                                  size="icon-xs"
+                                  className={cn(
+                                    taskRowIconButtonClassName,
+                                    'absolute top-1/2 left-1 -translate-y-1/2',
+                                  )}
+                                  isIconOnly
+                                  size="sm"
                                   type="button"
                                   variant="ghost"
-                                  onClick={() => toggleTaskCollapse(task.id)}
+                                  onPress={() => toggleTaskCollapse(task.id)}
                                 >
                                   <HugeiconsIcon
                                     icon={ArrowRight01Icon}
@@ -607,17 +632,10 @@ export function TaskPanel({ currentWorkspace }) {
                                       !isCollapsed && 'rotate-90',
                                     )}
                                   />
-                                </LegacyButton>
+                                </Button>
                               ) : null}
                               <div className="flex min-w-0 items-center gap-3">
-                                <Checkbox
-                                  aria-label={`Toggle ${task.title}`}
-                                  checked={getCheckboxState(task)}
-                                  disabled={isUpdating}
-                                  onCheckedChange={() => {
-                                    void handleToggleTaskDone(task);
-                                  }}
-                                />
+                                {renderTaskCheckbox(task, isUpdating)}
 
                                 <div className="min-w-0 flex-1">
                                   <div className="flex min-w-0 items-center gap-2">
@@ -660,35 +678,39 @@ export function TaskPanel({ currentWorkspace }) {
                             <Table.Cell className="w-20 pr-8 text-right">
                               <div className="flex justify-end gap-1">
                                 {hasDescription && (
-                                  <LegacyButton
+                                  <Button
                                     aria-label={`${isDescriptionExpanded ? 'Hide' : 'Show'} notes for ${task.title}`}
-                                    size="icon-xs"
+                                    className={taskRowIconButtonClassName}
+                                    isIconOnly
+                                    size="sm"
                                     type="button"
                                     variant="ghost"
-                                    onClick={() => toggleTaskDescription(task.id)}
+                                    onPress={() => toggleTaskDescription(task.id)}
                                   >
                                     <HugeiconsIcon
                                       icon={MoreHorizontalIcon}
                                       aria-hidden="true"
                                       className="size-[18px] shrink-0 translate-y-px"
                                     />
-                                  </LegacyButton>
+                                  </Button>
                                 )}
 
-                                <LegacyButton
+                                <Button
                                   aria-label={`Add child todo to ${task.title}`}
-                                  disabled={isCreatingChild}
-                                  size="icon-xs"
+                                  className={taskRowIconButtonClassName}
+                                  isDisabled={isCreatingChild}
+                                  isIconOnly
+                                  size="sm"
                                   type="button"
                                   variant="ghost"
-                                  onClick={() => openChildTaskForm(task.id)}
+                                  onPress={() => openChildTaskForm(task.id)}
                                 >
                                   <HugeiconsIcon
                                     icon={Add01Icon}
                                     aria-hidden="true"
                                     className="size-[18px] shrink-0 translate-y-px"
                                   />
-                                </LegacyButton>
+                                </Button>
                               </div>
                             </Table.Cell>
                           </Table.Row>
@@ -712,26 +734,30 @@ export function TaskPanel({ currentWorkspace }) {
                                     void handleCreateChildTask(event, task);
                                   }}
                                 >
-                                  <LegacyInput
+                                  <TextField
                                     aria-label={`Child todo for ${task.title}`}
-                                    className="h-8"
-                                    disabled={isCreatingChild}
-                                    placeholder="Add child todo..."
+                                    className="min-w-0 flex-1"
+                                    fullWidth
+                                    isDisabled={isCreatingChild}
                                     value={childTaskTitle}
-                                    onChange={(event) => setChildTaskTitle(event.target.value)}
-                                  />
-                                  <LegacyButton disabled={isCreatingChild} size="sm" type="submit">
+                                    onChange={setChildTaskTitle}
+                                  >
+                                    <InputGroup className="h-8 min-h-8" fullWidth>
+                                      <InputGroup.Input placeholder="Add child todo..." />
+                                    </InputGroup>
+                                  </TextField>
+                                  <Button isDisabled={isCreatingChild} size="sm" type="submit">
                                     Add
-                                  </LegacyButton>
-                                  <LegacyButton
-                                    disabled={isCreatingChild}
+                                  </Button>
+                                  <Button
+                                    isDisabled={isCreatingChild}
                                     size="sm"
                                     type="button"
                                     variant="ghost"
-                                    onClick={closeChildTaskForm}
+                                    onPress={closeChildTaskForm}
                                   >
                                     Cancel
-                                  </LegacyButton>
+                                  </Button>
                                 </form>
                               </Table.Cell>
                             </Table.Row>
@@ -762,14 +788,7 @@ export function TaskPanel({ currentWorkspace }) {
                                   >
                                     <Table.Cell className="pl-16">
                                       <div className="flex min-w-0 items-center gap-3">
-                                        <Checkbox
-                                          aria-label={`Toggle ${childTask.title}`}
-                                          checked={getCheckboxState(childTask)}
-                                          disabled={isChildUpdating}
-                                          onCheckedChange={() => {
-                                            void handleToggleTaskDone(childTask);
-                                          }}
-                                        />
+                                        {renderTaskCheckbox(childTask, isChildUpdating)}
 
                                         <div className="min-w-0 flex-1">
                                           <div
@@ -802,19 +821,21 @@ export function TaskPanel({ currentWorkspace }) {
                                     </Table.Cell>
                                     <Table.Cell className="w-20 pr-8 text-right">
                                       {hasChildDescription && (
-                                        <LegacyButton
+                                        <Button
                                           aria-label={`${isChildDescriptionExpanded ? 'Hide' : 'Show'} notes for ${childTask.title}`}
-                                          size="icon-xs"
+                                          className={taskRowIconButtonClassName}
+                                          isIconOnly
+                                          size="sm"
                                           type="button"
                                           variant="ghost"
-                                          onClick={() => toggleTaskDescription(childTask.id)}
+                                          onPress={() => toggleTaskDescription(childTask.id)}
                                         >
                                           <HugeiconsIcon
                                             icon={MoreHorizontalIcon}
                                             aria-hidden="true"
                                             className="size-[18px] shrink-0 translate-y-px"
                                           />
-                                        </LegacyButton>
+                                        </Button>
                                       )}
                                     </Table.Cell>
                                   </Table.Row>

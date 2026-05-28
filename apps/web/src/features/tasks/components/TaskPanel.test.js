@@ -87,15 +87,24 @@ describe('TaskPanel table migration boundary', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
     expect(source).toContain('Dropdown');
+    expect(source).toContain('Checkbox');
     expect(source).toContain('InputGroup');
     expect(source).toContain('Popover');
     expect(source).toContain('TextArea');
     expect(source).toContain('TextField');
+    expect(source).toContain('<Checkbox.Control');
+    expect(source).toContain('<Checkbox.Indicator');
     expect(source).not.toContain('@/components/ui/dropdown-menu');
     expect(source).not.toContain('@/components/ui/field');
     expect(source).not.toContain('@/components/ui/input-group');
     expect(source).not.toContain('@/components/ui/popover');
     expect(source).not.toContain('@/components/ui/textarea');
+    expect(source).not.toContain('@/components/ui/button');
+    expect(source).not.toContain('@/components/ui/checkbox');
+    expect(source).not.toContain('@/components/ui/input');
+    expect(source).not.toContain('LegacyButton');
+    expect(source).not.toContain('LegacyInput');
+    expect(source).not.toContain('onCheckedChange');
   });
 
   it('keeps the quick add input group full width while the add button stays fixed', () => {
