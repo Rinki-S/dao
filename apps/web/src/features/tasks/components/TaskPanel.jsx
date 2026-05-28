@@ -5,7 +5,7 @@ import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
 import Calendar03Icon from '@hugeicons/core-free-icons/Calendar03Icon';
 import MoreHorizontalIcon from '@hugeicons/core-free-icons/MoreHorizontalIcon';
 import TaskDone01Icon from '@hugeicons/core-free-icons/TaskDone01Icon';
-import { Badge } from '@/components/ui/badge';
+import { Chip, Table } from '@heroui/react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -25,7 +25,6 @@ import {
 } from '@/components/ui/input-group';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { notifyActivityChanged } from '../../activities/events.js';
@@ -533,265 +532,283 @@ export function TaskPanel({ currentWorkspace }) {
 
         {status === 'ready' && parentTasks.length > 0 && (
           <div>
-            <Table className={'border-b'}>
-              <TableBody>
-                {parentTasks.map((task) => {
-                  const taskChildren = childrenByParentId.get(task.id) ?? [];
-                  const projectName = task.projectId ? projectNameById.get(task.projectId) : null;
-                  const dueDate = formatDate(task.dueDate);
-                  const isDone = task.status === 'done';
-                  const isUpdating = updatingTaskIds.has(task.id);
-                  const isAddingChild = childTaskParentId === task.id;
-                  const hasChildren = taskChildren.length > 0;
-                  const isCollapsed = collapsedTaskIds.has(task.id);
-                  const hasDescription = task.description.trim() !== '';
-                  const isDescriptionExpanded = expandedDescriptionTaskIds.has(task.id);
+            <Table className="border-b">
+              <Table.ScrollContainer className="w-full overflow-x-auto">
+                <Table.Content aria-label="Tasks" className="w-full min-w-full">
+                  <Table.Header className="sr-only">
+                    <Table.Column isRowHeader>Task</Table.Column>
+                    <Table.Column>Due</Table.Column>
+                    <Table.Column>Actions</Table.Column>
+                  </Table.Header>
+                  <Table.Body>
+                    {parentTasks.map((task) => {
+                      const taskChildren = childrenByParentId.get(task.id) ?? [];
+                      const projectName = task.projectId
+                        ? projectNameById.get(task.projectId)
+                        : null;
+                      const dueDate = formatDate(task.dueDate);
+                      const isDone = task.status === 'done';
+                      const isUpdating = updatingTaskIds.has(task.id);
+                      const isAddingChild = childTaskParentId === task.id;
+                      const hasChildren = taskChildren.length > 0;
+                      const isCollapsed = collapsedTaskIds.has(task.id);
+                      const hasDescription = task.description.trim() !== '';
+                      const isDescriptionExpanded = expandedDescriptionTaskIds.has(task.id);
 
-                  return (
-                    <Fragment key={task.id}>
-                      <TableRow
-                        key={task.id}
-                        className={cn(hasDescription && isDescriptionExpanded && 'border-b-0')}
-                      >
-                        <TableCell className="relative pl-8">
-                          {hasChildren ? (
-                            <Button
-                              aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${task.title}`}
-                              className="absolute top-1/2 left-1 -translate-y-1/2"
-                              size="icon-xs"
-                              type="button"
-                              variant="ghost"
-                              onClick={() => toggleTaskCollapse(task.id)}
-                            >
-                              <HugeiconsIcon
-                                icon={ArrowRight01Icon}
-                                aria-hidden="true"
-                                className={cn(
-                                  'size-[18px] shrink-0 transition-transform',
-                                  !isCollapsed && 'rotate-90',
-                                )}
-                              />
-                            </Button>
-                          ) : null}
-                          <div className="flex min-w-0 items-center gap-3">
-                            <Checkbox
-                              aria-label={`Toggle ${task.title}`}
-                              checked={getCheckboxState(task)}
-                              disabled={isUpdating}
-                              onCheckedChange={() => {
-                                void handleToggleTaskDone(task);
-                              }}
-                            />
-
-                            <div className="min-w-0 flex-1">
-                              <div className="flex min-w-0 items-center gap-2">
-                                <div
-                                  className={cn(
-                                    'min-w-0 truncate text-sm font-medium text-foreground',
-                                    isDone && 'text-muted-foreground line-through',
-                                  )}
+                      return (
+                        <Fragment key={task.id}>
+                          <Table.Row
+                            id={task.id}
+                            className={cn(hasDescription && isDescriptionExpanded && 'border-b-0')}
+                          >
+                            <Table.Cell className="relative pl-8">
+                              {hasChildren ? (
+                                <Button
+                                  aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${task.title}`}
+                                  className="absolute top-1/2 left-1 -translate-y-1/2"
+                                  size="icon-xs"
+                                  type="button"
+                                  variant="ghost"
+                                  onClick={() => toggleTaskCollapse(task.id)}
                                 >
-                                  {task.title}
-                                  {projectName && (
-                                    <span className="font-normal text-muted-foreground">
-                                      /{projectName}
-                                    </span>
-                                  )}
-                                </div>
-                                <Badge variant={task.priority === 'high' ? 'default' : 'secondary'}>
-                                  {priorityLabels[task.priority]}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="w-28 text-muted-foreground">
-                          {dueDate && (
-                            <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
-                              <HugeiconsIcon
-                                icon={Calendar03Icon}
-                                aria-hidden="true"
-                                className="size-3 shrink-0"
-                              />
-                              {dueDate}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="w-20 pr-8 text-right">
-                          <div className="flex justify-end gap-1">
-                            {hasDescription && (
-                              <Button
-                                aria-label={`${isDescriptionExpanded ? 'Hide' : 'Show'} notes for ${task.title}`}
-                                size="icon-xs"
-                                type="button"
-                                variant="ghost"
-                                onClick={() => toggleTaskDescription(task.id)}
-                              >
-                                <HugeiconsIcon
-                                  icon={MoreHorizontalIcon}
-                                  aria-hidden="true"
-                                  className="size-[18px] shrink-0 translate-y-px"
+                                  <HugeiconsIcon
+                                    icon={ArrowRight01Icon}
+                                    aria-hidden="true"
+                                    className={cn(
+                                      'size-[18px] shrink-0 transition-transform',
+                                      !isCollapsed && 'rotate-90',
+                                    )}
+                                  />
+                                </Button>
+                              ) : null}
+                              <div className="flex min-w-0 items-center gap-3">
+                                <Checkbox
+                                  aria-label={`Toggle ${task.title}`}
+                                  checked={getCheckboxState(task)}
+                                  disabled={isUpdating}
+                                  onCheckedChange={() => {
+                                    void handleToggleTaskDone(task);
+                                  }}
                                 />
-                              </Button>
-                            )}
 
-                            <Button
-                              aria-label={`Add child todo to ${task.title}`}
-                              disabled={isCreatingChild}
-                              size="icon-xs"
-                              type="button"
-                              variant="ghost"
-                              onClick={() => openChildTaskForm(task.id)}
-                            >
-                              <HugeiconsIcon
-                                icon={Add01Icon}
-                                aria-hidden="true"
-                                className="size-[18px] shrink-0 translate-y-px"
-                              />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-
-                      {hasDescription && isDescriptionExpanded && (
-                        <TableRow key={`${task.id}-description`}>
-                          <TableCell className="pl-15 pr-8" colSpan={3}>
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                              {task.description}
-                            </p>
-                          </TableCell>
-                        </TableRow>
-                      )}
-
-                      {isAddingChild && !isCollapsed && (
-                        <TableRow key={`${task.id}-child-form`}>
-                          <TableCell className="pl-16" colSpan={3}>
-                            <form
-                              className="flex items-center gap-2"
-                              onSubmit={(event) => {
-                                void handleCreateChildTask(event, task);
-                              }}
-                            >
-                              <Input
-                                aria-label={`Child todo for ${task.title}`}
-                                className="h-8"
-                                disabled={isCreatingChild}
-                                placeholder="Add child todo..."
-                                value={childTaskTitle}
-                                onChange={(event) => setChildTaskTitle(event.target.value)}
-                              />
-                              <Button disabled={isCreatingChild} size="sm" type="submit">
-                                Add
-                              </Button>
-                              <Button
-                                disabled={isCreatingChild}
-                                size="sm"
-                                type="button"
-                                variant="ghost"
-                                onClick={closeChildTaskForm}
-                              >
-                                Cancel
-                              </Button>
-                            </form>
-                          </TableCell>
-                        </TableRow>
-                      )}
-
-                      {!isCollapsed &&
-                        taskChildren.map((childTask) => {
-                          const childProjectName = childTask.projectId
-                            ? projectNameById.get(childTask.projectId)
-                            : null;
-                          const childDueDate = formatDate(childTask.dueDate);
-                          const isChildDone = childTask.status === 'done';
-                          const isChildUpdating = updatingTaskIds.has(childTask.id);
-                          const hasChildDescription = childTask.description.trim() !== '';
-                          const isChildDescriptionExpanded = expandedDescriptionTaskIds.has(
-                            childTask.id,
-                          );
-
-                          return (
-                            <Fragment key={childTask.id}>
-                              <TableRow
-                                className={cn(
-                                  hasChildDescription && isChildDescriptionExpanded && 'border-b-0',
-                                )}
-                              >
-                                <TableCell className="pl-16">
-                                  <div className="flex min-w-0 items-center gap-3">
-                                    <Checkbox
-                                      aria-label={`Toggle ${childTask.title}`}
-                                      checked={getCheckboxState(childTask)}
-                                      disabled={isChildUpdating}
-                                      onCheckedChange={() => {
-                                        void handleToggleTaskDone(childTask);
-                                      }}
-                                    />
-
-                                    <div className="min-w-0 flex-1">
-                                      <div
-                                        className={cn(
-                                          'min-w-0 truncate text-sm font-medium text-foreground',
-                                          isChildDone && 'text-muted-foreground line-through',
-                                        )}
-                                      >
-                                        {childTask.title}
-                                        {childProjectName && (
-                                          <span className="font-normal text-muted-foreground">
-                                            /{childProjectName}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="w-28 text-muted-foreground">
-                                  {childDueDate && (
-                                    <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
-                                      <HugeiconsIcon
-                                        icon={Calendar03Icon}
-                                        aria-hidden="true"
-                                        className="size-3 shrink-0"
-                                      />
-                                      {childDueDate}
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="w-20 pr-8 text-right">
-                                  {hasChildDescription && (
-                                    <Button
-                                      aria-label={`${isChildDescriptionExpanded ? 'Hide' : 'Show'} notes for ${childTask.title}`}
-                                      size="icon-xs"
-                                      type="button"
-                                      variant="ghost"
-                                      onClick={() => toggleTaskDescription(childTask.id)}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <div
+                                      className={cn(
+                                        'min-w-0 truncate text-sm font-medium text-foreground',
+                                        isDone && 'text-muted-foreground line-through',
+                                      )}
                                     >
-                                      <HugeiconsIcon
-                                        icon={MoreHorizontalIcon}
-                                        aria-hidden="true"
-                                        className="size-[18px] shrink-0 translate-y-px"
-                                      />
-                                    </Button>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-
-                              {hasChildDescription && isChildDescriptionExpanded && (
-                                <TableRow>
-                                  <TableCell className="pl-28 pr-8" colSpan={3}>
-                                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                                      {childTask.description}
-                                    </p>
-                                  </TableCell>
-                                </TableRow>
+                                      {task.title}
+                                      {projectName && (
+                                        <span className="font-normal text-muted-foreground">
+                                          /{projectName}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <Chip
+                                      color={task.priority === 'high' ? 'accent' : 'default'}
+                                      size="sm"
+                                      variant={task.priority === 'high' ? 'primary' : 'soft'}
+                                    >
+                                      {priorityLabels[task.priority]}
+                                    </Chip>
+                                  </div>
+                                </div>
+                              </div>
+                            </Table.Cell>
+                            <Table.Cell className="w-28 text-muted-foreground">
+                              {dueDate && (
+                                <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
+                                  <HugeiconsIcon
+                                    icon={Calendar03Icon}
+                                    aria-hidden="true"
+                                    className="size-3 shrink-0"
+                                  />
+                                  {dueDate}
+                                </span>
                               )}
-                            </Fragment>
-                          );
-                        })}
-                    </Fragment>
-                  );
-                })}
-              </TableBody>
+                            </Table.Cell>
+                            <Table.Cell className="w-20 pr-8 text-right">
+                              <div className="flex justify-end gap-1">
+                                {hasDescription && (
+                                  <Button
+                                    aria-label={`${isDescriptionExpanded ? 'Hide' : 'Show'} notes for ${task.title}`}
+                                    size="icon-xs"
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => toggleTaskDescription(task.id)}
+                                  >
+                                    <HugeiconsIcon
+                                      icon={MoreHorizontalIcon}
+                                      aria-hidden="true"
+                                      className="size-[18px] shrink-0 translate-y-px"
+                                    />
+                                  </Button>
+                                )}
+
+                                <Button
+                                  aria-label={`Add child todo to ${task.title}`}
+                                  disabled={isCreatingChild}
+                                  size="icon-xs"
+                                  type="button"
+                                  variant="ghost"
+                                  onClick={() => openChildTaskForm(task.id)}
+                                >
+                                  <HugeiconsIcon
+                                    icon={Add01Icon}
+                                    aria-hidden="true"
+                                    className="size-[18px] shrink-0 translate-y-px"
+                                  />
+                                </Button>
+                              </div>
+                            </Table.Cell>
+                          </Table.Row>
+
+                          {hasDescription && isDescriptionExpanded && (
+                            <Table.Row id={`${task.id}-description`}>
+                              <Table.Cell className="pl-15 pr-8" colSpan={3}>
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                                  {task.description}
+                                </p>
+                              </Table.Cell>
+                            </Table.Row>
+                          )}
+
+                          {isAddingChild && !isCollapsed && (
+                            <Table.Row id={`${task.id}-child-form`}>
+                              <Table.Cell className="pl-16" colSpan={3}>
+                                <form
+                                  className="flex items-center gap-2"
+                                  onSubmit={(event) => {
+                                    void handleCreateChildTask(event, task);
+                                  }}
+                                >
+                                  <Input
+                                    aria-label={`Child todo for ${task.title}`}
+                                    className="h-8"
+                                    disabled={isCreatingChild}
+                                    placeholder="Add child todo..."
+                                    value={childTaskTitle}
+                                    onChange={(event) => setChildTaskTitle(event.target.value)}
+                                  />
+                                  <Button disabled={isCreatingChild} size="sm" type="submit">
+                                    Add
+                                  </Button>
+                                  <Button
+                                    disabled={isCreatingChild}
+                                    size="sm"
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={closeChildTaskForm}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </form>
+                              </Table.Cell>
+                            </Table.Row>
+                          )}
+
+                          {!isCollapsed &&
+                            taskChildren.map((childTask) => {
+                              const childProjectName = childTask.projectId
+                                ? projectNameById.get(childTask.projectId)
+                                : null;
+                              const childDueDate = formatDate(childTask.dueDate);
+                              const isChildDone = childTask.status === 'done';
+                              const isChildUpdating = updatingTaskIds.has(childTask.id);
+                              const hasChildDescription = childTask.description.trim() !== '';
+                              const isChildDescriptionExpanded = expandedDescriptionTaskIds.has(
+                                childTask.id,
+                              );
+
+                              return (
+                                <Fragment key={childTask.id}>
+                                  <Table.Row
+                                    id={childTask.id}
+                                    className={cn(
+                                      hasChildDescription &&
+                                        isChildDescriptionExpanded &&
+                                        'border-b-0',
+                                    )}
+                                  >
+                                    <Table.Cell className="pl-16">
+                                      <div className="flex min-w-0 items-center gap-3">
+                                        <Checkbox
+                                          aria-label={`Toggle ${childTask.title}`}
+                                          checked={getCheckboxState(childTask)}
+                                          disabled={isChildUpdating}
+                                          onCheckedChange={() => {
+                                            void handleToggleTaskDone(childTask);
+                                          }}
+                                        />
+
+                                        <div className="min-w-0 flex-1">
+                                          <div
+                                            className={cn(
+                                              'min-w-0 truncate text-sm font-medium text-foreground',
+                                              isChildDone && 'text-muted-foreground line-through',
+                                            )}
+                                          >
+                                            {childTask.title}
+                                            {childProjectName && (
+                                              <span className="font-normal text-muted-foreground">
+                                                /{childProjectName}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </Table.Cell>
+                                    <Table.Cell className="w-28 text-muted-foreground">
+                                      {childDueDate && (
+                                        <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
+                                          <HugeiconsIcon
+                                            icon={Calendar03Icon}
+                                            aria-hidden="true"
+                                            className="size-3 shrink-0"
+                                          />
+                                          {childDueDate}
+                                        </span>
+                                      )}
+                                    </Table.Cell>
+                                    <Table.Cell className="w-20 pr-8 text-right">
+                                      {hasChildDescription && (
+                                        <Button
+                                          aria-label={`${isChildDescriptionExpanded ? 'Hide' : 'Show'} notes for ${childTask.title}`}
+                                          size="icon-xs"
+                                          type="button"
+                                          variant="ghost"
+                                          onClick={() => toggleTaskDescription(childTask.id)}
+                                        >
+                                          <HugeiconsIcon
+                                            icon={MoreHorizontalIcon}
+                                            aria-hidden="true"
+                                            className="size-[18px] shrink-0 translate-y-px"
+                                          />
+                                        </Button>
+                                      )}
+                                    </Table.Cell>
+                                  </Table.Row>
+
+                                  {hasChildDescription && isChildDescriptionExpanded && (
+                                    <Table.Row id={`${childTask.id}-description`}>
+                                      <Table.Cell className="pl-28 pr-8" colSpan={3}>
+                                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                                          {childTask.description}
+                                        </p>
+                                      </Table.Cell>
+                                    </Table.Row>
+                                  )}
+                                </Fragment>
+                              );
+                            })}
+                        </Fragment>
+                      );
+                    })}
+                  </Table.Body>
+                </Table.Content>
+              </Table.ScrollContainer>
             </Table>
           </div>
         )}

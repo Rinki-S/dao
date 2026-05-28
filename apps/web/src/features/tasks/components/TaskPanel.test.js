@@ -1,0 +1,92 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+import { createElement } from 'react';
+import { render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { TaskPanel } from './TaskPanel.jsx';
+
+vi.mock('../../projects/api.js', () => ({
+  listProjects: vi.fn(async () => [
+    {
+      id: 'project-1',
+      workspaceId: 'workspace-1',
+      name: 'Dao Project',
+      description: '',
+      folderPath: '/tmp/dao-test/personal-workspace-1/dao-project',
+      status: 'active',
+      startedAt: null,
+      endedAt: null,
+      createdAt: '2026-05-25T00:00:00Z',
+      updatedAt: '2026-05-25T00:00:00Z',
+      deletedAt: null,
+      version: 1,
+      syncStatus: 'synced',
+    },
+  ]),
+}));
+
+vi.mock('../api.js', () => ({
+  createTask: vi.fn(),
+  updateTaskStatus: vi.fn(),
+  listTasks: vi.fn(async () => [
+    {
+      id: 'task-1',
+      workspaceId: 'workspace-1',
+      projectId: 'project-1',
+      parentId: null,
+      title: 'Review HeroUI migration',
+      description: '',
+      status: 'todo',
+      priority: 'high',
+      dueDate: null,
+      createdAt: '2026-05-25T00:00:00Z',
+      updatedAt: '2026-05-25T00:00:00Z',
+      deletedAt: null,
+      version: 1,
+      syncStatus: 'synced',
+    },
+  ]),
+}));
+
+vi.mock('../../activities/events.js', () => ({
+  notifyActivityChanged: vi.fn(),
+}));
+
+const taskPanelPath = path.resolve(import.meta.dirname, 'TaskPanel.jsx');
+const currentWorkspace = {
+  id: 'workspace-1',
+  name: 'Personal',
+  description: '',
+  rootPath: '/tmp/dao-test/personal-workspace-1',
+  createdAt: '2026-05-25T00:00:00Z',
+  updatedAt: '2026-05-25T00:00:00Z',
+  deletedAt: null,
+  version: 1,
+  syncStatus: 'synced',
+};
+
+describe('TaskPanel table migration boundary', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('uses HeroUI for table rows and compact labels instead of shadcn table and badge', () => {
+    const source = fs.readFileSync(taskPanelPath, 'utf8');
+
+    expect(source).toContain("from '@heroui/react'");
+    expect(source).toContain('Chip');
+    expect(source).toContain('Table');
+    expect(source).not.toContain("import { Badge } from '@/components/ui/badge'");
+    expect(source).not.toContain('import { Table, TableBody, TableCell, TableRow }');
+  });
+
+  it('renders task rows through the HeroUI task table', async () => {
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    expect(await screen.findByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.getByText('Review HeroUI migration')).toBeInTheDocument();
+    expect(screen.getByText('/Dao Project')).toBeInTheDocument();
+    expect(screen.getByText('High')).toBeInTheDocument();
+  });
+});
