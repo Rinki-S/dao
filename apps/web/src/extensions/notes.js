@@ -1,4 +1,4 @@
-import { Markdown } from '@nine-thirty-five/material-symbols-react/rounded';
+import { MarkdownIcon } from '@/components/icons.jsx';
 
 export const notesExtension = {
   id: 'notes',
@@ -8,7 +8,7 @@ export const notesExtension = {
       {
         format: 'markdown',
         label: 'Markdown',
-        icon: Markdown,
+        icon: MarkdownIcon,
       },
     ],
     surfaces: [

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FolderOpen } from '@nine-thirty-five/material-symbols-react/rounded';
+import { FolderOpenIconComponent } from '@/components/icons.jsx';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -148,7 +148,7 @@ export function WorkingDirectoryOnboarding({
                 variant="outline"
                 onClick={handleChooseDirectory}
               >
-                <FolderOpen data-icon="inline-start" />
+                <FolderOpenIconComponent data-icon="inline-start" />
                 {isChoosing ? 'Choosing...' : 'Choose folder'}
               </Button>
               <Button

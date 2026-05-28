@@ -1,4 +1,4 @@
-import { Extension } from '@nine-thirty-five/material-symbols-react/rounded';
+import { ExtensionIcon } from '@/components/icons.jsx';
 import {
   Sidebar,
   SidebarContent,
@@ -129,7 +129,7 @@ export function AppSidebar({
             <SidebarMenu>
               {sidebarItems.map((item) => {
                 const surfaceId = item.href.replace(/^#/, '');
-                const Icon = item.icon ?? Extension;
+                const Icon = item.icon ?? ExtensionIcon;
 
                 return (
                   <SidebarMenuItem key={item.id}>
@@ -171,7 +171,7 @@ export function AppSidebar({
           <SidebarMenu>
             {footerSidebarItems.map((item) => {
               const surfaceId = item.href.replace(/^#/, '');
-              const Icon = item.icon ?? Extension;
+              const Icon = item.icon ?? ExtensionIcon;
 
               return (
                 <SidebarMenuItem key={item.id}>

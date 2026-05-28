@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { Close, Search } from '@nine-thirty-five/material-symbols-react/rounded';
+import { CloseIcon, SearchIcon } from '@/components/icons.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -109,7 +109,7 @@ export function AppSearchBar() {
         className="flex h-8 items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50"
         onSubmit={handleSearch}
       >
-        <Search className="size-[18px] shrink-0 translate-y-px text-muted-foreground" />
+        <SearchIcon className="size-[18px] shrink-0 translate-y-px text-muted-foreground" />
         <label className="sr-only" htmlFor={searchInputId}>
           Search
         </label>
@@ -135,7 +135,7 @@ export function AppSearchBar() {
               setStatus('idle');
             }}
           >
-            <Close className="size-[18px] shrink-0 translate-y-px" />
+            <CloseIcon className="size-[18px] shrink-0 translate-y-px" />
           </Button>
         )}
       </form>

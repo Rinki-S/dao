@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import {
-  Add,
-  Check,
-  Error,
-  KeyboardArrowDown,
-  Stacks,
-} from '@nine-thirty-five/material-symbols-react/rounded';
+  AddIcon,
+  ArrowDownIcon,
+  CheckIcon,
+  ErrorIcon,
+  StacksIcon,
+} from '@/components/icons.jsx';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -76,7 +76,7 @@ export function WorkspaceSwitcher({
             className="app-no-drag font-heading"
           >
             <span className="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-              <Stacks className="size-[18px] shrink-0 translate-y-px" />
+              <StacksIcon className="size-[18px] shrink-0 translate-y-px" />
             </span>
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-semibold tracking-normal">
@@ -86,7 +86,7 @@ export function WorkspaceSwitcher({
                 {isLoading ? 'Loading...' : 'Workspace'}
               </span>
             </span>
-            <KeyboardArrowDown className="size-[18px] shrink-0 translate-y-px" />
+            <ArrowDownIcon className="size-[18px] shrink-0 translate-y-px" />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
 
@@ -97,7 +97,7 @@ export function WorkspaceSwitcher({
               <DropdownMenuItem key={workspace.id} onSelect={() => onSelectWorkspace(workspace.id)}>
                 <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
                 {workspace.id === currentWorkspace?.id && (
-                  <Check className="size-[18px] shrink-0 translate-y-px" />
+                  <CheckIcon className="size-[18px] shrink-0 translate-y-px" />
                 )}
               </DropdownMenuItem>
             ))}
@@ -111,7 +111,7 @@ export function WorkspaceSwitcher({
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem disabled>
-                <Error className="size-[18px] shrink-0 translate-y-px" />
+                <ErrorIcon className="size-[18px] shrink-0 translate-y-px" />
                 <span className="truncate">{error}</span>
               </DropdownMenuItem>
             </>
@@ -125,7 +125,7 @@ export function WorkspaceSwitcher({
                 onCreateDialogOpenChange(true);
               }}
             >
-              <Add className="size-[18px] shrink-0 translate-y-px" />
+              <AddIcon className="size-[18px] shrink-0 translate-y-px" />
               <span>Create workspace</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>

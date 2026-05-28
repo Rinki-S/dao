@@ -1,4 +1,4 @@
-import { TaskAlt } from '@nine-thirty-five/material-symbols-react/rounded';
+import { TaskDoneIcon } from '@/components/icons.jsx';
 
 export const tasksExtension = {
   id: 'tasks',
@@ -17,7 +17,7 @@ export const tasksExtension = {
         id: 'tasks',
         label: 'Tasks',
         href: '#tasks',
-        icon: TaskAlt,
+        icon: TaskDoneIcon,
         order: 40,
       },
     ],

@@ -1,6 +1,6 @@
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
-import { Check, ChevronRight } from '@nine-thirty-five/material-symbols-react/rounded';
 
+import { ArrowRightIcon, CheckIcon } from '@/components/icons.jsx';
 import { cn } from '@/lib/utils';
 
 function DropdownMenu({ ...props }) {
@@ -68,7 +68,7 @@ function DropdownMenuCheckboxItem({ className, children, checked, inset, ...prop
         data-slot="dropdown-menu-checkbox-item-indicator"
       >
         <DropdownMenuPrimitive.ItemIndicator>
-          <Check className="size-[18px] shrink-0 translate-y-px" />
+          <CheckIcon className="size-[18px] shrink-0 translate-y-px" />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
       {children}
@@ -96,7 +96,7 @@ function DropdownMenuRadioItem({ className, children, inset, ...props }) {
         data-slot="dropdown-menu-radio-item-indicator"
       >
         <DropdownMenuPrimitive.ItemIndicator>
-          <Check className="size-[18px] shrink-0 translate-y-px" />
+          <CheckIcon className="size-[18px] shrink-0 translate-y-px" />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
       {children}
@@ -157,7 +157,7 @@ function DropdownMenuSubTrigger({ className, inset, children, ...props }) {
       {...props}
     >
       {children}
-      <ChevronRight className="ml-auto size-[18px] shrink-0 translate-y-px" />
+      <ArrowRightIcon className="ml-auto size-[18px] shrink-0 translate-y-px" />
     </DropdownMenuPrimitive.SubTrigger>
   );
 }

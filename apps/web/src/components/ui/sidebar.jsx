@@ -1,8 +1,8 @@
 import * as React from 'react';
 import { cva } from 'class-variance-authority';
 import { Slot } from 'radix-ui';
-import { DockToLeft } from '@nine-thirty-five/material-symbols-react/rounded';
 
+import { SidebarIcon } from '@/components/icons.jsx';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -235,7 +235,7 @@ function SidebarTrigger({ className, onClick, ...props }) {
       }}
       {...props}
     >
-      <DockToLeft className="size-[18px] shrink-0 translate-y-px" />
+      <SidebarIcon className="size-[18px] shrink-0 translate-y-px" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );

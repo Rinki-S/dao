@@ -1,11 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Add,
-  CalendarToday,
-  KeyboardArrowRight,
-  MoreHoriz,
-  TaskAlt,
-} from '@nine-thirty-five/material-symbols-react/rounded';
+  AddIcon,
+  ArrowRightIcon,
+  CalendarIcon,
+  MoreHorizontalIconComponent,
+  TaskDoneIcon,
+} from '@/components/icons.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -511,7 +511,7 @@ export function TaskPanel({ currentWorkspace }) {
 
         {status === 'ready' && currentWorkspace && visibleTasks.length === 0 && (
           <div className="mx-8 flex min-h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border text-center">
-            <TaskAlt aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+            <TaskDoneIcon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
             <p className="text-sm font-medium text-foreground">No tasks yet</p>
             <p className="max-w-sm text-sm text-muted-foreground text-pretty">
               Capture the next concrete action for this workspace.
@@ -560,7 +560,7 @@ export function TaskPanel({ currentWorkspace }) {
                               variant="ghost"
                               onClick={() => toggleTaskCollapse(task.id)}
                             >
-                              <KeyboardArrowRight
+                              <ArrowRightIcon
                                 aria-hidden="true"
                                 className={cn(
                                   'size-[18px] shrink-0 transition-transform',
@@ -604,7 +604,7 @@ export function TaskPanel({ currentWorkspace }) {
                         <TableCell className="w-28 text-muted-foreground">
                           {dueDate && (
                             <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
-                              <CalendarToday aria-hidden="true" className="size-3 shrink-0" />
+                              <CalendarIcon aria-hidden="true" className="size-3 shrink-0" />
                               {dueDate}
                             </span>
                           )}
@@ -619,7 +619,7 @@ export function TaskPanel({ currentWorkspace }) {
                                 variant="ghost"
                                 onClick={() => toggleTaskDescription(task.id)}
                               >
-                                <MoreHoriz
+                                <MoreHorizontalIconComponent
                                   aria-hidden="true"
                                   className="size-[18px] shrink-0 translate-y-px"
                                 />
@@ -634,7 +634,7 @@ export function TaskPanel({ currentWorkspace }) {
                               variant="ghost"
                               onClick={() => openChildTaskForm(task.id)}
                             >
-                              <Add
+                              <AddIcon
                                 aria-hidden="true"
                                 className="size-[18px] shrink-0 translate-y-px"
                               />
@@ -738,7 +738,7 @@ export function TaskPanel({ currentWorkspace }) {
                                 <TableCell className="w-28 text-muted-foreground">
                                   {childDueDate && (
                                     <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
-                                      <CalendarToday
+                                      <CalendarIcon
                                         aria-hidden="true"
                                         className="size-3 shrink-0"
                                       />
@@ -755,7 +755,7 @@ export function TaskPanel({ currentWorkspace }) {
                                       variant="ghost"
                                       onClick={() => toggleTaskDescription(childTask.id)}
                                     >
-                                      <MoreHoriz
+                                      <MoreHorizontalIconComponent
                                         aria-hidden="true"
                                         className="size-[18px] shrink-0 translate-y-px"
                                       />

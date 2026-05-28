@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Add,
-  AddNotes,
-  Folder,
-  FolderOpen,
-} from '@nine-thirty-five/material-symbols-react/rounded';
+  AddIcon,
+  AddNotesIcon,
+  FolderIcon,
+  FolderOpenIconComponent,
+} from '@/components/icons.jsx';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -284,7 +284,7 @@ export function ProjectTree({
               setIsProjectDialogOpen(true);
             }}
           >
-            <Add aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+            <AddIcon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
           </Button>
           <Button
             aria-label="Create content"
@@ -295,7 +295,7 @@ export function ProjectTree({
             variant="ghost"
             onClick={() => openContentDialog()}
           >
-            <AddNotes aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+            <AddNotesIcon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
           </Button>
         </div>
       </div>
@@ -322,7 +322,7 @@ export function ProjectTree({
           {workspaceProjects.map((project) => {
             const isExpanded = expandedProjectIds.has(project.id);
             const projectNotes = notesByProjectId.get(project.id) ?? [];
-            const ProjectIcon = isExpanded ? FolderOpen : Folder;
+            const ProjectIcon = isExpanded ? FolderOpenIconComponent : FolderIcon;
 
             return (
               <SidebarMenuItem key={project.id}>

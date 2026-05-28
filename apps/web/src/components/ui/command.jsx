@@ -1,8 +1,8 @@
 'use client';
 
 import { Command as CommandPrimitive } from 'cmdk';
-import { Check, Search } from '@nine-thirty-five/material-symbols-react/rounded';
 
+import { CheckIcon, SearchIcon } from '@/components/icons.jsx';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -63,7 +63,7 @@ function CommandInput({ className, ...props }) {
           {...props}
         />
         <InputGroupAddon>
-          <Search className="size-[18px] shrink-0 translate-y-px opacity-50" />
+          <SearchIcon className="size-[18px] shrink-0 translate-y-px opacity-50" />
         </InputGroupAddon>
       </InputGroup>
     </div>
@@ -127,7 +127,7 @@ function CommandItem({ className, children, ...props }) {
       {...props}
     >
       {children}
-      <Check className="ml-auto size-[18px] shrink-0 translate-y-px opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
+      <CheckIcon className="ml-auto size-[18px] shrink-0 translate-y-px opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
     </CommandPrimitive.Item>
   );
 }

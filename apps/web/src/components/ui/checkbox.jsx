@@ -1,6 +1,6 @@
 import { Checkbox as CheckboxPrimitive } from 'radix-ui';
-import { Check, Remove } from '@nine-thirty-five/material-symbols-react/rounded';
 
+import { CheckIcon, RemoveIcon } from '@/components/icons.jsx';
 import { cn } from '@/lib/utils';
 
 function Checkbox({ className, ...props }) {
@@ -18,9 +18,9 @@ function Checkbox({ className, ...props }) {
         className="grid place-content-center text-current transition-none [&>svg]:size-3.5"
       >
         {props.checked === 'indeterminate' ? (
-          <Remove aria-hidden="true" />
+          <RemoveIcon aria-hidden="true" />
         ) : (
-          <Check aria-hidden="true" />
+          <CheckIcon aria-hidden="true" />
         )}
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
