@@ -1,9 +1,7 @@
 import { useState } from 'react';
+import { Button, FieldError, Input, Label, Surface, TextField } from '@heroui/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import FolderOpenIcon from '@hugeicons/core-free-icons/FolderOpenIcon';
-import { Button } from '@/components/ui/button';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { DirectoryPickerResultSchema } from '@/features/settings/schemas.js';
 
 export function WorkingDirectoryOnboarding({
@@ -136,31 +134,35 @@ export function WorkingDirectoryOnboarding({
 
         {step === 'directory' ? (
           <div className="flex flex-col gap-4">
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            <Surface
+              className="rounded-xl border border-border px-3 py-2 text-sm text-muted"
+              variant="default"
+            >
               {selectedPath || 'No directory selected'}
-            </div>
+            </Surface>
 
             {error && <FieldError>{error}</FieldError>}
 
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
-                disabled={isChoosing || isSaving}
+                isDisabled={isChoosing || isSaving}
+                isPending={isChoosing}
                 type="button"
                 variant="outline"
-                onClick={handleChooseDirectory}
+                onPress={handleChooseDirectory}
               >
                 <HugeiconsIcon icon={FolderOpenIcon} data-icon="inline-start" />
                 {isChoosing ? 'Choosing...' : 'Choose folder'}
               </Button>
               <Button
-                disabled={!selectedPath || isSaving}
+                isDisabled={!selectedPath || isSaving}
                 type="button"
-                onClick={handleContinueToWorkspace}
+                onPress={handleContinueToWorkspace}
               >
                 Continue
               </Button>
               {onCancel && (
-                <Button disabled={isSaving} type="button" variant="ghost" onClick={onCancel}>
+                <Button isDisabled={isSaving} type="button" variant="ghost" onPress={onCancel}>
                   Cancel
                 </Button>
               )}
@@ -168,50 +170,61 @@ export function WorkingDirectoryOnboarding({
           </div>
         ) : step === 'strategy' ? (
           <div className="flex flex-col gap-4">
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            <Surface
+              className="rounded-xl border border-border px-3 py-2 text-sm text-muted"
+              variant="default"
+            >
               {selectedPath}
-            </div>
+            </Surface>
 
             <div className="grid gap-2">
-              <button
-                className="rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-muted/50"
+              <Button
+                className="h-auto justify-start rounded-xl border-border p-3 text-left"
+                fullWidth
                 type="button"
-                onClick={() => setDirectoryStrategy('start-fresh')}
+                variant={directoryStrategy === 'start-fresh' ? 'secondary' : 'outline'}
+                onPress={() => setDirectoryStrategy('start-fresh')}
               >
-                <span className="font-medium text-foreground">Start fresh</span>
-                <span className="mt-1 block text-muted-foreground">
-                  Use this directory for new workspace and project folders from now on.
+                <span className="flex flex-col items-start">
+                  <span className="font-medium text-foreground">Start fresh</span>
+                  <span className="mt-1 block text-muted">
+                    Use this directory for new workspace and project folders from now on.
+                  </span>
                 </span>
-              </button>
-              <button
-                className="rounded-lg border border-border px-3 py-2 text-left text-sm opacity-60"
-                disabled
+              </Button>
+              <Button
+                className="h-auto justify-start rounded-xl border-border p-3 text-left"
+                fullWidth
+                isDisabled
                 type="button"
-                onClick={() => setDirectoryStrategy('migrate')}
+                variant="outline"
+                onPress={() => setDirectoryStrategy('migrate')}
               >
-                <span className="font-medium text-foreground">Migrate files</span>
-                <span className="mt-1 block text-muted-foreground">
-                  Move existing workspace and project folders to the new directory. Coming soon.
+                <span className="flex flex-col items-start">
+                  <span className="font-medium text-foreground">Migrate files</span>
+                  <span className="mt-1 block text-muted">
+                    Move existing workspace and project folders to the new directory. Coming soon.
+                  </span>
                 </span>
-              </button>
+              </Button>
             </div>
 
             {error && <FieldError>{error}</FieldError>}
 
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button disabled={isSaving} type="button" onClick={handleContinueFromStrategy}>
+              <Button isDisabled={isSaving} type="button" onPress={handleContinueFromStrategy}>
                 Continue
               </Button>
               <Button
-                disabled={isSaving}
+                isDisabled={isSaving}
                 type="button"
                 variant="ghost"
-                onClick={() => setStep('directory')}
+                onPress={() => setStep('directory')}
               >
                 Back
               </Button>
               {onCancel && (
-                <Button disabled={isSaving} type="button" variant="ghost" onClick={onCancel}>
+                <Button isDisabled={isSaving} type="button" variant="ghost" onPress={onCancel}>
                   Cancel
                 </Button>
               )}
@@ -219,51 +232,64 @@ export function WorkingDirectoryOnboarding({
           </div>
         ) : (
           <form className="flex flex-col gap-4" onSubmit={handleCreateWorkspace}>
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            <Surface
+              className="rounded-xl border border-border px-3 py-2 text-sm text-muted"
+              variant="default"
+            >
               {selectedPath}
-            </div>
+            </Surface>
 
             {!hasWorkspace && (
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="onboarding-workspace-name">Workspace name</FieldLabel>
+              <div className="flex flex-col gap-4">
+                <TextField
+                  isDisabled={isSaving}
+                  isInvalid={Boolean(error && workspaceName.trim() === '')}
+                  isRequired
+                  name="workspaceName"
+                  value={workspaceName}
+                  onChange={setWorkspaceName}
+                >
+                  <Label htmlFor="onboarding-workspace-name">Workspace name</Label>
                   <Input
-                    id="onboarding-workspace-name"
-                    value={workspaceName}
-                    onChange={(event) => setWorkspaceName(event.target.value)}
-                    placeholder="Personal"
-                    disabled={isSaving}
                     autoFocus
+                    fullWidth
+                    id="onboarding-workspace-name"
+                    placeholder="Personal"
+                    variant="secondary"
                   />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="onboarding-workspace-description">Description</FieldLabel>
+                </TextField>
+                <TextField
+                  isDisabled={isSaving}
+                  name="workspaceDescription"
+                  value={workspaceDescription}
+                  onChange={setWorkspaceDescription}
+                >
+                  <Label htmlFor="onboarding-workspace-description">Description</Label>
                   <Input
+                    fullWidth
                     id="onboarding-workspace-description"
-                    value={workspaceDescription}
-                    onChange={(event) => setWorkspaceDescription(event.target.value)}
                     placeholder="Optional"
-                    disabled={isSaving}
+                    variant="secondary"
                   />
-                </Field>
-              </FieldGroup>
+                </TextField>
+              </div>
             )}
 
             {error && <FieldError>{error}</FieldError>}
 
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
-                disabled={isSaving}
+                isDisabled={isSaving}
                 type="button"
                 variant="outline"
-                onClick={() => {
+                onPress={() => {
                   setError('');
                   setStep('directory');
                 }}
               >
                 Back
               </Button>
-              <Button disabled={isSaving} type="submit">
+              <Button isDisabled={isSaving} isPending={isSaving} type="submit">
                 {isSaving
                   ? hasWorkspace
                     ? 'Saving...'
@@ -273,7 +299,7 @@ export function WorkingDirectoryOnboarding({
                     : 'Create workspace'}
               </Button>
               {onCancel && (
-                <Button disabled={isSaving} type="button" variant="ghost" onClick={onCancel}>
+                <Button isDisabled={isSaving} type="button" variant="ghost" onPress={onCancel}>
                   Cancel
                 </Button>
               )}
