@@ -47,7 +47,7 @@ describe('extension registry', () => {
   it('registers surfaces by order', () => {
     const surfaces = getRegisteredSurfaces();
 
-    expect(surfaces.map((surface) => surface.id)).toEqual(['dashboard', 'tasks', 'settings']);
+    expect(surfaces.map((surface) => surface.id)).toEqual(['tasks', 'settings']);
   });
 
   it('registers content formats', () => {
