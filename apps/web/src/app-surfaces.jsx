@@ -1,6 +1,5 @@
 import { ActivityMetricsPanel } from './features/activities/components/ActivityMetricsPanel.jsx';
 import { NotePanel } from './features/notes/components/NotePanel.jsx';
-import { ProjectPanel } from './features/projects/components/ProjectPanel.jsx';
 import { SettingsPanel } from './features/settings/components/SettingsPanel.jsx';
 import { TaskPanel } from './features/tasks/components/TaskPanel.jsx';
 
@@ -14,7 +13,6 @@ export function getSurfaceComponent(
         <ActivityMetricsPanel />
       </section>
     ),
-    projects: <ProjectPanel currentWorkspace={currentWorkspace} />,
     tasks: <TaskPanel currentWorkspace={currentWorkspace} />,
     notes: <NotePanel currentWorkspace={currentWorkspace} />,
     settings: (

@@ -105,12 +105,12 @@ export function AppSearchBar() {
       <SearchField
         className="w-full"
         name="app-search"
+        variant="primary"
         value={query}
-        variant="secondary"
         onChange={handleQueryChange}
       >
         <Label className="sr-only">Search</Label>
-        <SearchField.Group className="h-8 gap-1 rounded-lg border border-border bg-muted/40 px-2 shadow-none data-[focus-within=true]:border-ring data-[focus-within=true]:ring-3 data-[focus-within=true]:ring-ring/50">
+        <SearchField.Group className="h-8 gap-1 rounded-lg border border-border px-2 shadow-none data-[focus-within=true]:border-ring data-[focus-within=true]:ring-3 data-[focus-within=true]:ring-ring/50">
           <SearchField.SearchIcon className="m-0 text-muted-foreground">
             <HugeiconsIcon icon={Search01Icon} className="size-[18px] shrink-0 translate-y-px" />
           </SearchField.SearchIcon>

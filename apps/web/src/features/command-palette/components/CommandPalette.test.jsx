@@ -7,9 +7,6 @@ function renderCommandPaletteWithTargets() {
   return render(
     <>
       <CommandPalette />
-      <section id="projects">
-        <input data-command-target="project-name" aria-label="Project name" />
-      </section>
       <section id="tasks">
         <input data-command-target="task-title" aria-label="Task title" />
       </section>
@@ -98,7 +95,7 @@ describe('CommandPalette', () => {
     await user.keyboard('{ArrowDown}');
     await user.keyboard('{Enter}');
 
-    expect(window.location.hash).toBe('#projects');
+    expect(window.location.hash).toBe('#tasks');
   });
 
   it('runs the switch workspace action command', async () => {

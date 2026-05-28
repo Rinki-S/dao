@@ -30,8 +30,6 @@ describe('extension registry', () => {
     expect(commands.map((command) => command.id)).toEqual([
       'create-workspace',
       'switch-workspace',
-      'create-project',
-      'open-projects',
       'create-task',
       'open-tasks',
       'create-note',
@@ -53,7 +51,6 @@ describe('extension registry', () => {
 
     expect(surfaces.map((surface) => surface.id)).toEqual([
       'dashboard',
-      'projects',
       'tasks',
       'notes',
       'settings',
