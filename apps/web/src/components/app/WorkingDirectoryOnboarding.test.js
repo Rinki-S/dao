@@ -17,7 +17,9 @@ describe('WorkingDirectoryOnboarding HeroUI migration boundary', () => {
     const source = fs.readFileSync(onboardingPath, 'utf8');
 
     expect(source).toContain('OnboardingStepIndicator');
+    expect(source).toContain('data-onboarding-footer');
     expect(source).toContain('data-step-transition');
+    expect(source).toContain('data-step-header');
     expect(source).toContain('data-direction={stepDirection}');
     expect(source).toContain('motion-reduce:transition-none');
   });

@@ -124,34 +124,8 @@ export function WorkingDirectoryOnboarding({
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-background px-6 text-foreground">
-      <div className="flex w-full max-w-xl flex-col gap-6">
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted-foreground">
-            {mode === 'replay'
-              ? 'Working directory setup'
-              : `Step ${step === 'directory' ? '1' : '2'} of 2`}
-          </p>
-          <h1 className="font-heading text-2xl font-semibold text-foreground">
-            {step === 'directory'
-              ? 'Choose a working directory'
-              : step === 'strategy'
-                ? 'Choose how to use this directory'
-                : hasWorkspace
-                  ? 'Workspace setup'
-                  : 'Create your first workspace'}
-          </h1>
-          <p className="text-sm text-muted-foreground text-pretty">
-            {step === 'directory'
-              ? 'Dao stores workspace folders, project folders, notes, and future imported files in a directory you control.'
-              : step === 'strategy'
-                ? 'Changing the working directory can either start fresh or migrate existing files later.'
-                : hasWorkspace
-                  ? 'You already have a workspace. You can continue without creating another one.'
-                  : 'A workspace is the top-level place for your projects, tasks, notes, and future local files.'}
-          </p>
-        </div>
-
+    <div className="relative flex min-h-dvh items-center justify-center bg-background px-6 py-12 pb-28 text-foreground">
+      <div className="w-full max-w-xl overflow-hidden">
         <div
           key={step}
           data-direction={stepDirection}
@@ -161,6 +135,32 @@ export function WorkingDirectoryOnboarding({
               'animate-in fade-in-0 duration-150 ease-out data-[direction=backward]:slide-in-from-left-4 data-[direction=forward]:slide-in-from-right-4 motion-reduce:animate-none motion-reduce:transition-none',
           )}
         >
+          <div className="mb-6 flex flex-col gap-2" data-step-header>
+            <p className="text-sm text-muted-foreground">
+              {mode === 'replay'
+                ? 'Working directory setup'
+                : `Step ${step === 'directory' ? '1' : '2'} of 2`}
+            </p>
+            <h1 className="font-heading text-2xl font-semibold text-foreground">
+              {step === 'directory'
+                ? 'Choose a working directory'
+                : step === 'strategy'
+                  ? 'Choose how to use this directory'
+                  : hasWorkspace
+                    ? 'Workspace setup'
+                    : 'Create your first workspace'}
+            </h1>
+            <p className="text-sm text-muted-foreground text-pretty">
+              {step === 'directory'
+                ? 'Dao stores workspace folders, project folders, notes, and future imported files in a directory you control.'
+                : step === 'strategy'
+                  ? 'Changing the working directory can either start fresh or migrate existing files later.'
+                  : hasWorkspace
+                    ? 'You already have a workspace. You can continue without creating another one.'
+                    : 'A workspace is the top-level place for your projects, tasks, notes, and future local files.'}
+            </p>
+          </div>
+
           {step === 'directory' ? (
             <div className="flex flex-col gap-4">
               <Surface
@@ -336,7 +336,12 @@ export function WorkingDirectoryOnboarding({
             </form>
           )}
         </div>
+      </div>
 
+      <div
+        className="fixed inset-x-0 bottom-0 flex justify-center px-6 pt-4 pb-[calc(2rem+env(safe-area-inset-bottom))]"
+        data-onboarding-footer
+      >
         <OnboardingStepIndicator currentStep={getOnboardingStepProgress(step)} />
       </div>
     </div>
