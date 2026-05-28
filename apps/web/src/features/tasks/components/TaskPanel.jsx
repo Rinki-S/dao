@@ -50,6 +50,9 @@ const prioritySortOrder = {
   low: 2,
 };
 
+const quickAddAccessoryButtonClassName =
+  '[--button-fg:var(--field-placeholder)] hover:[--button-fg:var(--field-foreground)] focus-visible:[--button-fg:var(--field-foreground)]';
+
 function compareTasks(firstTask, secondTask) {
   const statusDifference =
     (statusSortOrder[firstTask.status] ?? 99) - (statusSortOrder[secondTask.status] ?? 99);
@@ -93,7 +96,6 @@ export function TaskPanel({ currentWorkspace }) {
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isDescriptionPopoverOpen, setIsDescriptionPopoverOpen] = useState(false);
   const [updatingTaskIds, setUpdatingTaskIds] = useState(() => new Set());
   const [childTaskParentId, setChildTaskParentId] = useState('');
@@ -255,7 +257,6 @@ export function TaskPanel({ currentWorkspace }) {
     setTaskDescription('');
     setTaskPriority('medium');
     setIsDescriptionPopoverOpen(false);
-    setIsQuickAddOpen(false);
     setError('');
     taskTitleInputRef.current?.blur();
   }
@@ -394,134 +395,128 @@ export function TaskPanel({ currentWorkspace }) {
                   ref={taskTitleInputRef}
                   data-command-target="task-title"
                   placeholder="Add a task..."
-                  onFocus={() => setIsQuickAddOpen(true)}
                 />
 
-                {isQuickAddOpen && (
-                  <InputGroup.Suffix className="gap-1 pr-1">
-                    <Dropdown>
-                      <Button
-                        aria-label="Select project"
-                        isDisabled={!currentWorkspace || isCreating}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        {({ isPressed }) => (
-                          <span className={cn(isPressed && 'scale-[0.97]')}>
-                            {selectedWorkspaceProjectId
-                              ? (projectNameById.get(selectedWorkspaceProjectId) ?? 'Project')
-                              : 'No project'}
-                          </span>
-                        )}
-                      </Button>
-                      <Dropdown.Popover className="w-52" placement="bottom end">
-                        <Dropdown.Menu
-                          selectedKeys={new Set([selectedWorkspaceProjectId || 'none'])}
-                          selectionMode="single"
-                          onSelectionChange={(keys) => {
-                            const [nextProjectId] = [...keys];
-                            handleProjectChange(String(nextProjectId ?? 'none'));
-                          }}
-                        >
-                          <Dropdown.Item id="none" textValue="No project">
-                            <Dropdown.ItemIndicator />
-                            <Label>No project</Label>
-                          </Dropdown.Item>
-                          {workspaceProjects.map((project) => (
-                            <Dropdown.Item
-                              id={project.id}
-                              key={project.id}
-                              textValue={project.name}
-                            >
-                              <Dropdown.ItemIndicator />
-                              <Label>{project.name}</Label>
-                            </Dropdown.Item>
-                          ))}
-                        </Dropdown.Menu>
-                      </Dropdown.Popover>
-                    </Dropdown>
-
-                    <Dropdown>
-                      <Button
-                        aria-label="Select priority"
-                        isDisabled={!currentWorkspace || isCreating}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        {({ isPressed }) => (
-                          <span className={cn(isPressed && 'scale-[0.97]')}>
-                            {priorityLabels[taskPriority]}
-                          </span>
-                        )}
-                      </Button>
-                      <Dropdown.Popover className="w-36" placement="bottom end">
-                        <Dropdown.Menu
-                          selectedKeys={new Set([taskPriority])}
-                          selectionMode="single"
-                          onSelectionChange={(keys) => {
-                            const [nextPriority] = [...keys];
-                            if (nextPriority) {
-                              setTaskPriority(String(nextPriority));
-                            }
-                          }}
-                        >
-                          {priorityOptions.map((option) => (
-                            <Dropdown.Item
-                              id={option.value}
-                              key={option.value}
-                              textValue={option.label}
-                            >
-                              <Dropdown.ItemIndicator />
-                              <Label>{option.label}</Label>
-                            </Dropdown.Item>
-                          ))}
-                        </Dropdown.Menu>
-                      </Dropdown.Popover>
-                    </Dropdown>
-
-                    <Popover
-                      isOpen={isDescriptionPopoverOpen}
-                      onOpenChange={setIsDescriptionPopoverOpen}
+                <InputGroup.Suffix className="gap-1 pr-1">
+                  <Dropdown>
+                    <Button
+                      aria-label="Select project"
+                      className={quickAddAccessoryButtonClassName}
+                      isDisabled={!currentWorkspace || isCreating}
+                      size="sm"
+                      variant="ghost"
                     >
-                      <Popover.Trigger>
-                        <Button
-                          aria-label="Edit description"
-                          isDisabled={!currentWorkspace || isCreating}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          {taskDescription.trim() ? 'Description' : 'No description'}
-                        </Button>
-                      </Popover.Trigger>
-                      <Popover.Content className="w-80" placement="bottom end">
-                        <Popover.Dialog className="flex flex-col gap-2">
-                          <Label htmlFor="task-description">Description</Label>
-                          <TextArea
-                            id="task-description"
-                            className="max-h-48 min-h-28 resize-none overflow-y-auto"
-                            value={taskDescription}
-                            onChange={(event) => setTaskDescription(event.target.value)}
-                            placeholder="Add details..."
-                            disabled={!currentWorkspace || isCreating}
-                            variant="secondary"
-                          />
-                        </Popover.Dialog>
-                      </Popover.Content>
-                    </Popover>
-                  </InputGroup.Suffix>
-                )}
+                      {({ isPressed }) => (
+                        <span className={cn(isPressed && 'scale-[0.97]')}>
+                          {selectedWorkspaceProjectId
+                            ? (projectNameById.get(selectedWorkspaceProjectId) ?? 'Project')
+                            : 'No project'}
+                        </span>
+                      )}
+                    </Button>
+                    <Dropdown.Popover className="w-52" placement="bottom end">
+                      <Dropdown.Menu
+                        selectedKeys={new Set([selectedWorkspaceProjectId || 'none'])}
+                        selectionMode="single"
+                        onSelectionChange={(keys) => {
+                          const [nextProjectId] = [...keys];
+                          handleProjectChange(String(nextProjectId ?? 'none'));
+                        }}
+                      >
+                        <Dropdown.Item id="none" textValue="No project">
+                          <Dropdown.ItemIndicator />
+                          <Label>No project</Label>
+                        </Dropdown.Item>
+                        {workspaceProjects.map((project) => (
+                          <Dropdown.Item id={project.id} key={project.id} textValue={project.name}>
+                            <Dropdown.ItemIndicator />
+                            <Label>{project.name}</Label>
+                          </Dropdown.Item>
+                        ))}
+                      </Dropdown.Menu>
+                    </Dropdown.Popover>
+                  </Dropdown>
+
+                  <Dropdown>
+                    <Button
+                      aria-label="Select priority"
+                      className={quickAddAccessoryButtonClassName}
+                      isDisabled={!currentWorkspace || isCreating}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      {({ isPressed }) => (
+                        <span className={cn(isPressed && 'scale-[0.97]')}>
+                          {priorityLabels[taskPriority]}
+                        </span>
+                      )}
+                    </Button>
+                    <Dropdown.Popover className="w-36" placement="bottom end">
+                      <Dropdown.Menu
+                        selectedKeys={new Set([taskPriority])}
+                        selectionMode="single"
+                        onSelectionChange={(keys) => {
+                          const [nextPriority] = [...keys];
+                          if (nextPriority) {
+                            setTaskPriority(String(nextPriority));
+                          }
+                        }}
+                      >
+                        {priorityOptions.map((option) => (
+                          <Dropdown.Item
+                            id={option.value}
+                            key={option.value}
+                            textValue={option.label}
+                          >
+                            <Dropdown.ItemIndicator />
+                            <Label>{option.label}</Label>
+                          </Dropdown.Item>
+                        ))}
+                      </Dropdown.Menu>
+                    </Dropdown.Popover>
+                  </Dropdown>
+
+                  <Popover
+                    isOpen={isDescriptionPopoverOpen}
+                    onOpenChange={setIsDescriptionPopoverOpen}
+                  >
+                    <Popover.Trigger>
+                      <Button
+                        aria-label="Edit description"
+                        className={quickAddAccessoryButtonClassName}
+                        isDisabled={!currentWorkspace || isCreating}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        {taskDescription.trim() ? 'Description' : 'No description'}
+                      </Button>
+                    </Popover.Trigger>
+                    <Popover.Content className="w-80" placement="bottom end">
+                      <Popover.Dialog className="flex flex-col gap-2">
+                        <Label htmlFor="task-description">Description</Label>
+                        <TextArea
+                          id="task-description"
+                          className="max-h-48 min-h-28 resize-none overflow-y-auto"
+                          value={taskDescription}
+                          onChange={(event) => setTaskDescription(event.target.value)}
+                          placeholder="Add details..."
+                          disabled={!currentWorkspace || isCreating}
+                          variant="secondary"
+                        />
+                      </Popover.Dialog>
+                    </Popover.Content>
+                  </Popover>
+                </InputGroup.Suffix>
               </InputGroup>
 
-              {isQuickAddOpen && (
-                <Button
-                  className="h-9 shrink-0"
-                  isDisabled={isCreating || !currentWorkspace}
-                  isPending={isCreating}
-                  type="submit"
-                >
-                  {isCreating ? 'Adding...' : 'Add'}
-                </Button>
-              )}
+              <Button
+                className="h-9 shrink-0"
+                isDisabled={isCreating || !currentWorkspace || taskTitle.trim() === ''}
+                isPending={isCreating}
+                type="submit"
+              >
+                {isCreating ? 'Adding...' : 'Add'}
+              </Button>
             </div>
           </TextField>
 

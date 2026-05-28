@@ -109,6 +109,35 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).toContain('className="h-9 shrink-0"');
   });
 
+  it('keeps the quick add button visible and disables it until a title is entered', async () => {
+    const user = userEvent.setup();
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const titleInput = await screen.findByPlaceholderText('Add a task...');
+    const addButton = screen.getByRole('button', { name: 'Add' });
+
+    expect(addButton).toBeDisabled();
+
+    await user.type(titleInput, 'Write migration notes');
+
+    expect(addButton).toBeEnabled();
+  });
+
+  it('keeps the quick add accessory controls visible and visually subdued', async () => {
+    const source = fs.readFileSync(taskPanelPath, 'utf8');
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    await screen.findByPlaceholderText('Add a task...');
+
+    expect(screen.getByRole('button', { name: 'Select project' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Select priority' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Edit description' })).toBeVisible();
+    expect(source).toContain('[--button-fg:var(--field-placeholder)]');
+    expect(source).toContain('hover:[--button-fg:var(--field-foreground)]');
+    expect(source).not.toContain('--muted-foreground');
+  });
+
   it('renders task rows through the HeroUI task table', async () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
