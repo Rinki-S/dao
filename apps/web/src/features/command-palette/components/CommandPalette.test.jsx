@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CommandPalette } from './CommandPalette.jsx';
@@ -9,9 +9,6 @@ function renderCommandPaletteWithTargets() {
       <CommandPalette />
       <section id="tasks">
         <input data-command-target="task-title" aria-label="Task title" />
-      </section>
-      <section id="notes">
-        <input data-command-target="note-title" aria-label="Note title" />
       </section>
       <section id="settings" />
     </>,
@@ -75,13 +72,10 @@ describe('CommandPalette', () => {
     renderCommandPaletteWithTargets();
 
     await user.keyboard('{Control>}{Shift>}p{/Shift}{/Control}');
-    await user.type(screen.getByPlaceholderText('Type a command'), 'create note');
+    await user.type(screen.getByPlaceholderText('Type a command'), 'settings');
     await user.keyboard('{Enter}');
 
-    expect(window.location.hash).toBe('#notes');
-    await waitFor(() => {
-      expect(screen.getByLabelText('Note title')).toHaveFocus();
-    });
+    expect(window.location.hash).toBe('#settings');
     expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
   });
 

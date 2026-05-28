@@ -32,8 +32,6 @@ describe('extension registry', () => {
       'switch-workspace',
       'create-task',
       'open-tasks',
-      'create-note',
-      'open-notes',
       'open-search',
       'open-settings',
     ]);
@@ -49,12 +47,7 @@ describe('extension registry', () => {
   it('registers surfaces by order', () => {
     const surfaces = getRegisteredSurfaces();
 
-    expect(surfaces.map((surface) => surface.id)).toEqual([
-      'dashboard',
-      'tasks',
-      'notes',
-      'settings',
-    ]);
+    expect(surfaces.map((surface) => surface.id)).toEqual(['dashboard', 'tasks', 'settings']);
   });
 
   it('registers content formats', () => {

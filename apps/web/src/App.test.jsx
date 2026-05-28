@@ -97,11 +97,11 @@ describe('App', () => {
     renderApp();
 
     await user.keyboard('{Control>}{Shift>}p{/Shift}{/Control}');
-    await user.type(screen.getByPlaceholderText('Type a command'), 'open notes');
+    await user.type(screen.getByPlaceholderText('Type a command'), 'open settings');
     await user.keyboard('{Enter}');
 
-    expect(window.location.hash).toBe('#notes');
-    expect(screen.getByRole('heading', { name: 'Notes' })).toBeInTheDocument();
+    expect(window.location.hash).toBe('#settings');
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
   });
 
