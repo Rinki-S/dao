@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  AddIcon,
-  AddNotesIcon,
-  FolderIcon,
-  FolderOpenIconComponent,
-} from '@/components/icons.jsx';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
+import Folder01Icon from '@hugeicons/core-free-icons/Folder01Icon';
+import FolderOpenIcon from '@hugeicons/core-free-icons/FolderOpenIcon';
+import NoteAddIcon from '@hugeicons/core-free-icons/NoteAddIcon';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -284,7 +283,11 @@ export function ProjectTree({
               setIsProjectDialogOpen(true);
             }}
           >
-            <AddIcon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+            <HugeiconsIcon
+              icon={Add01Icon}
+              aria-hidden="true"
+              className="size-[18px] shrink-0 translate-y-px"
+            />
           </Button>
           <Button
             aria-label="Create content"
@@ -295,7 +298,11 @@ export function ProjectTree({
             variant="ghost"
             onClick={() => openContentDialog()}
           >
-            <AddNotesIcon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+            <HugeiconsIcon
+              icon={NoteAddIcon}
+              aria-hidden="true"
+              className="size-[18px] shrink-0 translate-y-px"
+            />
           </Button>
         </div>
       </div>
@@ -322,7 +329,7 @@ export function ProjectTree({
           {workspaceProjects.map((project) => {
             const isExpanded = expandedProjectIds.has(project.id);
             const projectNotes = notesByProjectId.get(project.id) ?? [];
-            const ProjectIcon = isExpanded ? FolderOpenIconComponent : FolderIcon;
+            const projectIcon = isExpanded ? FolderOpenIcon : Folder01Icon;
 
             return (
               <SidebarMenuItem key={project.id}>
@@ -332,7 +339,11 @@ export function ProjectTree({
                   tooltip={project.name}
                   onClick={() => toggleProject(project.id)}
                 >
-                  <ProjectIcon aria-hidden="true" className="size-[18px] shrink-0" />
+                  <HugeiconsIcon
+                    icon={projectIcon}
+                    aria-hidden="true"
+                    className="size-[18px] shrink-0"
+                  />
                   <span>{project.name}</span>
                 </SidebarMenuButton>
 

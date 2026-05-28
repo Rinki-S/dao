@@ -1,5 +1,7 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { CloseIcon, SearchIcon } from '@/components/icons.jsx';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
+import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -109,7 +111,10 @@ export function AppSearchBar() {
         className="flex h-8 items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50"
         onSubmit={handleSearch}
       >
-        <SearchIcon className="size-[18px] shrink-0 translate-y-px text-muted-foreground" />
+        <HugeiconsIcon
+          icon={Search01Icon}
+          className="size-[18px] shrink-0 translate-y-px text-muted-foreground"
+        />
         <label className="sr-only" htmlFor={searchInputId}>
           Search
         </label>
@@ -135,7 +140,10 @@ export function AppSearchBar() {
               setStatus('idle');
             }}
           >
-            <CloseIcon className="size-[18px] shrink-0 translate-y-px" />
+            <HugeiconsIcon
+              icon={Cancel01Icon}
+              className="size-[18px] shrink-0 translate-y-px"
+            />
           </Button>
         )}
       </form>

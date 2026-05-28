@@ -1,8 +1,9 @@
 import * as React from 'react';
 import { cva } from 'class-variance-authority';
 import { Slot } from 'radix-ui';
+import { HugeiconsIcon } from '@hugeicons/react';
+import ViewSidebarLeftIcon from '@hugeicons/core-free-icons/ViewSidebarLeftIcon';
 
-import { SidebarIcon } from '@/components/icons.jsx';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -235,7 +236,10 @@ function SidebarTrigger({ className, onClick, ...props }) {
       }}
       {...props}
     >
-      <SidebarIcon className="size-[18px] shrink-0 translate-y-px" />
+      <HugeiconsIcon
+        icon={ViewSidebarLeftIcon}
+        className="size-[18px] shrink-0 translate-y-px"
+      />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );

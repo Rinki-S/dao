@@ -1,6 +1,8 @@
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
+import { HugeiconsIcon } from '@hugeicons/react';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import CheckmarkSquare01Icon from '@hugeicons/core-free-icons/CheckmarkSquare01Icon';
 
-import { ArrowRightIcon, CheckIcon } from '@/components/icons.jsx';
 import { cn } from '@/lib/utils';
 
 function DropdownMenu({ ...props }) {
@@ -68,7 +70,10 @@ function DropdownMenuCheckboxItem({ className, children, checked, inset, ...prop
         data-slot="dropdown-menu-checkbox-item-indicator"
       >
         <DropdownMenuPrimitive.ItemIndicator>
-          <CheckIcon className="size-[18px] shrink-0 translate-y-px" />
+          <HugeiconsIcon
+            icon={CheckmarkSquare01Icon}
+            className="size-[18px] shrink-0 translate-y-px"
+          />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
       {children}
@@ -96,7 +101,10 @@ function DropdownMenuRadioItem({ className, children, inset, ...props }) {
         data-slot="dropdown-menu-radio-item-indicator"
       >
         <DropdownMenuPrimitive.ItemIndicator>
-          <CheckIcon className="size-[18px] shrink-0 translate-y-px" />
+          <HugeiconsIcon
+            icon={CheckmarkSquare01Icon}
+            className="size-[18px] shrink-0 translate-y-px"
+          />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
       {children}
@@ -157,7 +165,10 @@ function DropdownMenuSubTrigger({ className, inset, children, ...props }) {
       {...props}
     >
       {children}
-      <ArrowRightIcon className="ml-auto size-[18px] shrink-0 translate-y-px" />
+      <HugeiconsIcon
+        icon={ArrowRight01Icon}
+        className="ml-auto size-[18px] shrink-0 translate-y-px"
+      />
     </DropdownMenuPrimitive.SubTrigger>
   );
 }

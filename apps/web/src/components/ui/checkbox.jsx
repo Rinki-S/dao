@@ -1,6 +1,8 @@
 import { Checkbox as CheckboxPrimitive } from 'radix-ui';
+import { HugeiconsIcon } from '@hugeicons/react';
+import CheckmarkSquare01Icon from '@hugeicons/core-free-icons/CheckmarkSquare01Icon';
+import MinusSignIcon from '@hugeicons/core-free-icons/MinusSignIcon';
 
-import { CheckIcon, RemoveIcon } from '@/components/icons.jsx';
 import { cn } from '@/lib/utils';
 
 function Checkbox({ className, ...props }) {
@@ -18,9 +20,9 @@ function Checkbox({ className, ...props }) {
         className="grid place-content-center text-current transition-none [&>svg]:size-3.5"
       >
         {props.checked === 'indeterminate' ? (
-          <RemoveIcon aria-hidden="true" />
+          <HugeiconsIcon icon={MinusSignIcon} aria-hidden="true" />
         ) : (
-          <CheckIcon aria-hidden="true" />
+          <HugeiconsIcon icon={CheckmarkSquare01Icon} aria-hidden="true" />
         )}
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>

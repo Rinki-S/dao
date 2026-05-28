@@ -1,8 +1,10 @@
 'use client';
 
 import { Command as CommandPrimitive } from 'cmdk';
+import { HugeiconsIcon } from '@hugeicons/react';
+import CheckmarkSquare01Icon from '@hugeicons/core-free-icons/CheckmarkSquare01Icon';
+import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
 
-import { CheckIcon, SearchIcon } from '@/components/icons.jsx';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -63,7 +65,10 @@ function CommandInput({ className, ...props }) {
           {...props}
         />
         <InputGroupAddon>
-          <SearchIcon className="size-[18px] shrink-0 translate-y-px opacity-50" />
+          <HugeiconsIcon
+            icon={Search01Icon}
+            className="size-[18px] shrink-0 translate-y-px opacity-50"
+          />
         </InputGroupAddon>
       </InputGroup>
     </div>
@@ -127,7 +132,10 @@ function CommandItem({ className, children, ...props }) {
       {...props}
     >
       {children}
-      <CheckIcon className="ml-auto size-[18px] shrink-0 translate-y-px opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
+      <HugeiconsIcon
+        icon={CheckmarkSquare01Icon}
+        className="ml-auto size-[18px] shrink-0 translate-y-px opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100"
+      />
     </CommandPrimitive.Item>
   );
 }

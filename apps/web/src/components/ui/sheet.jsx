@@ -1,6 +1,7 @@
 import { Dialog as SheetPrimitive } from 'radix-ui';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
 
-import { CloseIcon } from '@/components/icons.jsx';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -50,7 +51,7 @@ function SheetContent({ className, children, side = 'right', showCloseButton = t
         {showCloseButton && (
           <SheetPrimitive.Close data-slot="sheet-close" asChild>
             <Button variant="ghost" className="absolute top-3 right-3" size="icon-sm">
-              <CloseIcon className="size-[18px] shrink-0 translate-y-px" />
+              <HugeiconsIcon icon={Cancel01Icon} className="size-[18px] shrink-0 translate-y-px" />
               <span className="sr-only">Close</span>
             </Button>
           </SheetPrimitive.Close>

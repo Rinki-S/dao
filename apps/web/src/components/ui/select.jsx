@@ -1,6 +1,8 @@
 import { Select as SelectPrimitive } from 'radix-ui';
+import { HugeiconsIcon } from '@hugeicons/react';
+import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
+import CheckmarkSquare01Icon from '@hugeicons/core-free-icons/CheckmarkSquare01Icon';
 
-import { ArrowDownIcon, CheckIcon } from '@/components/icons.jsx';
 import { cn } from '@/lib/utils';
 
 function Select({ ...props }) {
@@ -34,7 +36,10 @@ function SelectTrigger({ className, size = 'default', children, ...props }) {
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <ArrowDownIcon className="pointer-events-none size-[18px] shrink-0 translate-y-px text-muted-foreground" />
+        <HugeiconsIcon
+          icon={ArrowDown01Icon}
+          className="pointer-events-none size-[18px] shrink-0 translate-y-px text-muted-foreground"
+        />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
@@ -100,7 +105,10 @@ function SelectItem({ className, children, ...props }) {
     >
       <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
         <SelectPrimitive.ItemIndicator>
-          <CheckIcon className="pointer-events-none size-[18px] shrink-0 translate-y-px" />
+          <HugeiconsIcon
+            icon={CheckmarkSquare01Icon}
+            className="pointer-events-none size-[18px] shrink-0 translate-y-px"
+          />
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
@@ -128,7 +136,10 @@ function SelectScrollUpButton({ className, ...props }) {
       )}
       {...props}
     >
-      <ArrowDownIcon className="size-[18px] shrink-0 rotate-180 translate-y-px" />
+      <HugeiconsIcon
+        icon={ArrowDown01Icon}
+        className="size-[18px] shrink-0 rotate-180 translate-y-px"
+      />
     </SelectPrimitive.ScrollUpButton>
   );
 }
@@ -143,7 +154,7 @@ function SelectScrollDownButton({ className, ...props }) {
       )}
       {...props}
     >
-      <ArrowDownIcon className="size-[18px] shrink-0 translate-y-px" />
+      <HugeiconsIcon icon={ArrowDown01Icon} className="size-[18px] shrink-0 translate-y-px" />
     </SelectPrimitive.ScrollDownButton>
   );
 }

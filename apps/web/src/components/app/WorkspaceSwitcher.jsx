@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import {
-  AddIcon,
-  ArrowDownIcon,
-  CheckIcon,
-  ErrorIcon,
-  StacksIcon,
-} from '@/components/icons.jsx';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
+import AlertCircleIcon from '@hugeicons/core-free-icons/AlertCircleIcon';
+import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
+import CheckmarkSquare01Icon from '@hugeicons/core-free-icons/CheckmarkSquare01Icon';
+import SquareStackIcon from '@hugeicons/core-free-icons/SquareStackIcon';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -76,7 +75,10 @@ export function WorkspaceSwitcher({
             className="app-no-drag font-heading"
           >
             <span className="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-              <StacksIcon className="size-[18px] shrink-0 translate-y-px" />
+              <HugeiconsIcon
+                icon={SquareStackIcon}
+                className="size-[18px] shrink-0 translate-y-px"
+              />
             </span>
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-semibold tracking-normal">
@@ -86,7 +88,10 @@ export function WorkspaceSwitcher({
                 {isLoading ? 'Loading...' : 'Workspace'}
               </span>
             </span>
-            <ArrowDownIcon className="size-[18px] shrink-0 translate-y-px" />
+            <HugeiconsIcon
+              icon={ArrowDown01Icon}
+              className="size-[18px] shrink-0 translate-y-px"
+            />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
 
@@ -97,7 +102,10 @@ export function WorkspaceSwitcher({
               <DropdownMenuItem key={workspace.id} onSelect={() => onSelectWorkspace(workspace.id)}>
                 <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
                 {workspace.id === currentWorkspace?.id && (
-                  <CheckIcon className="size-[18px] shrink-0 translate-y-px" />
+                  <HugeiconsIcon
+                    icon={CheckmarkSquare01Icon}
+                    className="size-[18px] shrink-0 translate-y-px"
+                  />
                 )}
               </DropdownMenuItem>
             ))}
@@ -111,7 +119,10 @@ export function WorkspaceSwitcher({
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem disabled>
-                <ErrorIcon className="size-[18px] shrink-0 translate-y-px" />
+                <HugeiconsIcon
+                  icon={AlertCircleIcon}
+                  className="size-[18px] shrink-0 translate-y-px"
+                />
                 <span className="truncate">{error}</span>
               </DropdownMenuItem>
             </>
@@ -125,7 +136,7 @@ export function WorkspaceSwitcher({
                 onCreateDialogOpenChange(true);
               }}
             >
-              <AddIcon className="size-[18px] shrink-0 translate-y-px" />
+              <HugeiconsIcon icon={Add01Icon} className="size-[18px] shrink-0 translate-y-px" />
               <span>Create workspace</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>

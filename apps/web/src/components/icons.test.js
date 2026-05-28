@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 const sourceRoot = path.resolve(import.meta.dirname, '..');
 const packageJsonPath = path.resolve(sourceRoot, '..', 'package.json');
 const forbiddenPackage = '@nine-thirty-five/' + 'material-symbols-react';
+const legacyIconEntry = '@/components/' + 'icons.jsx';
+const legacyIconEntryPath = path.resolve(sourceRoot, 'components/icons.jsx');
 
 function listSourceFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -36,5 +38,14 @@ describe('icon library boundaries', () => {
 
     expect(packageJson.dependencies).not.toHaveProperty(forbiddenPackage);
     expect(packageJson.devDependencies ?? {}).not.toHaveProperty(forbiddenPackage);
+  });
+
+  it('does not use a shared renderer icon entrypoint', () => {
+    const sharedIconImports = listSourceFiles(sourceRoot).filter((filePath) => {
+      return fs.readFileSync(filePath, 'utf8').includes(legacyIconEntry);
+    });
+
+    expect(sharedIconImports).toEqual([]);
+    expect(fs.existsSync(legacyIconEntryPath)).toBe(false);
   });
 });

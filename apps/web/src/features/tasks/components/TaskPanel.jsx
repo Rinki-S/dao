@@ -1,11 +1,10 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  AddIcon,
-  ArrowRightIcon,
-  CalendarIcon,
-  MoreHorizontalIconComponent,
-  TaskDoneIcon,
-} from '@/components/icons.jsx';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import Calendar03Icon from '@hugeicons/core-free-icons/Calendar03Icon';
+import MoreHorizontalIcon from '@hugeicons/core-free-icons/MoreHorizontalIcon';
+import TaskDone01Icon from '@hugeicons/core-free-icons/TaskDone01Icon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -511,7 +510,11 @@ export function TaskPanel({ currentWorkspace }) {
 
         {status === 'ready' && currentWorkspace && visibleTasks.length === 0 && (
           <div className="mx-8 flex min-h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border text-center">
-            <TaskDoneIcon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+            <HugeiconsIcon
+              icon={TaskDone01Icon}
+              aria-hidden="true"
+              className="size-[18px] shrink-0 translate-y-px"
+            />
             <p className="text-sm font-medium text-foreground">No tasks yet</p>
             <p className="max-w-sm text-sm text-muted-foreground text-pretty">
               Capture the next concrete action for this workspace.
@@ -560,7 +563,8 @@ export function TaskPanel({ currentWorkspace }) {
                               variant="ghost"
                               onClick={() => toggleTaskCollapse(task.id)}
                             >
-                              <ArrowRightIcon
+                              <HugeiconsIcon
+                                icon={ArrowRight01Icon}
                                 aria-hidden="true"
                                 className={cn(
                                   'size-[18px] shrink-0 transition-transform',
@@ -604,7 +608,11 @@ export function TaskPanel({ currentWorkspace }) {
                         <TableCell className="w-28 text-muted-foreground">
                           {dueDate && (
                             <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
-                              <CalendarIcon aria-hidden="true" className="size-3 shrink-0" />
+                              <HugeiconsIcon
+                                icon={Calendar03Icon}
+                                aria-hidden="true"
+                                className="size-3 shrink-0"
+                              />
                               {dueDate}
                             </span>
                           )}
@@ -619,7 +627,8 @@ export function TaskPanel({ currentWorkspace }) {
                                 variant="ghost"
                                 onClick={() => toggleTaskDescription(task.id)}
                               >
-                                <MoreHorizontalIconComponent
+                                <HugeiconsIcon
+                                  icon={MoreHorizontalIcon}
                                   aria-hidden="true"
                                   className="size-[18px] shrink-0 translate-y-px"
                                 />
@@ -634,7 +643,8 @@ export function TaskPanel({ currentWorkspace }) {
                               variant="ghost"
                               onClick={() => openChildTaskForm(task.id)}
                             >
-                              <AddIcon
+                              <HugeiconsIcon
+                                icon={Add01Icon}
                                 aria-hidden="true"
                                 className="size-[18px] shrink-0 translate-y-px"
                               />
@@ -738,7 +748,8 @@ export function TaskPanel({ currentWorkspace }) {
                                 <TableCell className="w-28 text-muted-foreground">
                                   {childDueDate && (
                                     <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
-                                      <CalendarIcon
+                                      <HugeiconsIcon
+                                        icon={Calendar03Icon}
                                         aria-hidden="true"
                                         className="size-3 shrink-0"
                                       />
@@ -755,7 +766,8 @@ export function TaskPanel({ currentWorkspace }) {
                                       variant="ghost"
                                       onClick={() => toggleTaskDescription(childTask.id)}
                                     >
-                                      <MoreHorizontalIconComponent
+                                      <HugeiconsIcon
+                                        icon={MoreHorizontalIcon}
                                         aria-hidden="true"
                                         className="size-[18px] shrink-0 translate-y-px"
                                       />

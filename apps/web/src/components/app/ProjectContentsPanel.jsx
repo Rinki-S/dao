@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FolderIcon } from '@/components/icons.jsx';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Folder01Icon from '@hugeicons/core-free-icons/Folder01Icon';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -147,7 +148,11 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
     <section className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <FolderIcon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+          <HugeiconsIcon
+            icon={Folder01Icon}
+            aria-hidden="true"
+            className="size-[18px] shrink-0 translate-y-px"
+          />
           <span>{currentWorkspace.name}</span>
         </div>
         <div className="min-w-0">

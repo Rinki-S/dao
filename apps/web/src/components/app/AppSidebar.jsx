@@ -1,4 +1,5 @@
-import { ExtensionIcon } from '@/components/icons.jsx';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Layers01Icon from '@hugeicons/core-free-icons/Layers01Icon';
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +14,10 @@ import {
 } from '@/components/ui/sidebar';
 import { ProjectTree } from './ProjectTree.jsx';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx';
+
+function ExtensionIcon(props) {
+  return <HugeiconsIcon icon={Layers01Icon} {...props} />;
+}
 
 export function AppSidebar({
   activeSurfaceId,

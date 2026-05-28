@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { FolderOpenIconComponent } from '@/components/icons.jsx';
+import { HugeiconsIcon } from '@hugeicons/react';
+import FolderOpenIcon from '@hugeicons/core-free-icons/FolderOpenIcon';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -148,7 +149,7 @@ export function WorkingDirectoryOnboarding({
                 variant="outline"
                 onClick={handleChooseDirectory}
               >
-                <FolderOpenIconComponent data-icon="inline-start" />
+                <HugeiconsIcon icon={FolderOpenIcon} data-icon="inline-start" />
                 {isChoosing ? 'Choosing...' : 'Choose folder'}
               </Button>
               <Button

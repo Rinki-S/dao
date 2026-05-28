@@ -1,4 +1,13 @@
-import { SettingsIcon } from '@/components/icons.jsx';
+import { createElement } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Settings01Icon from '@hugeicons/core-free-icons/Settings01Icon';
+
+function SettingsIcon(props) {
+  return createElement(HugeiconsIcon, {
+    icon: Settings01Icon,
+    ...props,
+  });
+}
 
 export const settingsExtension = {
   id: 'settings',
