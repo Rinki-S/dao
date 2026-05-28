@@ -16,14 +16,16 @@ describe('App', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (path) => {
-        if (path === '/api/settings/working-directory') {
+        const pathname = new URL(path, window.location.origin).pathname;
+
+        if (pathname === '/api/settings/working-directory') {
           return Response.json({
             path: '/tmp/dao-test',
             configured: true,
           });
         }
 
-        if (path === '/api/workspaces') {
+        if (pathname === '/api/workspaces') {
           return Response.json([
             {
               id: 'workspace-1',
@@ -37,6 +39,30 @@ describe('App', () => {
               syncStatus: 'synced',
             },
           ]);
+        }
+
+        if (pathname === '/api/projects') {
+          return Response.json([
+            {
+              id: 'project-1',
+              workspaceId: 'workspace-1',
+              name: 'Dao Project',
+              description: '',
+              folderPath: '/tmp/dao-test/personal-workspace-1/dao-project',
+              status: 'active',
+              startedAt: null,
+              endedAt: null,
+              createdAt: '2026-05-25T00:00:00Z',
+              updatedAt: '2026-05-25T00:00:00Z',
+              deletedAt: null,
+              version: 1,
+              syncStatus: 'synced',
+            },
+          ]);
+        }
+
+        if (pathname === '/api/notes') {
+          return Response.json([]);
         }
 
         return Response.json([]);
@@ -55,6 +81,7 @@ describe('App', () => {
     renderApp();
 
     expect(await screen.findByRole('heading', { name: 'Tasks' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Dao Project' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Settings' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Settings' }));

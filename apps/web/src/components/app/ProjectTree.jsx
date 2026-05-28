@@ -551,7 +551,11 @@ function ProjectTreeButton({ icon: Icon, isActive, isSidebarOpen, label, onClick
       type="button"
       onClick={onClick}
     >
-      <Icon aria-hidden="true" className="size-[18px] shrink-0" />
+      {Array.isArray(Icon) ? (
+        <HugeiconsIcon icon={Icon} aria-hidden="true" className="size-[18px] shrink-0" />
+      ) : (
+        <Icon aria-hidden="true" className="size-[18px] shrink-0" />
+      )}
       <span className={cn('truncate', !isSidebarOpen && 'sr-only')}>{label}</span>
     </button>
   );
