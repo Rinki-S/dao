@@ -84,7 +84,7 @@ describe('App', () => {
     expect(await screen.findByRole('button', { name: 'Dao Project' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Settings' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('link', { name: 'Settings' }));
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
 
     expect(window.location.hash).toBe('#settings');
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { Tooltip } from '@heroui/react';
+import { Button, Tooltip } from '@heroui/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Layers01Icon from '@hugeicons/core-free-icons/Layers01Icon';
 import { cn } from '@/lib/utils.js';
@@ -8,6 +8,18 @@ import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx';
 function ExtensionIcon(props) {
   return <HugeiconsIcon icon={Layers01Icon} {...props} />;
 }
+
+const sidebarSurfaceButtonBase =
+  'app-no-drag flex h-8 w-full transform-gpu items-center justify-start gap-2 overflow-hidden rounded-md p-2 text-left text-sm font-normal ring-sidebar-ring outline-hidden transition-[background-color,color,width,height,padding,scale] duration-[250ms] ease-[var(--ease-smooth)] data-[focus-visible=true]:ring-2 active:scale-[0.96] data-[pressed=true]:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100';
+
+const sidebarIconButtonBase =
+  'app-no-drag size-8 min-w-0 transform-gpu p-0 transition-[background-color,color,scale] duration-[250ms] ease-[var(--ease-smooth)] data-[focus-visible=true]:ring-2 active:scale-[0.96] data-[pressed=true]:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100';
+
+const activeSurfaceButtonClass =
+  'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground data-[pressed=true]:bg-accent-soft-hover data-[pressed=true]:text-accent-soft-foreground';
+
+const inactiveSurfaceButtonClass =
+  'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[pressed=true]:bg-sidebar-accent data-[pressed=true]:text-sidebar-accent-foreground';
 
 export function AppSidebar({
   activeSurfaceId,
@@ -140,33 +152,31 @@ export function AppSidebar({
                 const surfaceId = item.href.replace(/^#/, '');
                 const Icon = item.icon ?? ExtensionIcon;
                 const isActive = surfaceId === activeSurfaceId;
-                const link = (
-                  <a
+                const surfaceButton = (
+                  <Button
                     className={cn(
-                      'app-no-drag flex h-8 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[background-color,color,width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2',
+                      sidebarSurfaceButtonBase,
                       !isSidebarOpen && 'size-8 justify-center p-2',
-                      isActive && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground',
+                      isActive ? activeSurfaceButtonClass : inactiveSurfaceButtonClass,
                     )}
-                    href={item.href}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      onSelectSurface(surfaceId);
-                    }}
+                    type="button"
+                    variant="ghost"
+                    onPress={() => onSelectSurface(surfaceId)}
                   >
-                    <Icon aria-hidden="true" className="size-4 shrink-0" />
+                    <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
                     <span className={cn('truncate', !isSidebarOpen && 'sr-only')}>
                       {item.label}
                     </span>
-                  </a>
+                  </Button>
                 );
 
                 return (
                   <li key={item.id} className="relative">
                     {isSidebarOpen ? (
-                      link
+                      surfaceButton
                     ) : (
                       <Tooltip delay={0}>
-                        {link}
+                        {surfaceButton}
                         <Tooltip.Content placement="right">{item.label}</Tooltip.Content>
                       </Tooltip>
                     )}
@@ -194,28 +204,28 @@ export function AppSidebar({
               const surfaceId = item.href.replace(/^#/, '');
               const Icon = item.icon ?? ExtensionIcon;
               const isActive = surfaceId === activeSurfaceId;
-              const link = (
-                <a
-                  className={cn(
-                    'app-no-drag flex size-8 items-center justify-center overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[background-color,color] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2',
-                    isActive && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground',
-                  )}
-                  href={item.href}
+              const surfaceButton = (
+                <Button
                   aria-label={item.label}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    onSelectSurface(surfaceId);
-                  }}
+                  className={cn(
+                    sidebarIconButtonBase,
+                    isActive ? activeSurfaceButtonClass : inactiveSurfaceButtonClass,
+                  )}
+                  isIconOnly
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onPress={() => onSelectSurface(surfaceId)}
                 >
                   <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
                   <span className="sr-only">{item.label}</span>
-                </a>
+                </Button>
               );
 
               return (
                 <li key={item.id} className="relative">
                   <Tooltip delay={0}>
-                    {link}
+                    {surfaceButton}
                     <Tooltip.Content placement="right">{item.label}</Tooltip.Content>
                   </Tooltip>
                 </li>
