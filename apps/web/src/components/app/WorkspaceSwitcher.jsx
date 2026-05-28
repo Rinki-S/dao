@@ -80,7 +80,7 @@ export function WorkspaceSwitcher({
         <Dropdown.Trigger
           aria-label="Switch workspace"
           className={cn(
-            'app-no-drag flex h-12 w-full transform-gpu items-center gap-2 overflow-hidden rounded-md p-2 text-left font-heading text-sm ring-sidebar-ring outline-hidden transition-[transform,scale,background-color,color,width,height,padding] duration-[250ms] ease-[var(--ease-smooth)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:scale-[0.97] data-[pressed=true]:scale-[0.97] data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100',
+            'app-no-drag flex h-12 w-full transform-gpu items-center gap-2 overflow-hidden rounded-md p-2 text-left font-heading text-sm ring-sidebar-ring outline-hidden transition-[transform,scale,background-color,color,width,height,padding] duration-[250ms] ease-[var(--ease-smooth)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[focus-visible=true]:ring-2 active:scale-[0.97] data-[pressed=true]:scale-[0.97] data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100',
             menuOpen && 'bg-sidebar-accent text-sidebar-accent-foreground',
             !isSidebarOpen && 'size-8 justify-center p-0',
           )}

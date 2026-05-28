@@ -31,4 +31,11 @@ describe('WorkspaceSwitcher HeroUI migration boundary', () => {
     expect(source).toContain('active:scale-[0.97]');
     expect(source).toContain('transform-gpu');
   });
+
+  it('uses React Aria focus-visible state for the workspace trigger ring', () => {
+    const source = fs.readFileSync(workspaceSwitcherPath, 'utf8');
+
+    expect(source).toContain('data-[focus-visible=true]:ring-2');
+    expect(source).not.toContain('focus-visible:ring-2');
+  });
 });
