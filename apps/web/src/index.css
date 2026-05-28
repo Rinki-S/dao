@@ -2,7 +2,6 @@
 @import '@heroui/styles';
 @import 'tw-animate-css';
 @import '@fontsource-variable/funnel-sans';
-@import '@fontsource-variable/outfit';
 
 @custom-variant dark (&:is(.dark *));
 

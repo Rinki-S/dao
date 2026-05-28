@@ -22,5 +22,6 @@ describe('WorkingDirectoryOnboarding HeroUI migration boundary', () => {
     expect(source).toContain('data-step-header');
     expect(source).toContain('data-direction={stepDirection}');
     expect(source).toContain('motion-reduce:transition-none');
+    expect(source).not.toContain('max-w-xl overflow-hidden');
   });
 });

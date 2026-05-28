@@ -125,7 +125,7 @@ export function WorkingDirectoryOnboarding({
 
   return (
     <div className="relative flex min-h-dvh items-center justify-center bg-background px-6 py-12 pb-28 text-foreground">
-      <div className="w-full max-w-xl overflow-hidden">
+      <div className="w-full max-w-xl">
         <div
           key={step}
           data-direction={stepDirection}
