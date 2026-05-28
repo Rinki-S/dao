@@ -1,14 +1,11 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Chip, Label, SearchField } from '@heroui/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
 import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { searchAll } from '@/features/search/api.js';
 
 export function AppSearchBar() {
-  const searchInputId = useId();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState('idle');
@@ -47,7 +44,9 @@ export function AppSearchBar() {
                     {result.snippet || 'No snippet'}
                   </span>
                 </div>
-                <Badge variant="secondary">{result.entityType}</Badge>
+                <Chip size="sm" variant="soft">
+                  {result.entityType}
+                </Chip>
               </div>
             </li>
           ))}
@@ -91,14 +90,10 @@ export function AppSearchBar() {
     };
   }, [trimmedQuery]);
 
-  function handleSearch(event) {
-    event.preventDefault();
-  }
+  function handleQueryChange(nextQuery) {
+    setQuery(nextQuery);
 
-  function handleQueryChange(event) {
-    setQuery(event.target.value);
-
-    if (event.target.value.trim() === '') {
+    if (nextQuery.trim() === '') {
       setResults([]);
       setError('');
       setStatus('idle');
@@ -107,46 +102,28 @@ export function AppSearchBar() {
 
   return (
     <div className="app-no-drag relative w-full max-w-md">
-      <form
-        className="flex h-8 items-center gap-1 rounded-lg border border-border bg-muted/40 px-2 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50"
-        onSubmit={handleSearch}
+      <SearchField
+        className="w-full"
+        name="app-search"
+        value={query}
+        variant="secondary"
+        onChange={handleQueryChange}
       >
-        <HugeiconsIcon
-          icon={Search01Icon}
-          className="size-[18px] shrink-0 translate-y-px text-muted-foreground"
-        />
-        <label className="sr-only" htmlFor={searchInputId}>
-          Search
-        </label>
-        <Input
-          id={searchInputId}
-          className="h-auto min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-          value={query}
-          onChange={handleQueryChange}
-          placeholder="Search"
-          data-command-target="search-query"
-        />
-        {query.trim() !== '' && (
-          <Button
-            aria-label="Clear search"
-            className="size-6"
-            size="icon-xs"
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setQuery('');
-              setResults([]);
-              setError('');
-              setStatus('idle');
-            }}
-          >
-            <HugeiconsIcon
-              icon={Cancel01Icon}
-              className="size-[18px] shrink-0 translate-y-px"
-            />
-          </Button>
-        )}
-      </form>
+        <Label className="sr-only">Search</Label>
+        <SearchField.Group className="h-8 gap-1 rounded-lg border border-border bg-muted/40 px-2 shadow-none data-[focus-within=true]:border-ring data-[focus-within=true]:ring-3 data-[focus-within=true]:ring-ring/50">
+          <SearchField.SearchIcon className="m-0 text-muted-foreground">
+            <HugeiconsIcon icon={Search01Icon} className="size-[18px] shrink-0 translate-y-px" />
+          </SearchField.SearchIcon>
+          <SearchField.Input
+            className="h-auto min-w-0 flex-1 px-0 py-0"
+            data-command-target="search-query"
+            placeholder="Search"
+          />
+          <SearchField.ClearButton aria-label="Clear search" className="mr-0 size-6 min-w-0 p-0">
+            <HugeiconsIcon icon={Cancel01Icon} className="size-[18px] shrink-0 translate-y-px" />
+          </SearchField.ClearButton>
+        </SearchField.Group>
+      </SearchField>
 
       {isPanelVisible && (
         <div className="absolute top-10 left-0 z-[100] w-full rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10">
