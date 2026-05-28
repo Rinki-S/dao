@@ -107,6 +107,19 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).not.toContain('onCheckedChange');
   });
 
+  it('uses a fading overlay instead of ScrollShadow or a hard quick add divider', () => {
+    const source = fs.readFileSync(taskPanelPath, 'utf8');
+
+    expect(source).toContain('data-testid="task-scroll-shadow"');
+    expect(source).toContain('opacity-100');
+    expect(source).toContain('opacity-0');
+    expect(source).toContain('transition-opacity duration-150 ease-out');
+    expect(source).not.toContain('ScrollShadow');
+    expect(source).not.toContain('className="flex shrink-0 flex-col gap-3 px-8 py-4 border-b"');
+    expect(source).toContain('className="flex shrink-0 flex-col gap-3 px-8 py-4"');
+    expect(source).toContain('className="h-full min-h-0 overflow-y-auto"');
+  });
+
   it('keeps the quick add input group full width while the add button stays fixed', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 

@@ -104,6 +104,7 @@ export function TaskPanel({ currentWorkspace }) {
   const [isCreatingChild, setIsCreatingChild] = useState(false);
   const [collapsedTaskIds, setCollapsedTaskIds] = useState(() => new Set());
   const [expandedDescriptionTaskIds, setExpandedDescriptionTaskIds] = useState(() => new Set());
+  const [hasTaskScrollOffset, setHasTaskScrollOffset] = useState(false);
   const taskTitleInputRef = useRef(null);
 
   const workspaceProjects = useMemo(() => {
@@ -390,10 +391,19 @@ export function TaskPanel({ currentWorkspace }) {
     });
   }
 
+  function handleTaskListScroll(event) {
+    const nextHasTaskScrollOffset = event.currentTarget.scrollTop > 0;
+    setHasTaskScrollOffset((currentHasTaskScrollOffset) =>
+      currentHasTaskScrollOffset === nextHasTaskScrollOffset
+        ? currentHasTaskScrollOffset
+        : nextHasTaskScrollOffset,
+    );
+  }
+
   return (
     <section id="tasks" className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <form
-        className="flex shrink-0 flex-col gap-3 px-8 py-4 border-b"
+        className="flex shrink-0 flex-col gap-3 px-8 py-4"
         onSubmit={handleCreateTask}
         onKeyDown={handleQuickAddKeyDown}
       >
@@ -545,42 +555,50 @@ export function TaskPanel({ currentWorkspace }) {
         </div>
       </form>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {status === 'loading' && (
-          <p className="px-8 text-sm text-muted-foreground">Loading tasks...</p>
-        )}
+      <div className="relative min-h-0 flex-1">
+        <div
+          data-testid="task-scroll-shadow"
+          className={cn(
+            'pointer-events-none absolute inset-x-0 top-0 z-10 h-5 bg-linear-to-b from-background to-transparent transition-opacity duration-150 ease-out',
+            hasTaskScrollOffset ? 'opacity-100' : 'opacity-0',
+          )}
+        />
 
-        {status === 'ready' && !currentWorkspace && (
-          <p className="px-8 text-sm text-muted-foreground">
-            Create a workspace before adding tasks.
-          </p>
-        )}
+        <div className="h-full min-h-0 overflow-y-auto" onScroll={handleTaskListScroll}>
+          {status === 'loading' && (
+            <p className="px-8 text-sm text-muted-foreground">Loading tasks...</p>
+          )}
 
-        {status === 'ready' && currentWorkspace && visibleTasks.length === 0 && (
-          <div className="mx-8 flex min-h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border text-center">
-            <HugeiconsIcon
-              icon={TaskDone01Icon}
-              aria-hidden="true"
-              className="size-[18px] shrink-0 translate-y-px"
-            />
-            <p className="text-sm font-medium text-foreground">No tasks yet</p>
-            <p className="max-w-sm text-sm text-muted-foreground text-pretty">
-              Capture the next concrete action for this workspace.
+          {status === 'ready' && !currentWorkspace && (
+            <p className="px-8 text-sm text-muted-foreground">
+              Create a workspace before adding tasks.
             </p>
-          </div>
-        )}
+          )}
 
-        {status === 'ready' &&
-          currentWorkspace &&
-          visibleTasks.length > 0 &&
-          parentTasks.length === 0 && (
-            <div className="mx-8 flex min-h-32 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-              No tasks match this filter.
+          {status === 'ready' && currentWorkspace && visibleTasks.length === 0 && (
+            <div className="mx-8 flex min-h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border text-center">
+              <HugeiconsIcon
+                icon={TaskDone01Icon}
+                aria-hidden="true"
+                className="size-[18px] shrink-0 translate-y-px"
+              />
+              <p className="text-sm font-medium text-foreground">No tasks yet</p>
+              <p className="max-w-sm text-sm text-muted-foreground text-pretty">
+                Capture the next concrete action for this workspace.
+              </p>
             </div>
           )}
 
-        {status === 'ready' && parentTasks.length > 0 && (
-          <div>
+          {status === 'ready' &&
+            currentWorkspace &&
+            visibleTasks.length > 0 &&
+            parentTasks.length === 0 && (
+              <div className="mx-8 flex min-h-32 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+                No tasks match this filter.
+              </div>
+            )}
+
+          {status === 'ready' && parentTasks.length > 0 && (
             <Table className="border-b">
               <Table.ScrollContainer className="w-full overflow-x-auto">
                 <Table.Content aria-label="Tasks" className="w-full min-w-full">
@@ -859,8 +877,8 @@ export function TaskPanel({ currentWorkspace }) {
                 </Table.Content>
               </Table.ScrollContainer>
             </Table>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </section>
   );
