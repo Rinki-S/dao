@@ -38,7 +38,7 @@ Important decisions:
 - Use SQLite as the first local database.
 - Use `net/http` first, with a possible future move to `chi` when routing and middleware complexity justify it.
 - Use Tailwind CSS for styling.
-- Use shadcn/ui for the React component system, with Dao-specific design tokens and composition on top.
+- Use HeroUI for the React component system, with Dao-specific design tokens and composition on top.
 
 ## Milestone 1: Project Loop
 
@@ -461,9 +461,39 @@ Keep deferred:
 Notes:
 
 - This milestone is a UI foundation milestone, not the final product UI.
+- This milestone used a shadcn-style local component layer. Dao later chose to migrate the component foundation to HeroUI while keeping Dao-specific composition and product density.
 - Current screens still primarily expose MVP create/list/test flows.
 - The next UI phase should turn the renderer from stacked feature panels into a real product workspace.
 - The first product UI branch should focus on the app shell, active surface navigation, dashboard shape, and command palette fit inside the product workflow.
+
+## Active Foundation Migration: HeroUI and hugeicons
+
+Recommended branch:
+
+```txt
+feat/heroui-hugeicons
+```
+
+Goal:
+
+```txt
+Dao moves its React component foundation to HeroUI and replaces Material Symbols with hugeicons.
+```
+
+Direction:
+
+- use HeroUI as the maintained accessible primitive layer for buttons, inputs, overlays, tables, menus, keyboard hints, and related controls
+- keep Dao-specific layout and product composition in app-owned components
+- migrate gradually through compatibility wrappers instead of rewriting every product surface at once
+- keep `cmdk` for the command palette until a HeroUI-backed command composition is designed
+- replace `@nine-thirty-five/material-symbols-react` with `@hugeicons/react` and `@hugeicons/core-free-icons`
+- remove shadcn, Radix, class-variance-authority, and tailwind-merge only after no current component imports depend on them
+
+First migration slice:
+
+- install HeroUI and hugeicons dependencies
+- import HeroUI styles after Tailwind CSS
+- update project documentation to describe the new UI and icon direction
 
 ## Next Milestone: Product Shell
 

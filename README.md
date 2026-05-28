@@ -43,7 +43,7 @@ Dao brings these fragments into one calm, local-first workspace.
 - JavaScript
 - Go
 - SQLite
-- shadcn/ui
+- HeroUI
 - Tailwind CSS
 - Zod
 - JSDoc
@@ -76,8 +76,8 @@ React creates tasks
 React lists notes
 React creates notes
 React searches projects, tasks, and notes
-React exposes core actions through a shadcn/cmdk command palette
-React renders MVP surfaces on a shadcn/ui foundation
+React exposes core actions through a command palette
+React is migrating from a shadcn-style UI foundation to HeroUI
 SQLite persists workspace data locally
 ```
 
@@ -122,7 +122,8 @@ These features are planned for later stages:
 - [x] Add command palette
 - [x] Add activity log
 - [x] Add extension system
-- [x] Add shadcn/ui foundation
+- [x] Add initial UI foundation
+- [ ] Migrate component foundation to HeroUI
 - [ ] Build product app shell
 - [ ] Add AI summary features
 - [ ] Add contextual AI workflow features

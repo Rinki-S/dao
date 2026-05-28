@@ -433,18 +433,20 @@ Avoid heavy card shadows.
 Dao uses:
 
 ```txt
-shadcn/ui + Tailwind CSS + custom Dao design system
+HeroUI + Tailwind CSS + custom Dao design system
 ```
 
-shadcn/ui provides source-owned, accessible React components that Dao can adapt to its own product needs.
+HeroUI provides accessible React components built on React Aria and Tailwind CSS v4. Dao should use HeroUI as the interactive primitive layer and keep Dao-specific product composition in the application code.
 
-Dao should define its own UI layer on top of shadcn/ui components instead of scattering one-off Tailwind styling across business pages.
+Dao should define its own UI layer on top of HeroUI components instead of scattering one-off Tailwind styling across business pages.
 
-Business pages should import stable Dao UI components and composed feature components, not copy registry examples directly.
+Business pages should import stable Dao UI components and composed feature components, not copy HeroUI examples directly.
 
-When a screen needs a semantic or interactive primitive that is not installed yet, add the appropriate shadcn/ui component and adapt it into Dao's component layer. Do not avoid adding shadcn/ui components when doing so would lead to hand-rolled controls, weaker accessibility, or non-standard interaction behavior.
+When a screen needs a semantic or interactive primitive, prefer the appropriate HeroUI component and adapt it into Dao's component layer. Do not hand-roll controls when HeroUI provides a maintained accessible primitive.
 
-The shadcn/ui preset should be treated as the starting component contract and token baseline. Dao should still keep its own visual identity: neutral-first surfaces, restrained jade accent, compact developer-tool density, and calm product voice.
+HeroUI should be treated as the component contract and accessibility baseline. Dao should still keep its own visual identity: neutral-first surfaces, restrained jade accent, compact developer-tool density, and calm product voice.
+
+During the migration from the previous shadcn-style component layer, old local components may remain temporarily only as compatibility wrappers. New UI work should move toward HeroUI-backed primitives.
 
 ## 9.1 Recommended Component Package
 
@@ -591,7 +593,7 @@ Icon style should be:
 Recommended icon library:
 
 ```txt
-Phosphor Icons
+hugeicons
 ```
 
 Icon style:
@@ -693,8 +695,9 @@ Social preview should include:
 - use brush stroke clichés
 - use red-and-gold festival colors
 - make everything green
-- copy default shadcn/ui style
-- bypass Dao's component layer with one-off shadcn example code
+- copy default component-library style
+- copy default HeroUI examples without adapting them to Dao's product density and tone
+- bypass Dao's component layer with one-off HeroUI example code
 - build a generic SaaS dashboard
 - use heavy gradients
 - overuse shadows
@@ -738,12 +741,12 @@ Dao’s design is successful when:
 Dao should use:
 
 ```txt
-shadcn/ui + Tailwind CSS
+HeroUI + Tailwind CSS
 Custom Dao UI layer
 Jade Green #00A86B as primary accent
 Neutral-first interface
 Outfit Variable headings + Geist Variable body
-Phosphor Icons
+hugeicons
 Geometric English and Chinese logo system
 ```
 
