@@ -5,27 +5,21 @@ import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
 import Calendar03Icon from '@hugeicons/core-free-icons/Calendar03Icon';
 import MoreHorizontalIcon from '@hugeicons/core-free-icons/MoreHorizontalIcon';
 import TaskDone01Icon from '@hugeicons/core-free-icons/TaskDone01Icon';
-import { Chip, Table } from '@heroui/react';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
-import {
+  Button,
+  Chip,
+  Dropdown,
+  FieldError,
   InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '@/components/ui/input-group';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Textarea } from '@/components/ui/textarea';
+  Label,
+  Popover,
+  Table,
+  TextArea,
+  TextField,
+} from '@heroui/react';
+import { Button as LegacyButton } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input as LegacyInput } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { notifyActivityChanged } from '../../activities/events.js';
 import { listProjects } from '../../projects/api.js';
@@ -381,119 +375,157 @@ export function TaskPanel({ currentWorkspace }) {
         onSubmit={handleCreateTask}
         onKeyDown={handleQuickAddKeyDown}
       >
-        <FieldGroup className="gap-3">
-          <Field>
-            <FieldLabel className="sr-only" htmlFor="task-title">
+        <div className="flex flex-col gap-3">
+          <TextField
+            className="min-w-0 flex-1"
+            isDisabled={!currentWorkspace || isCreating}
+            name="task-title"
+            value={taskTitle}
+            onChange={setTaskTitle}
+          >
+            <Label className="sr-only" htmlFor="task-title">
               Task title
-            </FieldLabel>
+            </Label>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <InputGroup className="h-9">
-                <InputGroupInput
+              <InputGroup>
+                <InputGroup.Input
                   id="task-title"
                   ref={taskTitleInputRef}
-                  value={taskTitle}
-                  onChange={(event) => setTaskTitle(event.target.value)}
-                  onFocus={() => setIsQuickAddOpen(true)}
-                  placeholder="Add a task..."
-                  disabled={!currentWorkspace || isCreating}
                   data-command-target="task-title"
+                  placeholder="Add a task..."
+                  onFocus={() => setIsQuickAddOpen(true)}
                 />
 
                 {isQuickAddOpen && (
-                  <InputGroupAddon align="inline-end" className="gap-1">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <InputGroupButton
-                          aria-label="Select project"
-                          disabled={!currentWorkspace || isCreating}
+                  <InputGroup.Suffix className="gap-1 pr-1">
+                    <Dropdown>
+                      <Button
+                        aria-label="Select project"
+                        isDisabled={!currentWorkspace || isCreating}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        {({ isPressed }) => (
+                          <span className={cn(isPressed && 'scale-[0.97]')}>
+                            {selectedWorkspaceProjectId
+                              ? (projectNameById.get(selectedWorkspaceProjectId) ?? 'Project')
+                              : 'No project'}
+                          </span>
+                        )}
+                      </Button>
+                      <Dropdown.Popover className="w-52" placement="bottom end">
+                        <Dropdown.Menu
+                          selectedKeys={new Set([selectedWorkspaceProjectId || 'none'])}
+                          selectionMode="single"
+                          onSelectionChange={(keys) => {
+                            const [nextProjectId] = [...keys];
+                            handleProjectChange(String(nextProjectId ?? 'none'));
+                          }}
                         >
-                          {selectedWorkspaceProjectId
-                            ? (projectNameById.get(selectedWorkspaceProjectId) ?? 'Project')
-                            : 'No project'}
-                        </InputGroupButton>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-52">
-                        <DropdownMenuRadioGroup
-                          value={selectedWorkspaceProjectId || 'none'}
-                          onValueChange={handleProjectChange}
-                        >
-                          <DropdownMenuGroup>
-                            <DropdownMenuRadioItem value="none">No project</DropdownMenuRadioItem>
-                            {workspaceProjects.map((project) => (
-                              <DropdownMenuRadioItem key={project.id} value={project.id}>
-                                {project.name}
-                              </DropdownMenuRadioItem>
-                            ))}
-                          </DropdownMenuGroup>
-                        </DropdownMenuRadioGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          <Dropdown.Item id="none" textValue="No project">
+                            <Dropdown.ItemIndicator />
+                            <Label>No project</Label>
+                          </Dropdown.Item>
+                          {workspaceProjects.map((project) => (
+                            <Dropdown.Item
+                              id={project.id}
+                              key={project.id}
+                              textValue={project.name}
+                            >
+                              <Dropdown.ItemIndicator />
+                              <Label>{project.name}</Label>
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown.Popover>
+                    </Dropdown>
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <InputGroupButton
-                          aria-label="Select priority"
-                          disabled={!currentWorkspace || isCreating}
+                    <Dropdown>
+                      <Button
+                        aria-label="Select priority"
+                        isDisabled={!currentWorkspace || isCreating}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        {({ isPressed }) => (
+                          <span className={cn(isPressed && 'scale-[0.97]')}>
+                            {priorityLabels[taskPriority]}
+                          </span>
+                        )}
+                      </Button>
+                      <Dropdown.Popover className="w-36" placement="bottom end">
+                        <Dropdown.Menu
+                          selectedKeys={new Set([taskPriority])}
+                          selectionMode="single"
+                          onSelectionChange={(keys) => {
+                            const [nextPriority] = [...keys];
+                            if (nextPriority) {
+                              setTaskPriority(String(nextPriority));
+                            }
+                          }}
                         >
-                          {priorityLabels[taskPriority]}
-                        </InputGroupButton>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-36">
-                        <DropdownMenuRadioGroup
-                          value={taskPriority}
-                          onValueChange={setTaskPriority}
-                        >
-                          <DropdownMenuGroup>
-                            {priorityOptions.map((option) => (
-                              <DropdownMenuRadioItem key={option.value} value={option.value}>
-                                {option.label}
-                              </DropdownMenuRadioItem>
-                            ))}
-                          </DropdownMenuGroup>
-                        </DropdownMenuRadioGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          {priorityOptions.map((option) => (
+                            <Dropdown.Item
+                              id={option.value}
+                              key={option.value}
+                              textValue={option.label}
+                            >
+                              <Dropdown.ItemIndicator />
+                              <Label>{option.label}</Label>
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown.Popover>
+                    </Dropdown>
 
                     <Popover
-                      open={isDescriptionPopoverOpen}
+                      isOpen={isDescriptionPopoverOpen}
                       onOpenChange={setIsDescriptionPopoverOpen}
                     >
-                      <PopoverTrigger asChild>
-                        <InputGroupButton
+                      <Popover.Trigger>
+                        <Button
                           aria-label="Edit description"
-                          disabled={!currentWorkspace || isCreating}
+                          isDisabled={!currentWorkspace || isCreating}
+                          size="sm"
+                          variant="ghost"
                         >
                           {taskDescription.trim() ? 'Description' : 'No description'}
-                        </InputGroupButton>
-                      </PopoverTrigger>
-                      <PopoverContent align="end" className="w-80">
-                        <Field>
-                          <FieldLabel htmlFor="task-description">Description</FieldLabel>
-                          <Textarea
+                        </Button>
+                      </Popover.Trigger>
+                      <Popover.Content className="w-80" placement="bottom end">
+                        <Popover.Dialog className="flex flex-col gap-2">
+                          <Label htmlFor="task-description">Description</Label>
+                          <TextArea
                             id="task-description"
                             className="max-h-48 min-h-28 resize-none overflow-y-auto"
                             value={taskDescription}
                             onChange={(event) => setTaskDescription(event.target.value)}
                             placeholder="Add details..."
                             disabled={!currentWorkspace || isCreating}
+                            variant="secondary"
                           />
-                        </Field>
-                      </PopoverContent>
+                        </Popover.Dialog>
+                      </Popover.Content>
                     </Popover>
-                  </InputGroupAddon>
+                  </InputGroup.Suffix>
                 )}
               </InputGroup>
 
               {isQuickAddOpen && (
-                <Button className="h-9" disabled={isCreating || !currentWorkspace} type="submit">
+                <Button
+                  className="h-9"
+                  isDisabled={isCreating || !currentWorkspace}
+                  isPending={isCreating}
+                  type="submit"
+                >
                   {isCreating ? 'Adding...' : 'Add'}
                 </Button>
               )}
             </div>
-          </Field>
+          </TextField>
 
           {error && <FieldError>{error}</FieldError>}
-        </FieldGroup>
+        </div>
       </form>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -563,7 +595,7 @@ export function TaskPanel({ currentWorkspace }) {
                           >
                             <Table.Cell className="relative pl-8">
                               {hasChildren ? (
-                                <Button
+                                <LegacyButton
                                   aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${task.title}`}
                                   className="absolute top-1/2 left-1 -translate-y-1/2"
                                   size="icon-xs"
@@ -579,7 +611,7 @@ export function TaskPanel({ currentWorkspace }) {
                                       !isCollapsed && 'rotate-90',
                                     )}
                                   />
-                                </Button>
+                                </LegacyButton>
                               ) : null}
                               <div className="flex min-w-0 items-center gap-3">
                                 <Checkbox
@@ -632,7 +664,7 @@ export function TaskPanel({ currentWorkspace }) {
                             <Table.Cell className="w-20 pr-8 text-right">
                               <div className="flex justify-end gap-1">
                                 {hasDescription && (
-                                  <Button
+                                  <LegacyButton
                                     aria-label={`${isDescriptionExpanded ? 'Hide' : 'Show'} notes for ${task.title}`}
                                     size="icon-xs"
                                     type="button"
@@ -644,10 +676,10 @@ export function TaskPanel({ currentWorkspace }) {
                                       aria-hidden="true"
                                       className="size-[18px] shrink-0 translate-y-px"
                                     />
-                                  </Button>
+                                  </LegacyButton>
                                 )}
 
-                                <Button
+                                <LegacyButton
                                   aria-label={`Add child todo to ${task.title}`}
                                   disabled={isCreatingChild}
                                   size="icon-xs"
@@ -660,7 +692,7 @@ export function TaskPanel({ currentWorkspace }) {
                                     aria-hidden="true"
                                     className="size-[18px] shrink-0 translate-y-px"
                                   />
-                                </Button>
+                                </LegacyButton>
                               </div>
                             </Table.Cell>
                           </Table.Row>
@@ -684,7 +716,7 @@ export function TaskPanel({ currentWorkspace }) {
                                     void handleCreateChildTask(event, task);
                                   }}
                                 >
-                                  <Input
+                                  <LegacyInput
                                     aria-label={`Child todo for ${task.title}`}
                                     className="h-8"
                                     disabled={isCreatingChild}
@@ -692,10 +724,10 @@ export function TaskPanel({ currentWorkspace }) {
                                     value={childTaskTitle}
                                     onChange={(event) => setChildTaskTitle(event.target.value)}
                                   />
-                                  <Button disabled={isCreatingChild} size="sm" type="submit">
+                                  <LegacyButton disabled={isCreatingChild} size="sm" type="submit">
                                     Add
-                                  </Button>
-                                  <Button
+                                  </LegacyButton>
+                                  <LegacyButton
                                     disabled={isCreatingChild}
                                     size="sm"
                                     type="button"
@@ -703,7 +735,7 @@ export function TaskPanel({ currentWorkspace }) {
                                     onClick={closeChildTaskForm}
                                   >
                                     Cancel
-                                  </Button>
+                                  </LegacyButton>
                                 </form>
                               </Table.Cell>
                             </Table.Row>
@@ -774,7 +806,7 @@ export function TaskPanel({ currentWorkspace }) {
                                     </Table.Cell>
                                     <Table.Cell className="w-20 pr-8 text-right">
                                       {hasChildDescription && (
-                                        <Button
+                                        <LegacyButton
                                           aria-label={`${isChildDescriptionExpanded ? 'Hide' : 'Show'} notes for ${childTask.title}`}
                                           size="icon-xs"
                                           type="button"
@@ -786,7 +818,7 @@ export function TaskPanel({ currentWorkspace }) {
                                             aria-hidden="true"
                                             className="size-[18px] shrink-0 translate-y-px"
                                           />
-                                        </Button>
+                                        </LegacyButton>
                                       )}
                                     </Table.Cell>
                                   </Table.Row>

@@ -3,7 +3,9 @@ import path from 'node:path';
 
 import { createElement } from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createTask } from '../api.js';
 import { TaskPanel } from './TaskPanel.jsx';
 
 vi.mock('../../projects/api.js', () => ({
@@ -81,6 +83,21 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).not.toContain('import { Table, TableBody, TableCell, TableRow }');
   });
 
+  it('uses HeroUI for the quick add form instead of shadcn form controls', () => {
+    const source = fs.readFileSync(taskPanelPath, 'utf8');
+
+    expect(source).toContain('Dropdown');
+    expect(source).toContain('InputGroup');
+    expect(source).toContain('Popover');
+    expect(source).toContain('TextArea');
+    expect(source).toContain('TextField');
+    expect(source).not.toContain('@/components/ui/dropdown-menu');
+    expect(source).not.toContain('@/components/ui/field');
+    expect(source).not.toContain('@/components/ui/input-group');
+    expect(source).not.toContain('@/components/ui/popover');
+    expect(source).not.toContain('@/components/ui/textarea');
+  });
+
   it('renders task rows through the HeroUI task table', async () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
@@ -88,5 +105,23 @@ describe('TaskPanel table migration boundary', () => {
     expect(screen.getByText('Review HeroUI migration')).toBeInTheDocument();
     expect(screen.getByText('/Dao Project')).toBeInTheDocument();
     expect(screen.getByText('High')).toBeInTheDocument();
+  });
+
+  it('creates a task from the HeroUI quick add form', async () => {
+    const user = userEvent.setup();
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const titleInput = await screen.findByPlaceholderText('Add a task...');
+    await user.type(titleInput, 'Write migration notes');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(createTask).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      projectId: null,
+      title: 'Write migration notes',
+      description: '',
+      priority: 'medium',
+      dueDate: null,
+    });
   });
 });
