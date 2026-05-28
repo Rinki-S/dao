@@ -1,29 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Tooltip } from '@heroui/react';
+import {
+  Button,
+  FieldError,
+  Input,
+  Label,
+  ListBox,
+  Modal,
+  Select,
+  TextArea,
+  TextField,
+  Tooltip,
+} from '@heroui/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
 import Folder01Icon from '@hugeicons/core-free-icons/Folder01Icon';
 import FolderOpenIcon from '@hugeicons/core-free-icons/FolderOpenIcon';
 import NoteAddIcon from '@hugeicons/core-free-icons/NoteAddIcon';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { getContentFormatIcon } from '@/extensions/registry.js';
 import { notifyActivityChanged, subscribeToActivityChanged } from '@/features/activities/events.js';
 import { createNote, listNotes } from '@/features/notes/api.js';
@@ -271,12 +263,13 @@ export function ProjectTree({
         <div className="flex items-center gap-1">
           <Button
             aria-label="Create project"
-            className="app-no-drag"
-            disabled={!currentWorkspace}
-            size="icon-xs"
+            className="app-no-drag size-7 min-w-0 transform-gpu p-0 transition-[background-color,color,scale] duration-[250ms] ease-[var(--ease-smooth)] active:scale-[0.96] active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[pressed=true]:scale-[0.96] data-[pressed=true]:bg-sidebar-accent data-[pressed=true]:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100"
+            isDisabled={!currentWorkspace}
+            isIconOnly
+            size="sm"
             type="button"
             variant="ghost"
-            onClick={() => {
+            onPress={() => {
               setError('');
               setIsProjectDialogOpen(true);
             }}
@@ -289,12 +282,13 @@ export function ProjectTree({
           </Button>
           <Button
             aria-label="Create content"
-            className="app-no-drag"
-            disabled={!currentWorkspace}
-            size="icon-xs"
+            className="app-no-drag size-7 min-w-0 transform-gpu p-0 transition-[background-color,color,scale] duration-[250ms] ease-[var(--ease-smooth)] active:scale-[0.96] active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[pressed=true]:scale-[0.96] data-[pressed=true]:bg-sidebar-accent data-[pressed=true]:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100"
+            isDisabled={!currentWorkspace}
+            isIconOnly
+            size="sm"
             type="button"
             variant="ghost"
-            onClick={() => openContentDialog()}
+            onPress={() => openContentDialog()}
           >
             <HugeiconsIcon
               icon={NoteAddIcon}
@@ -354,18 +348,20 @@ export function ProjectTree({
 
                       return (
                         <li key={note.id} className="relative">
-                          <button
+                          <Button
                             className={cn(
-                              'app-no-drag flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sm text-sidebar-foreground ring-sidebar-ring outline-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2',
-                              note.id === selectedNoteId &&
-                                'bg-sidebar-accent text-sidebar-accent-foreground',
+                              'app-no-drag flex h-7 w-full min-w-0 -translate-x-px transform-gpu items-center justify-start gap-2 overflow-hidden rounded-md px-2 text-sm font-normal text-sidebar-foreground ring-sidebar-ring outline-hidden transition-[background-color,color,scale] duration-[250ms] ease-[var(--ease-smooth)] data-[focus-visible=true]:ring-2 active:scale-[0.96] data-[pressed=true]:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100',
+                              note.id === selectedNoteId
+                                ? 'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground data-[pressed=true]:bg-accent-soft-hover data-[pressed=true]:text-accent-soft-foreground'
+                                : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[pressed=true]:bg-sidebar-accent data-[pressed=true]:text-sidebar-accent-foreground',
                             )}
                             type="button"
-                            onClick={() => onSelectNote(note.id)}
+                            variant="ghost"
+                            onPress={() => onSelectNote(note.id)}
                           >
                             <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
                             <span className="truncate">{note.title}</span>
-                          </button>
+                          </Button>
                         </li>
                       );
                     })}
@@ -394,162 +390,225 @@ export function ProjectTree({
         </ul>
       </div>
 
-      <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create project</DialogTitle>
-            <DialogDescription>Add a project to the current workspace.</DialogDescription>
-          </DialogHeader>
+      <Modal isOpen={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
+        <Modal.Backdrop>
+          <Modal.Container size="sm">
+            <Modal.Dialog aria-label="Create project">
+              <Modal.CloseTrigger />
+              <Modal.Header>
+                <Modal.Heading>Create project</Modal.Heading>
+                <p className="text-sm text-muted-foreground">
+                  Add a project to the current workspace.
+                </p>
+              </Modal.Header>
 
-          <form className="flex flex-col gap-3" onSubmit={handleCreateProject}>
-            <label className="sr-only" htmlFor="sidebar-project-name">
-              Project name
-            </label>
-            <Input
-              id="sidebar-project-name"
-              value={projectName}
-              onChange={(event) => setProjectName(event.target.value)}
-              placeholder="Project name"
-              disabled={!currentWorkspace || isCreatingProject}
-            />
+              <form onSubmit={handleCreateProject}>
+                <Modal.Body className="flex flex-col gap-3">
+                  <TextField
+                    fullWidth
+                    isDisabled={!currentWorkspace || isCreatingProject}
+                    isRequired
+                    name="sidebar-project-name"
+                    value={projectName}
+                    onChange={setProjectName}
+                  >
+                    <Label className="sr-only">Project name</Label>
+                    <Input placeholder="Project name" variant="secondary" />
+                  </TextField>
 
-            <label className="sr-only" htmlFor="sidebar-project-description">
-              Description
-            </label>
-            <Input
-              id="sidebar-project-description"
-              value={projectDescription}
-              onChange={(event) => setProjectDescription(event.target.value)}
-              placeholder="Description"
-              disabled={!currentWorkspace || isCreatingProject}
-            />
+                  <TextField
+                    fullWidth
+                    isDisabled={!currentWorkspace || isCreatingProject}
+                    name="sidebar-project-description"
+                    value={projectDescription}
+                    onChange={setProjectDescription}
+                  >
+                    <Label className="sr-only">Description</Label>
+                    <Input placeholder="Description" variant="secondary" />
+                  </TextField>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+                  {error && <FieldError>{error}</FieldError>}
+                </Modal.Body>
 
-            <DialogFooter>
-              <Button disabled={!currentWorkspace || isCreatingProject} type="submit">
-                {isCreatingProject ? 'Creating...' : 'Create project'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                <Modal.Footer>
+                  <Button
+                    isDisabled={!currentWorkspace || isCreatingProject}
+                    isPending={isCreatingProject}
+                    type="submit"
+                  >
+                    {isCreatingProject ? 'Creating...' : 'Create project'}
+                  </Button>
+                </Modal.Footer>
+              </form>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
 
-      <Dialog open={isContentDialogOpen} onOpenChange={setIsContentDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create content</DialogTitle>
-            <DialogDescription>Add a note now, with room for integrations later.</DialogDescription>
-          </DialogHeader>
+      <Modal isOpen={isContentDialogOpen} onOpenChange={setIsContentDialogOpen}>
+        <Modal.Backdrop>
+          <Modal.Container size="sm">
+            <Modal.Dialog aria-label="Create content">
+              <Modal.CloseTrigger />
+              <Modal.Header>
+                <Modal.Heading>Create content</Modal.Heading>
+                <p className="text-sm text-muted-foreground">
+                  Add a note now, with room for integrations later.
+                </p>
+              </Modal.Header>
 
-          <form className="flex flex-col gap-3" onSubmit={handleCreateContent}>
-            <label className="flex flex-col gap-1" htmlFor="sidebar-content-type">
-              <span className="text-xs font-medium text-muted-foreground">Content type</span>
-              <Select value={contentType} onValueChange={setContentType}>
-                <SelectTrigger id="sidebar-content-type" className="w-full">
-                  <SelectValue placeholder="Select content type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="note">Note</SelectItem>
-                    <SelectItem value="github" disabled>
-                      GitHub integration
-                    </SelectItem>
-                    <SelectItem value="website" disabled>
-                      Website
-                    </SelectItem>
-                    <SelectItem value="leetcode" disabled>
-                      LeetCode
-                    </SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </label>
+              <form onSubmit={handleCreateContent}>
+                <Modal.Body className="flex flex-col gap-3">
+                  <Select
+                    fullWidth
+                    disabledKeys={['github', 'website', 'leetcode']}
+                    selectedKey={contentType}
+                    variant="secondary"
+                    onSelectionChange={(key) => setContentType(String(key ?? 'note'))}
+                  >
+                    <Label>Content type</Label>
+                    <Select.Trigger>
+                      <Select.Value />
+                      <Select.Indicator />
+                    </Select.Trigger>
+                    <Select.Popover>
+                      <ListBox>
+                        <ListBox.Item id="note" textValue="Note">
+                          Note
+                          <ListBox.ItemIndicator />
+                        </ListBox.Item>
+                        <ListBox.Item id="github" textValue="GitHub integration">
+                          GitHub integration
+                          <ListBox.ItemIndicator />
+                        </ListBox.Item>
+                        <ListBox.Item id="website" textValue="Website">
+                          Website
+                          <ListBox.ItemIndicator />
+                        </ListBox.Item>
+                        <ListBox.Item id="leetcode" textValue="LeetCode">
+                          LeetCode
+                          <ListBox.ItemIndicator />
+                        </ListBox.Item>
+                      </ListBox>
+                    </Select.Popover>
+                  </Select>
 
-            <label className="flex flex-col gap-1" htmlFor="sidebar-content-project">
-              <span className="text-xs font-medium text-muted-foreground">Project</span>
-              <Select value={contentProjectId} onValueChange={setContentProjectId}>
-                <SelectTrigger id="sidebar-content-project" className="w-full">
-                  <SelectValue placeholder="Select project" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="none">No project</SelectItem>
-                    {workspaceProjects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </label>
+                  <Select
+                    fullWidth
+                    selectedKey={contentProjectId}
+                    variant="secondary"
+                    onSelectionChange={(key) => setContentProjectId(String(key ?? 'none'))}
+                  >
+                    <Label>Project</Label>
+                    <Select.Trigger>
+                      <Select.Value />
+                      <Select.Indicator />
+                    </Select.Trigger>
+                    <Select.Popover>
+                      <ListBox>
+                        <ListBox.Item id="none" textValue="No project">
+                          No project
+                          <ListBox.ItemIndicator />
+                        </ListBox.Item>
+                        {workspaceProjects.map((project) => (
+                          <ListBox.Item key={project.id} id={project.id} textValue={project.name}>
+                            {project.name}
+                            <ListBox.ItemIndicator />
+                          </ListBox.Item>
+                        ))}
+                      </ListBox>
+                    </Select.Popover>
+                  </Select>
 
-            <label className="sr-only" htmlFor="sidebar-note-title">
-              Note title
-            </label>
-            <Input
-              id="sidebar-note-title"
-              value={noteTitle}
-              onChange={(event) => setNoteTitle(event.target.value)}
-              placeholder="Note title"
-              disabled={!currentWorkspace || isCreatingContent}
-            />
+                  <TextField
+                    fullWidth
+                    isDisabled={!currentWorkspace || isCreatingContent}
+                    isRequired
+                    name="sidebar-note-title"
+                    value={noteTitle}
+                    onChange={setNoteTitle}
+                  >
+                    <Label className="sr-only">Note title</Label>
+                    <Input placeholder="Note title" variant="secondary" />
+                  </TextField>
 
-            <label className="flex flex-col gap-1" htmlFor="sidebar-note-type">
-              <span className="text-xs font-medium text-muted-foreground">Note type</span>
-              <Select value={noteType} onValueChange={setNoteType}>
-                <SelectTrigger id="sidebar-note-type" className="w-full">
-                  <SelectValue placeholder="Select note type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {noteTypeOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </label>
+                  <Select
+                    fullWidth
+                    selectedKey={noteType}
+                    variant="secondary"
+                    onSelectionChange={(key) => setNoteType(String(key ?? 'general'))}
+                  >
+                    <Label>Note type</Label>
+                    <Select.Trigger>
+                      <Select.Value />
+                      <Select.Indicator />
+                    </Select.Trigger>
+                    <Select.Popover>
+                      <ListBox>
+                        {noteTypeOptions.map((option) => (
+                          <ListBox.Item
+                            key={option.value}
+                            id={option.value}
+                            textValue={option.label}
+                          >
+                            {option.label}
+                            <ListBox.ItemIndicator />
+                          </ListBox.Item>
+                        ))}
+                      </ListBox>
+                    </Select.Popover>
+                  </Select>
 
-            <label className="sr-only" htmlFor="sidebar-note-content">
-              Content
-            </label>
-            <Textarea
-              id="sidebar-note-content"
-              className="min-h-28 resize-y"
-              value={noteContent}
-              onChange={(event) => setNoteContent(event.target.value)}
-              placeholder="Write a note..."
-              disabled={!currentWorkspace || isCreatingContent}
-            />
+                  <TextField
+                    fullWidth
+                    isDisabled={!currentWorkspace || isCreatingContent}
+                    name="sidebar-note-content"
+                    value={noteContent}
+                    onChange={setNoteContent}
+                  >
+                    <Label className="sr-only">Content</Label>
+                    <TextArea
+                      fullWidth
+                      className="min-h-28 resize-y"
+                      placeholder="Write a note..."
+                      variant="secondary"
+                    />
+                  </TextField>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+                  {error && <FieldError>{error}</FieldError>}
+                </Modal.Body>
 
-            <DialogFooter>
-              <Button disabled={!currentWorkspace || isCreatingContent} type="submit">
-                {isCreatingContent ? 'Creating...' : 'Create content'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                <Modal.Footer>
+                  <Button
+                    isDisabled={!currentWorkspace || isCreatingContent}
+                    isPending={isCreatingContent}
+                    type="submit"
+                  >
+                    {isCreatingContent ? 'Creating...' : 'Create content'}
+                  </Button>
+                </Modal.Footer>
+              </form>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
     </section>
   );
 }
 
 function ProjectTreeButton({ icon: Icon, isActive, isSidebarOpen, label, onClick }) {
   const button = (
-    <button
+    <Button
       className={cn(
-        'app-no-drag flex h-8 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[background-color,color,width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2',
+        'app-no-drag flex h-8 w-full transform-gpu items-center justify-start gap-2 overflow-hidden rounded-md p-2 text-left text-sm font-normal ring-sidebar-ring outline-hidden transition-[background-color,color,width,height,padding,scale] duration-[250ms] ease-[var(--ease-smooth)] data-[focus-visible=true]:ring-2 active:scale-[0.96] data-[pressed=true]:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100',
         !isSidebarOpen && 'size-8 justify-center p-2',
-        isActive && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground',
+        isActive
+          ? 'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground data-[pressed=true]:bg-accent-soft-hover data-[pressed=true]:text-accent-soft-foreground'
+          : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[pressed=true]:bg-sidebar-accent data-[pressed=true]:text-sidebar-accent-foreground',
       )}
       type="button"
-      onClick={onClick}
+      variant="ghost"
+      onPress={onClick}
     >
       {Array.isArray(Icon) ? (
         <HugeiconsIcon icon={Icon} aria-hidden="true" className="size-[18px] shrink-0" />
@@ -557,7 +616,7 @@ function ProjectTreeButton({ icon: Icon, isActive, isSidebarOpen, label, onClick
         <Icon aria-hidden="true" className="size-[18px] shrink-0" />
       )}
       <span className={cn('truncate', !isSidebarOpen && 'sr-only')}>{label}</span>
-    </button>
+    </Button>
   );
 
   if (isSidebarOpen) {
