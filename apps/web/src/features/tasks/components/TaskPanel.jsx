@@ -617,7 +617,7 @@ export function TaskPanel({ currentWorkspace }) {
                             <Table.Cell className="p-0" colSpan={3}>
                               <div data-slot="task-row-layout" className="flex min-w-0 flex-col">
                                 <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_7rem_5rem] items-center">
-                                  <div className="relative min-w-0 py-1.5 pl-8">
+                                  <div className="relative min-w-0 py-1.5 pl-4">
                                     <div className="flex min-w-0 items-center gap-3">
                                       {renderTaskCheckbox(task, isUpdating)}
 
@@ -689,7 +689,7 @@ export function TaskPanel({ currentWorkspace }) {
                                     )}
                                   </div>
 
-                                  <div className="pr-8 text-right">
+                                  <div className="pr-4 text-right">
                                     <div className="flex justify-end gap-1">
                                       <Button
                                         aria-label={`Add child todo to ${task.title}`}
