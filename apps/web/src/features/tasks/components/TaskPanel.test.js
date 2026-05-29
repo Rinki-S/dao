@@ -53,6 +53,8 @@ describe('TaskPanel table migration boundary', () => {
 
     expect(source).toContain('Dropdown');
     expect(source).toContain('Checkbox');
+    expect(source).toContain('FieldError');
+    expect(source).toContain('Form');
     expect(source).toContain('InputGroup');
     expect(source).toContain('Popover');
     expect(source).toContain('TextArea');
@@ -234,12 +236,17 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).not.toContain('--muted-foreground');
   });
 
-  it('renders task API errors without field validation components or empty overlay triggers', () => {
+  it('separates task API errors from field validation errors and empty overlay triggers', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
     expect(source).toContain('function TaskApiErrorMessage');
     expect(source).toContain('role="alert"');
-    expect(source).not.toContain('FieldError');
+    expect(source).toContain('FieldError');
+    expect(source).toContain('Task title is required');
+    expect(source).toContain('{quickAddError || taskActionError}');
+    expect(source).toContain('{childTaskError}');
+    expect(source).toContain('{editTaskError}');
+    expect(source).toContain('{deleteTaskError}');
     expect(source).not.toContain('<Popover.Trigger>');
     expect(source).not.toContain('<Dropdown.Trigger');
   });

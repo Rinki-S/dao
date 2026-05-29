@@ -11,6 +11,8 @@ import {
   Checkbox,
   Chip,
   Dropdown,
+  FieldError,
+  Form,
   InputGroup,
   Label,
   Modal,
@@ -210,13 +212,13 @@ function GsapDisclosure({ children, className, contentClassName, dataSlot, isOpe
   );
 }
 
-function TaskApiErrorMessage({ children }) {
+function TaskApiErrorMessage({ children, className }) {
   if (!children) {
     return null;
   }
 
   return (
-    <p role="alert" className="text-sm text-danger">
+    <p role="alert" className={cn('text-sm text-danger', className)}>
       {children}
     </p>
   );
@@ -230,7 +232,9 @@ export function TaskPanel({ currentWorkspace }) {
   const [taskDescription, setTaskDescription] = useState('');
   const [taskPriority, setTaskPriority] = useState('medium');
   const [status, setStatus] = useState('loading');
-  const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [quickAddError, setQuickAddError] = useState('');
+  const [taskActionError, setTaskActionError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isDescriptionPopoverOpen, setIsDescriptionPopoverOpen] = useState(false);
   const [updatingTaskIds, setUpdatingTaskIds] = useState(() => new Set());
@@ -238,6 +242,7 @@ export function TaskPanel({ currentWorkspace }) {
   const [renderedChildTaskParentId, setRenderedChildTaskParentId] = useState('');
   const [visibleChildTaskParentId, setVisibleChildTaskParentId] = useState('');
   const [childTaskTitle, setChildTaskTitle] = useState('');
+  const [childTaskError, setChildTaskError] = useState('');
   const [isCreatingChild, setIsCreatingChild] = useState(false);
   const [expandedTaskIds, setExpandedTaskIds] = useState(() => new Set());
   const [taskContextMenu, setTaskContextMenu] = useState(null);
@@ -248,6 +253,7 @@ export function TaskPanel({ currentWorkspace }) {
   const [editTaskPriority, setEditTaskPriority] = useState('medium');
   const [editTaskError, setEditTaskError] = useState('');
   const [isSavingTaskEdit, setIsSavingTaskEdit] = useState(false);
+  const [deleteTaskError, setDeleteTaskError] = useState('');
   const [isDeletingTask, setIsDeletingTask] = useState(false);
   const taskTitleInputRef = useRef(null);
 
@@ -321,7 +327,7 @@ export function TaskPanel({ currentWorkspace }) {
       setStatus('loading');
     }
 
-    setError('');
+    setLoadError('');
 
     const [nextProjects, nextTasks] = await Promise.all([listProjects(), listTasks()]);
 
@@ -336,7 +342,7 @@ export function TaskPanel({ currentWorkspace }) {
     async function load() {
       try {
         setStatus('loading');
-        setError('');
+        setLoadError('');
 
         const [nextProjects, nextTasks] = await Promise.all([listProjects(), listTasks()]);
 
@@ -349,7 +355,7 @@ export function TaskPanel({ currentWorkspace }) {
         setStatus('ready');
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load tasks');
+          setLoadError(err instanceof Error ? err.message : 'Failed to load tasks');
           setStatus('error');
         }
       }
@@ -397,18 +403,19 @@ export function TaskPanel({ currentWorkspace }) {
     event.preventDefault();
 
     if (!currentWorkspace) {
-      setError('Create a workspace before adding tasks');
+      setQuickAddError('Create a workspace before adding tasks');
       return;
     }
 
     if (taskTitle.trim() === '') {
-      setError('Task title is required');
+      setQuickAddError('');
       return;
     }
 
     try {
       setIsCreating(true);
-      setError('');
+      setQuickAddError('');
+      setTaskActionError('');
 
       await createTask({
         workspaceId: currentWorkspace.id,
@@ -429,7 +436,7 @@ export function TaskPanel({ currentWorkspace }) {
         taskTitleInputRef.current?.focus();
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create task');
+      setQuickAddError(err instanceof Error ? err.message : 'Failed to create task');
     } finally {
       setIsCreating(false);
     }
@@ -445,7 +452,7 @@ export function TaskPanel({ currentWorkspace }) {
     setTaskDescription('');
     setTaskPriority('medium');
     setIsDescriptionPopoverOpen(false);
-    setError('');
+    setQuickAddError('');
     taskTitleInputRef.current?.blur();
   }
 
@@ -457,13 +464,13 @@ export function TaskPanel({ currentWorkspace }) {
       nextIds.add(task.id);
       return nextIds;
     });
-    setError('');
+    setTaskActionError('');
 
     try {
       await updateTaskStatus(task.id, { status: nextStatus });
       await loadTaskData({ showLoading: false });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update task');
+      setTaskActionError(err instanceof Error ? err.message : 'Failed to update task');
     } finally {
       setUpdatingTaskIds((currentIds) => {
         const nextIds = new Set(currentIds);
@@ -481,25 +488,26 @@ export function TaskPanel({ currentWorkspace }) {
     });
     setChildTaskParentId(parentTaskId);
     setChildTaskTitle('');
-    setError('');
+    setChildTaskError('');
   }
 
   function closeChildTaskForm() {
     setChildTaskParentId('');
     setChildTaskTitle('');
+    setChildTaskError('');
   }
 
   async function handleCreateChildTask(event, parentTask) {
     event.preventDefault();
 
     if (!currentWorkspace) {
-      setError('Create a workspace before adding tasks');
+      setChildTaskError('Create a workspace before adding tasks');
       return;
     }
 
     try {
       setIsCreatingChild(true);
-      setError('');
+      setChildTaskError('');
 
       await createTask({
         workspaceId: currentWorkspace.id,
@@ -515,7 +523,7 @@ export function TaskPanel({ currentWorkspace }) {
       await loadTaskData({ showLoading: false });
       notifyActivityChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create child task');
+      setChildTaskError(err instanceof Error ? err.message : 'Failed to create child task');
     } finally {
       setIsCreatingChild(false);
     }
@@ -601,6 +609,7 @@ export function TaskPanel({ currentWorkspace }) {
   function openDeleteTaskDialog(task) {
     closeTaskContextMenu();
     setTaskPendingDelete(task);
+    setDeleteTaskError('');
   }
 
   function closeDeleteTaskDialog() {
@@ -609,6 +618,7 @@ export function TaskPanel({ currentWorkspace }) {
     }
 
     setTaskPendingDelete(null);
+    setDeleteTaskError('');
   }
 
   async function handleSaveTaskEdit(event) {
@@ -619,7 +629,7 @@ export function TaskPanel({ currentWorkspace }) {
     }
 
     if (editTaskTitle.trim() === '') {
-      setEditTaskError('Task title is required');
+      setEditTaskError('');
       return;
     }
 
@@ -650,7 +660,7 @@ export function TaskPanel({ currentWorkspace }) {
       return;
     }
 
-    setError('');
+    setDeleteTaskError('');
 
     try {
       setIsDeletingTask(true);
@@ -660,8 +670,7 @@ export function TaskPanel({ currentWorkspace }) {
       await loadTaskData({ showLoading: false });
       notifyActivityChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete task');
-      setTaskPendingDelete(null);
+      setDeleteTaskError(err instanceof Error ? err.message : 'Failed to delete task');
     } finally {
       setIsDeletingTask(false);
     }
@@ -684,8 +693,9 @@ export function TaskPanel({ currentWorkspace }) {
 
   return (
     <section id="tasks" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <form
+      <Form
         className="flex shrink-0 flex-col gap-3 px-8 py-4"
+        validationBehavior="native"
         onSubmit={handleCreateTask}
         onKeyDown={handleQuickAddKeyDown}
       >
@@ -694,7 +704,9 @@ export function TaskPanel({ currentWorkspace }) {
             className="w-full min-w-0"
             fullWidth
             isDisabled={!currentWorkspace || isCreating}
+            isRequired
             name="task-title"
+            validate={(value) => (value.trim() ? null : 'Task title is required')}
             value={taskTitle}
             onChange={setTaskTitle}
           >
@@ -829,16 +841,21 @@ export function TaskPanel({ currentWorkspace }) {
                 {isCreating ? 'Adding...' : 'Add'}
               </Button>
             </div>
+            <FieldError />
           </TextField>
 
-          <TaskApiErrorMessage>{error}</TaskApiErrorMessage>
+          <TaskApiErrorMessage>{quickAddError || taskActionError}</TaskApiErrorMessage>
         </div>
-      </form>
+      </Form>
 
       <div className="min-h-0 flex-1">
         <ScrollShadow className="h-full min-h-0" orientation="vertical" size={20}>
           {status === 'loading' && (
             <p className="px-8 text-sm text-muted-foreground">Loading tasks...</p>
+          )}
+
+          {status === 'error' && (
+            <TaskApiErrorMessage className="px-8">{loadError}</TaskApiErrorMessage>
           )}
 
           {status === 'ready' && !currentWorkspace && (
@@ -1021,44 +1038,56 @@ export function TaskPanel({ currentWorkspace }) {
                                         dataSlot="task-child-form"
                                         isOpen={isChildFormVisible}
                                       >
-                                        <form
-                                          className="flex items-center gap-2"
+                                        <Form
+                                          className="flex flex-col gap-2"
+                                          validationBehavior="native"
                                           onSubmit={(event) => {
                                             void handleCreateChildTask(event, task);
                                           }}
                                         >
-                                          <TextField
-                                            aria-label={`Child todo for ${task.title}`}
-                                            className="min-w-0 flex-1"
-                                            fullWidth
-                                            isDisabled={isCreatingChild}
-                                            value={childTaskTitle}
-                                            onChange={setChildTaskTitle}
-                                          >
-                                            <InputGroup
-                                              className="h-8 min-h-8 shadow-none"
+                                          <div className="flex items-center gap-2">
+                                            <TextField
+                                              aria-label={`Child todo for ${task.title}`}
+                                              className="min-w-0 flex-1"
                                               fullWidth
+                                              isDisabled={isCreatingChild}
+                                              isRequired
+                                              name={`child-task-title-${task.id}`}
+                                              validate={(value) =>
+                                                value.trim() ? null : 'Child todo title is required'
+                                              }
+                                              value={childTaskTitle}
+                                              onChange={setChildTaskTitle}
                                             >
-                                              <InputGroup.Input placeholder="Add child todo..." />
-                                            </InputGroup>
-                                          </TextField>
-                                          <Button
-                                            isDisabled={isCreatingChild}
-                                            size="sm"
-                                            type="submit"
-                                          >
-                                            Add
-                                          </Button>
-                                          <Button
-                                            isDisabled={isCreatingChild}
-                                            size="sm"
-                                            type="button"
-                                            variant="ghost"
-                                            onPress={closeChildTaskForm}
-                                          >
-                                            Cancel
-                                          </Button>
-                                        </form>
+                                              <InputGroup
+                                                className="h-8 min-h-8 shadow-none"
+                                                fullWidth
+                                              >
+                                                <InputGroup.Input placeholder="Add child todo..." />
+                                              </InputGroup>
+                                              <FieldError />
+                                            </TextField>
+                                            <Button
+                                              isDisabled={
+                                                isCreatingChild || childTaskTitle.trim() === ''
+                                              }
+                                              size="sm"
+                                              type="submit"
+                                            >
+                                              Add
+                                            </Button>
+                                            <Button
+                                              isDisabled={isCreatingChild}
+                                              size="sm"
+                                              type="button"
+                                              variant="ghost"
+                                              onPress={closeChildTaskForm}
+                                            >
+                                              Cancel
+                                            </Button>
+                                          </div>
+                                          <TaskApiErrorMessage>{childTaskError}</TaskApiErrorMessage>
+                                        </Form>
                                       </GsapDisclosure>
                                     )}
 
@@ -1210,13 +1239,14 @@ export function TaskPanel({ currentWorkspace }) {
                 <Modal.Heading>Edit task</Modal.Heading>
               </Modal.Header>
 
-              <form onSubmit={handleSaveTaskEdit}>
+              <Form validationBehavior="native" onSubmit={handleSaveTaskEdit}>
                 <Modal.Body className="flex flex-col gap-3">
                   <TextField
                     fullWidth
                     isDisabled={isSavingTaskEdit}
                     isRequired
                     name="edit-task-title"
+                    validate={(value) => (value.trim() ? null : 'Task title is required')}
                     value={editTaskTitle}
                     onChange={setEditTaskTitle}
                   >
@@ -1224,6 +1254,7 @@ export function TaskPanel({ currentWorkspace }) {
                     <InputGroup fullWidth>
                       <InputGroup.Input id="edit-task-title" />
                     </InputGroup>
+                    <FieldError />
                   </TextField>
 
                   <TextField
@@ -1281,14 +1312,14 @@ export function TaskPanel({ currentWorkspace }) {
 
                 <Modal.Footer>
                   <Button
-                    isDisabled={isSavingTaskEdit || editTaskTitle.trim() === ''}
+                    isDisabled={isSavingTaskEdit}
                     isPending={isSavingTaskEdit}
                     type="submit"
                   >
                     {isSavingTaskEdit ? 'Saving...' : 'Save'}
                   </Button>
                 </Modal.Footer>
-              </form>
+              </Form>
             </Modal.Dialog>
           </Modal.Container>
         </Modal.Backdrop>
@@ -1319,6 +1350,7 @@ export function TaskPanel({ currentWorkspace }) {
                     '.'
                   )}
                 </p>
+                <TaskApiErrorMessage>{deleteTaskError}</TaskApiErrorMessage>
               </Modal.Body>
 
               <Modal.Footer>

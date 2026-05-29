@@ -452,7 +452,7 @@ describe('TaskPanel interactions', () => {
     expect(deleteTask).not.toHaveBeenCalled();
   });
 
-  it('shows a page error and avoids reloading when deleting a task fails', async () => {
+  it('keeps the delete confirmation open and avoids reloading when deleting a task fails', async () => {
     const user = userEvent.setup();
     deleteTask.mockRejectedValue(new Error('Unable to delete task'));
 
@@ -471,12 +471,10 @@ describe('TaskPanel interactions', () => {
     await waitFor(() => {
       expect(deleteTask).toHaveBeenCalledTimes(1);
     });
-    expect(await screen.findByText('Unable to delete task')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: 'Delete task' })).not.toBeInTheDocument();
-    });
-    expect(screen.getByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
-    expect(screen.getByText('Review HeroUI migration')).toBeInTheDocument();
+    expect(await within(deleteDialog).findByText('Unable to delete task')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Delete task' })).toBeInTheDocument();
+    expect(screen.getByRole('grid', { hidden: true, name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.getAllByText('Review HeroUI migration').length).toBeGreaterThan(0);
     expect(listTasks).toHaveBeenCalledTimes(1);
   });
 });
