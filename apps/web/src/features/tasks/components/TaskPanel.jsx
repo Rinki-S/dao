@@ -231,11 +231,13 @@ export function TaskPanel({ currentWorkspace }) {
   const [expandedTaskIds, setExpandedTaskIds] = useState(() => new Set());
   const [taskContextMenu, setTaskContextMenu] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
+  const [taskPendingDelete, setTaskPendingDelete] = useState(null);
   const [editTaskTitle, setEditTaskTitle] = useState('');
   const [editTaskDescription, setEditTaskDescription] = useState('');
   const [editTaskPriority, setEditTaskPriority] = useState('medium');
   const [editTaskError, setEditTaskError] = useState('');
   const [isSavingTaskEdit, setIsSavingTaskEdit] = useState(false);
+  const [isDeletingTask, setIsDeletingTask] = useState(false);
   const taskTitleInputRef = useRef(null);
 
   const workspaceProjects = useMemo(() => {
@@ -578,6 +580,19 @@ export function TaskPanel({ currentWorkspace }) {
     setEditTaskError('');
   }
 
+  function openDeleteTaskDialog(task) {
+    closeTaskContextMenu();
+    setTaskPendingDelete(task);
+  }
+
+  function closeDeleteTaskDialog() {
+    if (isDeletingTask) {
+      return;
+    }
+
+    setTaskPendingDelete(null);
+  }
+
   async function handleSaveTaskEdit(event) {
     event.preventDefault();
 
@@ -612,16 +627,25 @@ export function TaskPanel({ currentWorkspace }) {
     }
   }
 
-  async function handleDeleteTask(task) {
-    closeTaskContextMenu();
+  async function handleConfirmDeleteTask() {
+    if (!taskPendingDelete) {
+      return;
+    }
+
     setError('');
 
     try {
-      await deleteTask(task.id);
+      setIsDeletingTask(true);
+
+      await deleteTask(taskPendingDelete.id);
+      setTaskPendingDelete(null);
       await loadTaskData({ showLoading: false });
       notifyActivityChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete task');
+      setTaskPendingDelete(null);
+    } finally {
+      setIsDeletingTask(false);
     }
   }
 
@@ -636,7 +660,7 @@ export function TaskPanel({ currentWorkspace }) {
     }
 
     if (actionKey === 'delete') {
-      void handleDeleteTask(taskContextMenuTask);
+      openDeleteTaskDialog(taskContextMenuTask);
     }
   }
 
@@ -1244,6 +1268,49 @@ export function TaskPanel({ currentWorkspace }) {
                   </Button>
                 </Modal.Footer>
               </form>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(taskPendingDelete)}
+        onOpenChange={(isOpen) => !isOpen && closeDeleteTaskDialog()}
+      >
+        <Modal.Backdrop>
+          <Modal.Container size="sm">
+            <Modal.Dialog aria-label="Delete task">
+              <Modal.Header>
+                <Modal.Heading>Delete task?</Modal.Heading>
+              </Modal.Header>
+
+              <Modal.Body>
+                <p>
+                  This will delete{' '}
+                  <span className="font-medium text-foreground">{taskPendingDelete?.title}</span>.
+                </p>
+              </Modal.Body>
+
+              <Modal.Footer>
+                <Button
+                  isDisabled={isDeletingTask}
+                  type="button"
+                  variant="tertiary"
+                  onPress={closeDeleteTaskDialog}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  isPending={isDeletingTask}
+                  type="button"
+                  variant="danger"
+                  onPress={() => {
+                    void handleConfirmDeleteTask();
+                  }}
+                >
+                  {isDeletingTask ? 'Deleting...' : 'Delete'}
+                </Button>
+              </Modal.Footer>
             </Modal.Dialog>
           </Modal.Container>
         </Modal.Backdrop>

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { createElement } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTask, deleteTask, listTasks, updateTask } from '../api.js';
@@ -427,7 +427,7 @@ describe('TaskPanel table migration boundary', () => {
     });
   });
 
-  it('opens a right-click task menu and deletes the task', async () => {
+  it('asks for confirmation before deleting a task from the right-click menu', async () => {
     const user = userEvent.setup();
     deleteTask.mockResolvedValue(undefined);
 
@@ -439,6 +439,13 @@ describe('TaskPanel table migration boundary', () => {
 
     fireEvent.contextMenu(trigger, { clientX: 120, clientY: 160 });
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+
+    expect(deleteTask).not.toHaveBeenCalled();
+    const deleteDialog = await screen.findByRole('dialog', { name: 'Delete task' });
+    expect(deleteDialog).toBeInTheDocument();
+    expect(within(deleteDialog).getByText('Review HeroUI migration')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(deleteTask).toHaveBeenCalledWith('task-1');
   });
