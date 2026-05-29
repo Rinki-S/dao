@@ -1,8 +1,13 @@
+import { useRef, useState } from 'react';
 import { Button, Tooltip } from '@heroui/react';
 import { HugeiconsIcon } from '@hugeicons/react';
+import { gsap } from 'gsap';
+import { useGSAP } from '@gsap/react';
 import Layers01Icon from '@hugeicons/core-free-icons/Layers01Icon';
 import { ProjectTree } from './ProjectTree.jsx';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx';
+
+gsap.registerPlugin(useGSAP);
 
 function ExtensionIcon(props) {
   return <HugeiconsIcon icon={Layers01Icon} {...props} />;
@@ -45,6 +50,106 @@ export function AppSidebar({
   resizeMaxWidth,
   resizeCollapseThreshold,
 }) {
+  const sidebarRef = useRef(null);
+  const hasMountedRef = useRef(false);
+  const [isSidebarVisuallyOpen, setIsSidebarVisuallyOpen] = useState(isSidebarOpen);
+
+  useGSAP(
+    () => {
+      const sidebar = sidebarRef.current;
+      if (!sidebar) return;
+
+      const targetWidth = isSidebarOpen ? 'var(--sidebar-width)' : '0px';
+
+      if (!hasMountedRef.current) {
+        hasMountedRef.current = true;
+        gsap.set(sidebar, { width: targetWidth });
+        return;
+      }
+
+      if (isSidebarOpen && !isSidebarVisuallyOpen) {
+        setIsSidebarVisuallyOpen(true);
+        return;
+      }
+
+      if (!isSidebarOpen && !isSidebarVisuallyOpen) {
+        gsap.set(sidebar, { width: targetWidth });
+        return;
+      }
+
+      if (process.env.NODE_ENV === 'test') {
+        gsap.set(sidebar, { width: targetWidth });
+        if (!isSidebarOpen) {
+          setIsSidebarVisuallyOpen(false);
+        }
+        return;
+      }
+
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (prefersReducedMotion) {
+        gsap.set(sidebar, { width: targetWidth });
+        if (!isSidebarOpen) {
+          setIsSidebarVisuallyOpen(false);
+        }
+        return;
+      }
+
+      const contentElements = sidebar.querySelectorAll('[data-sidebar-content]');
+      const currentWidth = `${sidebar.getBoundingClientRect().width}px`;
+
+      if (isSidebarOpen) {
+        const tl = gsap.timeline();
+
+        tl.fromTo(
+          sidebar,
+          { width: currentWidth },
+          {
+            width: 'var(--sidebar-width)',
+            duration: 0.3,
+            ease: 'power2.out',
+          },
+          0,
+        ).from(
+          contentElements,
+          {
+            autoAlpha: 0,
+            x: -10,
+            duration: 0.2,
+            stagger: 0.05,
+            ease: 'power2.out',
+          },
+          '-=0.15',
+        );
+      } else {
+        const tl = gsap.timeline({
+          onComplete: () => setIsSidebarVisuallyOpen(false),
+        });
+
+        tl.to(contentElements, {
+          autoAlpha: 0,
+          x: -10,
+          duration: 0.15,
+          stagger: 0.03,
+          ease: 'power2.in',
+        }).fromTo(
+          sidebar,
+          { width: currentWidth },
+          {
+            width: '0px',
+            duration: 0.25,
+            ease: 'power2.in',
+          },
+          '-=0.09',
+        );
+      }
+    },
+    {
+      dependencies: [isSidebarOpen, isSidebarVisuallyOpen],
+      scope: sidebarRef,
+      revertOnUpdate: true,
+    },
+  );
+
   function handleResizePointerDown(event) {
     if (event.button !== 0) {
       return;
@@ -106,12 +211,13 @@ export function AppSidebar({
 
   return (
     <aside
-      className={`relative hidden h-[calc(100dvh-3rem)] shrink-0 flex-col border-r border-border bg-surface text-sidebar-foreground transition-[width] duration-200 ease-linear md:flex ${isSidebarOpen ? 'w-(--sidebar-width)' : 'w-(--sidebar-width-icon)'}`}
-      data-collapsible={isSidebarOpen ? '' : 'icon'}
-      data-sidebar-state={isSidebarOpen ? 'expanded' : 'collapsed'}
+      ref={sidebarRef}
+      className={`relative hidden h-[calc(100dvh-3rem)] shrink-0 flex-col overflow-hidden border-r border-border bg-surface text-sidebar-foreground md:flex ${isSidebarVisuallyOpen ? 'w-(--sidebar-width)' : 'w-0'}`}
+      data-collapsible={isSidebarVisuallyOpen ? '' : 'hidden'}
+      data-sidebar-state={isSidebarVisuallyOpen ? 'expanded' : 'collapsed'}
       data-slot="app-sidebar"
     >
-      <div className="flex flex-col gap-2 p-2">
+      <div data-sidebar-content className="flex flex-col gap-2 p-2">
         <ul className="flex min-w-0 flex-col gap-0">
           <li className="relative">
             <WorkspaceSwitcher
@@ -120,7 +226,7 @@ export function AppSidebar({
               isLoading={isWorkspaceLoading}
               error={workspaceError}
               menuOpen={workspaceMenuOpen}
-              isSidebarOpen={isSidebarOpen}
+              isSidebarOpen={isSidebarVisuallyOpen}
               onMenuOpenChange={onWorkspaceMenuOpenChange}
               createDialogOpen={createWorkspaceDialogOpen}
               onCreateDialogOpenChange={onCreateWorkspaceDialogOpenChange}
@@ -131,10 +237,13 @@ export function AppSidebar({
         </ul>
       </div>
 
-      <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-0 overflow-auto data-[collapsed=true]:overflow-hidden">
+      <div
+        data-sidebar-content
+        className="no-scrollbar flex min-h-0 flex-1 flex-col gap-0 overflow-auto data-[collapsed=true]:overflow-hidden"
+      >
         <section className="relative flex w-full min-w-0 flex-col p-2">
           <div
-            className={`flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 transition-[margin,opacity] duration-200 ease-linear ${!isSidebarOpen ? '-mt-8 opacity-0' : ''}`}
+            className={`flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ${!isSidebarVisuallyOpen ? '-mt-8 opacity-0' : ''}`}
           >
             Workspace
           </div>
@@ -147,28 +256,19 @@ export function AppSidebar({
                 const isActive = surfaceId === activeSurfaceId;
                 const surfaceButton = (
                   <Button
-                    className={`${sidebarSurfaceButtonBase} ${!isSidebarOpen ? 'size-8 justify-center p-2' : 'justify-start'} ${isActive ? `font-medium ${activeSurfaceButtonClass}` : inactiveSurfaceButtonClass}`}
+                    className={`${sidebarSurfaceButtonBase} justify-start ${isActive ? `font-medium ${activeSurfaceButtonClass}` : inactiveSurfaceButtonClass}`}
                     type="button"
                     variant="ghost"
                     onPress={() => onSelectSurface(surfaceId)}
                   >
                     <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
-                    <span className={`truncate ${!isSidebarOpen ? 'sr-only' : ''}`}>
-                      {item.label}
-                    </span>
+                    <span className="truncate">{item.label}</span>
                   </Button>
                 );
 
                 return (
                   <li key={item.id} className="relative">
-                    {isSidebarOpen ? (
-                      surfaceButton
-                    ) : (
-                      <Tooltip delay={0}>
-                        {surfaceButton}
-                        <Tooltip.Content placement="right">{item.label}</Tooltip.Content>
-                      </Tooltip>
-                    )}
+                    {surfaceButton}
                   </li>
                 );
               })}
@@ -180,14 +280,14 @@ export function AppSidebar({
           currentWorkspace={currentWorkspace}
           selectedProjectId={selectedProjectId}
           selectedNoteId={selectedNoteId}
-          isSidebarOpen={isSidebarOpen}
+          isSidebarOpen={isSidebarVisuallyOpen}
           onSelectProject={onSelectProject}
           onSelectNote={onSelectNote}
         />
       </div>
 
       {footerSidebarItems.length > 0 && (
-        <div className="flex flex-col gap-2 p-2">
+        <div data-sidebar-content className="flex flex-col gap-2 p-2">
           <ul className="flex min-w-0 flex-col gap-0">
             {footerSidebarItems.map((item) => {
               const surfaceId = item.href.replace(/^#/, '');

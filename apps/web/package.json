@@ -16,6 +16,7 @@
     "@fontsource-variable/funnel-sans": "^5.2.8",
     "@fontsource-variable/geist": "^5.2.9",
     "@fontsource-variable/outfit": "^5.2.8",
+    "@gsap/react": "^2.1.2",
     "@heroui/react": "^3.1.0",
     "@heroui/styles": "^3.1.0",
     "@hugeicons/core-free-icons": "^4.1.4",
