@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { listProjects } from '../../projects/api.js';
-import { createTask, deleteTask, listTasks, updateTask } from '../api.js';
+import { createTask, deleteTask, listTasks, updateTask, updateTaskStatus } from '../api.js';
 import { TaskPanel } from './TaskPanel.jsx';
 import { currentWorkspace, projectFixture, taskFixture } from './TaskPanel.test-utils.js';
 
@@ -92,6 +92,87 @@ describe('TaskPanel interactions', () => {
         status: 'todo',
       }),
     ]);
+  });
+
+  it('toggles a todo task checkbox to done', async () => {
+    const user = userEvent.setup();
+    updateTaskStatus.mockResolvedValue(taskFixture({ status: 'done' }));
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    await user.click(
+      await screen.findByRole('checkbox', { name: 'Toggle Review HeroUI migration' }),
+    );
+
+    await waitFor(() => {
+      expect(updateTaskStatus).toHaveBeenCalledWith('task-1', { status: 'done' });
+    });
+  });
+
+  it('toggles a child todo checkbox with the child task id', async () => {
+    const user = userEvent.setup();
+    updateTaskStatus.mockResolvedValue(taskFixture({ id: 'task-2', status: 'done' }));
+    listTasks.mockResolvedValueOnce([
+      taskFixture({
+        status: 'doing',
+      }),
+      taskFixture({
+        id: 'task-2',
+        parentId: 'task-1',
+        title: 'Check child checkbox',
+        description: '',
+        status: 'todo',
+      }),
+    ]);
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Expand details for Review HeroUI migration' }),
+    );
+    await user.click(await screen.findByRole('checkbox', { name: 'Toggle Check child checkbox' }));
+
+    await waitFor(() => {
+      expect(updateTaskStatus).toHaveBeenCalledWith('task-2', { status: 'done' });
+    });
+  });
+
+  it('toggles an indeterminate doing parent task checkbox to done', async () => {
+    const user = userEvent.setup();
+    updateTaskStatus.mockResolvedValue(taskFixture({ status: 'done' }));
+    listTasks.mockResolvedValueOnce([
+      taskFixture({
+        status: 'doing',
+      }),
+      taskFixture({
+        id: 'task-2',
+        parentId: 'task-1',
+        title: 'Incomplete child',
+        description: '',
+        status: 'todo',
+      }),
+      taskFixture({
+        id: 'task-3',
+        parentId: 'task-1',
+        title: 'Complete child',
+        description: '',
+        status: 'done',
+      }),
+    ]);
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const parentCheckbox = await screen.findByRole('checkbox', {
+      name: 'Toggle Review HeroUI migration',
+    });
+
+    expect(parentCheckbox).toBePartiallyChecked();
+
+    await user.click(parentCheckbox);
+
+    await waitFor(() => {
+      expect(updateTaskStatus).toHaveBeenCalledWith('task-1', { status: 'done' });
+    });
   });
 
   it('opens a right-click task menu and edits the task', async () => {
