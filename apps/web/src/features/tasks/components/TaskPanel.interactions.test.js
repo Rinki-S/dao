@@ -214,6 +214,44 @@ describe('TaskPanel interactions', () => {
     });
   });
 
+  it('closes the edit task dialog without saving and resets unsaved draft state', async () => {
+    const user = userEvent.setup();
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const trigger = await screen.findByRole('button', {
+      name: 'Expand details for Review HeroUI migration',
+    });
+
+    fireEvent.contextMenu(trigger, { clientX: 120, clientY: 160 });
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Edit task' });
+    const titleInput = within(dialog).getByLabelText('Title');
+    const descriptionInput = within(dialog).getByLabelText('Description');
+
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Unsaved task title');
+    await user.clear(descriptionInput);
+    await user.type(descriptionInput, 'Unsaved task description');
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Edit task' })).not.toBeInTheDocument();
+    });
+    expect(updateTask).not.toHaveBeenCalled();
+
+    fireEvent.contextMenu(trigger, { clientX: 120, clientY: 160 });
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+
+    const reopenedDialog = await screen.findByRole('dialog', { name: 'Edit task' });
+    expect(within(reopenedDialog).getByLabelText('Title')).toHaveValue(
+      'Review HeroUI migration',
+    );
+    expect(within(reopenedDialog).getByLabelText('Description')).toHaveValue(
+      'Check the row trigger behavior.',
+    );
+  });
+
   it('asks for confirmation before deleting a task and its child todos from the right-click menu', async () => {
     const user = userEvent.setup();
     deleteTask.mockResolvedValue(undefined);
@@ -255,5 +293,57 @@ describe('TaskPanel interactions', () => {
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(deleteTask).toHaveBeenCalledWith('task-1');
+  });
+
+  it('cancels task deletion without calling the API and clears stale delete dialog state', async () => {
+    const user = userEvent.setup();
+    listTasks.mockResolvedValueOnce([
+      taskFixture({
+        status: 'doing',
+      }),
+      taskFixture({
+        id: 'task-2',
+        parentId: 'task-1',
+        title: 'Check stale delete state',
+        description: '',
+        status: 'todo',
+      }),
+    ]);
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const parentTrigger = await screen.findByRole('button', {
+      name: 'Expand details for Review HeroUI migration',
+    });
+
+    fireEvent.contextMenu(parentTrigger, { clientX: 120, clientY: 160 });
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+
+    const parentDeleteDialog = await screen.findByRole('dialog', { name: 'Delete task' });
+    expect(within(parentDeleteDialog).getByText('Review HeroUI migration')).toBeInTheDocument();
+
+    await user.click(within(parentDeleteDialog).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Delete task' })).not.toBeInTheDocument();
+    });
+    expect(deleteTask).not.toHaveBeenCalled();
+
+    await user.click(parentTrigger);
+    const childTitle = await screen.findByText('Check stale delete state');
+
+    fireEvent.contextMenu(childTitle, { clientX: 140, clientY: 220 });
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+
+    const childDeleteDialog = await screen.findByRole('dialog', { name: 'Delete task' });
+    expect(within(childDeleteDialog).getByText('Check stale delete state')).toBeInTheDocument();
+    expect(within(childDeleteDialog).queryByText('Review HeroUI migration')).toBeNull();
+
+    await user.click(within(childDeleteDialog).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Delete task' })).not.toBeInTheDocument();
+    });
+    expect(deleteTask).not.toHaveBeenCalled();
   });
 });
