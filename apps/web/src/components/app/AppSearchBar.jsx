@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chip, Label, SearchField } from '@heroui/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
@@ -10,6 +10,8 @@ export function AppSearchBar() {
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const listRef = useRef(null);
   const trimmedQuery = query.trim();
   const isPanelVisible = trimmedQuery !== '';
   const displayStatus = isPanelVisible && status === 'idle' ? 'pending' : status;
@@ -29,11 +31,13 @@ export function AppSearchBar() {
 
     if (displayStatus === 'ready') {
       return (
-        <ul className="flex max-h-80 flex-col overflow-y-auto p-1">
-          {results.map((result) => (
+        <ul ref={listRef} className="flex max-h-80 flex-col overflow-y-auto p-1">
+          {results.map((result, index) => (
             <li
               key={`${result.entityType}:${result.entityId}`}
-              className="rounded-md px-2 py-2 hover:bg-surface-secondary"
+              className={`rounded-lg px-2 py-2 hover:bg-surface-secondary ${
+                index === selectedIndex ? 'bg-accent-soft' : ''
+              }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -55,7 +59,13 @@ export function AppSearchBar() {
     }
 
     return null;
-  }, [displayStatus, error, results]);
+  }, [displayStatus, error, results, selectedIndex]);
+
+  useEffect(() => {
+    if (selectedIndex < 0 || !listRef.current) return;
+    const items = listRef.current.querySelectorAll('li');
+    items[selectedIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [selectedIndex]);
 
   useEffect(() => {
     if (trimmedQuery === '') {
@@ -92,6 +102,7 @@ export function AppSearchBar() {
 
   function handleQueryChange(nextQuery) {
     setQuery(nextQuery);
+    setSelectedIndex(-1);
 
     if (nextQuery.trim() === '') {
       setResults([]);
@@ -108,9 +119,37 @@ export function AppSearchBar() {
         variant="primary"
         value={query}
         onChange={handleQueryChange}
+        onKeyDown={(e) => {
+          if (!isPanelVisible || displayStatus !== 'ready') return;
+          
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedIndex((prev) => 
+              prev < results.length - 1 ? prev + 1 : 0
+            );
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedIndex((prev) => 
+              prev > 0 ? prev - 1 : results.length - 1
+            );
+          } else if (e.key === 'Enter' && selectedIndex >= 0) {
+            e.preventDefault();
+            const selected = results[selectedIndex];
+            if (selected) {
+              // TODO: Navigate to selected result
+              console.log('Selected:', selected);
+            }
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setQuery('');
+            setResults([]);
+            setStatus('idle');
+            setSelectedIndex(-1);
+          }
+        }}
       >
         <Label className="sr-only">Search</Label>
-        <SearchField.Group className="h-8 gap-1 rounded-lg border border-border px-2 shadow-none data-[focus-within=true]:border-ring data-[focus-within=true]:ring-3 data-[focus-within=true]:ring-ring/50">
+        <SearchField.Group className="h-8 gap-1 rounded-field border border-border px-2 shadow-none data-[focus-within=true]:border-ring data-[focus-within=true]:ring-3 data-[focus-within=true]:ring-ring/50">
           <SearchField.SearchIcon className="m-0 text-muted-foreground">
             <HugeiconsIcon icon={Search01Icon} className="size-[18px] shrink-0 translate-y-px" />
           </SearchField.SearchIcon>
@@ -126,7 +165,7 @@ export function AppSearchBar() {
       </SearchField>
 
       {isPanelVisible && (
-        <div className="absolute top-10 left-0 z-[100] w-full rounded-lg bg-overlay text-overlay-foreground shadow-md ring-1 ring-border">
+        <div className="absolute top-10 left-0 z-[100] w-full rounded-xl bg-overlay text-overlay-foreground shadow-md ring-1 ring-border">
           {panelContent}
         </div>
       )}
