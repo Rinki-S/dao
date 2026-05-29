@@ -16,15 +16,15 @@ export function AppSearchBar() {
 
   const panelContent = useMemo(() => {
     if (displayStatus === 'loading' || displayStatus === 'pending') {
-      return <p className="px-3 py-2 text-sm text-muted-foreground">Searching...</p>;
+      return <p className="px-3 py-2 text-sm text-muted">Searching...</p>;
     }
 
     if (displayStatus === 'error') {
-      return <p className="px-3 py-2 text-sm text-destructive">{error}</p>;
+      return <p className="px-3 py-2 text-sm text-danger">{error}</p>;
     }
 
     if (displayStatus === 'ready' && results.length === 0) {
-      return <p className="px-3 py-2 text-sm text-muted-foreground">No results found.</p>;
+      return <p className="px-3 py-2 text-sm text-muted">No results found.</p>;
     }
 
     if (displayStatus === 'ready') {
@@ -33,14 +33,14 @@ export function AppSearchBar() {
           {results.map((result) => (
             <li
               key={`${result.entityType}:${result.entityId}`}
-              className="rounded-md px-2 py-2 hover:bg-muted"
+              className="rounded-md px-2 py-2 hover:bg-surface-secondary"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <strong className="block truncate text-sm font-medium text-foreground">
                     {result.title}
                   </strong>
-                  <span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">
+                  <span className="mt-1 line-clamp-2 block text-xs text-muted">
                     {result.snippet || 'No snippet'}
                   </span>
                 </div>
@@ -126,7 +126,7 @@ export function AppSearchBar() {
       </SearchField>
 
       {isPanelVisible && (
-        <div className="absolute top-10 left-0 z-[100] w-full rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10">
+        <div className="absolute top-10 left-0 z-[100] w-full rounded-lg bg-overlay text-overlay-foreground shadow-md ring-1 ring-border">
           {panelContent}
         </div>
       )}
