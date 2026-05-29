@@ -131,6 +131,24 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).not.toContain('id={`${childTask.id}-description`}');
   });
 
+  it('animates task row expansion with explicit height and content transitions', () => {
+    const source = fs.readFileSync(taskPanelPath, 'utf8');
+
+    expect(source).toContain('transition-[grid-template-rows] duration-200 ease-out');
+    expect(source).toContain("isTaskDetailVisible ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'");
+    expect(source).toContain('shrink-0 transform-gpu transition-transform duration-150 ease-out');
+    expect(source).toContain(
+      'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
+    );
+    expect(source).toContain('transition-[opacity,transform] duration-150 ease-out');
+    expect(source).toContain("'translate-y-0 opacity-100'");
+    expect(source).toContain("'-translate-y-1 opacity-0'");
+    expect(source).not.toContain('taskDetailExitDurationMs');
+    expect(source).not.toContain('renderedTaskDetailIds');
+    expect(source).not.toContain('scale-y-');
+    expect(source).not.toContain('transition-all');
+  });
+
   it('keeps the quick add input group full width while the add button stays fixed', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
