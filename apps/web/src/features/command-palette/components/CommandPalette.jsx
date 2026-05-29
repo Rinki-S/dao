@@ -172,8 +172,8 @@ export function CommandPalette({ onSelectSurface, onRunAction }) {
 
   return (
     <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
-      <Modal.Backdrop>
-        <Modal.Container placement="top" size="sm">
+      <Modal.Backdrop className="z-[200]!">
+        <Modal.Container placement="center" size="sm">
           <Modal.Dialog aria-label="Command Palette" className="overflow-hidden p-0">
             <Modal.Header className="sr-only">
               <Modal.Heading>Command Palette</Modal.Heading>
@@ -185,27 +185,27 @@ export function CommandPalette({ onSelectSurface, onRunAction }) {
               shouldFilter={false}
               value={selectedCommandValue}
               onValueChange={setSelectedCommandValue}
-              className="flex size-full flex-col overflow-hidden rounded-xl bg-popover p-1 text-popover-foreground"
+              className="flex size-full flex-col overflow-hidden rounded-xl bg-surface p-3 text-surface-foreground"
             >
-              <div className="p-1 pb-0">
-                <div className="flex h-8 items-center gap-2 rounded-lg border border-input/30 bg-input/30 px-2 shadow-none focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+              <div>
+                <div className="flex h-8 items-center gap-2 rounded-field border border-field-border bg-field px-2 shadow-none focus-within:border-focus focus-within:ring-3 focus-within:ring-focus/30">
                   <HugeiconsIcon
                     icon={Search01Icon}
                     aria-hidden="true"
-                    className="size-[18px] shrink-0 translate-y-px text-muted-foreground"
+                    className="size-[18px] shrink-0 translate-y-px text-field-placeholder"
                   />
                   <CommandPrimitive.Input
                     ref={searchInputRef}
                     value={query}
                     onValueChange={handleQueryChange}
                     placeholder="Type a command"
-                    className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-full min-w-0 flex-1 bg-transparent text-sm text-field-foreground outline-none placeholder:text-field-placeholder disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
               </div>
 
-              <CommandPrimitive.List className="no-scrollbar max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none">
-                <CommandPrimitive.Empty className="py-6 text-center text-sm text-muted-foreground">
+              <CommandPrimitive.List className="no-scrollbar mt-2 max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none">
+                <CommandPrimitive.Empty className="py-6 text-center text-sm text-muted">
                   No commands found.
                 </CommandPrimitive.Empty>
 
@@ -215,18 +215,18 @@ export function CommandPalette({ onSelectSurface, onRunAction }) {
                       <CommandPrimitive.Group
                         key={commandGroup.group}
                         heading={commandGroup.group}
-                        className="overflow-hidden p-1 text-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-muted-foreground"
+                        className="overflow-hidden py-1 text-surface-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-muted"
                       >
                         {commandGroup.commands.map((command) => (
                           <CommandPrimitive.Item
                             key={command.id}
                             value={getCommandValue(command)}
                             onSelect={() => handleRunCommand(command)}
-                            className="relative flex cursor-default select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected=true]:bg-muted data-[selected=true]:text-foreground data-[disabled=true]:opacity-50"
+                            className="relative flex cursor-default select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected=true]:bg-accent-soft data-[selected=true]:text-accent-soft-foreground data-[disabled=true]:opacity-50"
                           >
                             <span className="flex min-w-0 flex-1 flex-col">
                               <span className="truncate font-medium">{command.title}</span>
-                              <span className="truncate text-muted-foreground">
+                              <span className="truncate text-muted group-data-[selected=true]:text-accent-soft-foreground">
                                 {command.description}
                               </span>
                             </span>
@@ -239,13 +239,13 @@ export function CommandPalette({ onSelectSurface, onRunAction }) {
               </CommandPrimitive.List>
 
               {feedback && (
-                <p className="border-t border-border px-4 py-2 text-xs text-destructive">
+                <p className="border-t border-separator px-4 py-2 text-xs text-danger">
                   {feedback}
                 </p>
               )}
 
-              <Separator />
-              <div className="flex w-full items-center justify-between px-3 py-2 text-[11px] text-muted-foreground">
+              <Separator className="mt-2" />
+              <div className="flex w-full items-center justify-between pt-2 text-[11px] text-muted">
                 <span className="flex items-center gap-1.5">
                   <span className="inline-flex items-center gap-1">
                     <Kbd>

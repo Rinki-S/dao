@@ -42,6 +42,29 @@ describe('CommandPalette', () => {
     expect(source).not.toContain('@/components/ui/kbd');
   });
 
+  it('uses HeroUI color tokens for the cmdk surface', () => {
+    const source = fs.readFileSync(commandPalettePath, 'utf8');
+
+    expect(source).toContain('bg-surface');
+    expect(source).toContain('text-surface-foreground');
+    expect(source).toContain('bg-field');
+    expect(source).toContain('text-field-foreground');
+    expect(source).toContain('placeholder:text-field-placeholder');
+    expect(source).toContain('bg-accent-soft');
+    expect(source).toContain('text-danger');
+    expect(source).not.toMatch(
+      /\b(bg-popover|text-popover-foreground|border-input|bg-input|border-ring|ring-ring|bg-muted|text-destructive|text-muted-foreground)\b/,
+    );
+  });
+
+  it('centers above the app titlebar overlay layer', () => {
+    const source = fs.readFileSync(commandPalettePath, 'utf8');
+
+    expect(source).toContain('<Modal.Backdrop className="z-[200]!"');
+    expect(source).toContain('<Modal.Container placement="center" size="sm">');
+    expect(source).not.toContain('placement="top"');
+  });
+
   it('opens with the command palette shortcut and closes with Escape', async () => {
     const user = userEvent.setup();
 
