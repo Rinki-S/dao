@@ -234,22 +234,12 @@ function App() {
     openTab(createSurfaceTab(surface));
   }
 
-  function handleSelectProject(projectId) {
-    openTab(
-      createProjectTab({
-        id: projectId,
-        name: 'Project',
-      }),
-    );
+  function handleSelectProject(project) {
+    openTab(createProjectTab(project));
   }
 
-  function handleSelectNote(noteId) {
-    openTab(
-      createNoteTab({
-        id: noteId,
-        title: 'Note',
-      }),
-    );
+  function handleSelectNote(note) {
+    openTab(createNoteTab(note));
   }
 
   function handleSidebarOpenChange(nextIsSidebarOpen) {

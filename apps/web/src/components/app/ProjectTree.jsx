@@ -149,16 +149,16 @@ export function ProjectTree({
     setIsContentDialogOpen(true);
   }
 
-  function toggleProject(projectId) {
-    onSelectProject(projectId);
+  function toggleProject(project) {
+    onSelectProject(project);
 
     setExpandedProjectIds((currentProjectIds) => {
       const nextProjectIds = new Set(currentProjectIds);
 
-      if (nextProjectIds.has(projectId)) {
-        nextProjectIds.delete(projectId);
+      if (nextProjectIds.has(project.id)) {
+        nextProjectIds.delete(project.id);
       } else {
-        nextProjectIds.add(projectId);
+        nextProjectIds.add(project.id);
       }
 
       return nextProjectIds;
@@ -186,7 +186,7 @@ export function ProjectTree({
       setProjectName('');
       setProjectDescription('');
       setIsProjectDialogOpen(false);
-      onSelectProject(createdProject.id);
+      onSelectProject(createdProject);
       setExpandedProjectIds((currentProjectIds) => {
         const nextProjectIds = new Set(currentProjectIds);
         nextProjectIds.add(createdProject.id);
@@ -242,7 +242,7 @@ export function ProjectTree({
       }
 
       await loadTreeData();
-      onSelectNote(createdNote.id);
+      onSelectNote(createdNote);
       notifyActivityChanged();
       onContentCreated?.();
     } catch (err) {
@@ -330,7 +330,7 @@ export function ProjectTree({
                   isActive={project.id === selectedProjectId}
                   isSidebarOpen={isSidebarOpen}
                   label={project.name}
-                  onClick={() => toggleProject(project.id)}
+                  onClick={() => toggleProject(project)}
                 />
 
                 {isExpanded && isSidebarOpen && (
@@ -352,7 +352,7 @@ export function ProjectTree({
                             className={`app-no-drag flex h-7 w-full min-w-0 -translate-x-px transform-gpu items-center justify-start gap-2 overflow-hidden rounded-md px-2 text-sm font-normal text-sidebar-foreground ring-sidebar-ring outline-hidden transition-[background-color,color,scale] duration-[250ms] ease-[var(--ease-smooth)] data-[focus-visible=true]:ring-2 active:scale-[0.96] data-[pressed=true]:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100 ${note.id === selectedNoteId ? 'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground data-[pressed=true]:bg-accent-soft-hover data-[pressed=true]:text-accent-soft-foreground' : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[pressed=true]:bg-sidebar-accent data-[pressed=true]:text-sidebar-accent-foreground'}`}
                             type="button"
                             variant="ghost"
-                            onPress={() => onSelectNote(note.id)}
+                            onPress={() => onSelectNote(note)}
                           >
                             <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
                             <span className="truncate">{note.title}</span>
@@ -377,7 +377,7 @@ export function ProjectTree({
                     isActive={note.id === selectedNoteId}
                     isSidebarOpen={isSidebarOpen}
                     label={note.title}
-                    onClick={() => onSelectNote(note.id)}
+                    onClick={() => onSelectNote(note)}
                   />
                 </li>
               );

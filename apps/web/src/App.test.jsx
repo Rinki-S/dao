@@ -62,7 +62,41 @@ describe('App', () => {
         }
 
         if (pathname === '/api/notes') {
-          return Response.json([]);
+          return Response.json([
+            {
+              id: 'note-1',
+              workspaceId: 'workspace-1',
+              projectId: 'project-1',
+              title: 'README',
+              content: '# README',
+              noteType: 'project',
+              contentType: 'markdown',
+              filePath: '/tmp/dao-test/personal-workspace-1/dao-project/README.md',
+              createdAt: '2026-05-25T00:00:00Z',
+              updatedAt: '2026-05-25T00:00:00Z',
+              deletedAt: null,
+              version: 1,
+              syncStatus: 'synced',
+            },
+          ]);
+        }
+
+        if (pathname === '/api/notes/note-1') {
+          return Response.json({
+            id: 'note-1',
+            workspaceId: 'workspace-1',
+            projectId: 'project-1',
+            title: 'README',
+            content: '# README',
+            noteType: 'project',
+            contentType: 'markdown',
+            filePath: '/tmp/dao-test/personal-workspace-1/dao-project/README.md',
+            createdAt: '2026-05-25T00:00:00Z',
+            updatedAt: '2026-05-25T00:00:00Z',
+            deletedAt: null,
+            version: 1,
+            syncStatus: 'synced',
+          });
         }
 
         return Response.json([]);
@@ -143,6 +177,30 @@ describe('App', () => {
 
     expect(screen.getByText('No tab open')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'No page open' })).toBeInTheDocument();
+  });
+
+  it('opens project and note tabs with resource titles and dedupes them', async () => {
+    const user = userEvent.setup();
+
+    renderApp();
+
+    await user.click(await screen.findByRole('button', { name: 'Dao Project' }));
+
+    expect(screen.getByRole('tab', { name: /Dao Project/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'README' }));
+
+    expect(screen.getByRole('tab', { name: /README/ })).toHaveAttribute('aria-selected', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Dao Project' }));
+    await user.click(screen.getByRole('button', { name: 'Dao Project' }));
+    await user.click(await screen.findByRole('button', { name: 'README' }));
+
+    expect(screen.getAllByRole('tab', { name: /Dao Project/ })).toHaveLength(1);
+    expect(screen.getAllByRole('tab', { name: /README/ })).toHaveLength(1);
   });
 
   it('does not depend on the legacy shadcn sidebar provider in the app shell', async () => {
