@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+
 import { notifyActivityChanged } from '@/features/activities/events.js';
 import { getNote, updateNote, updateNoteContent } from '../api.js';
 
@@ -227,9 +226,10 @@ export function NoteEditorPanel({ noteId }) {
       <div className="flex shrink-0 items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="truncate text-xs text-muted-foreground">{note?.filePath}</p>
-          <Input
+          <input
+            type="text"
             aria-label="Note title"
-            className="mt-1 h-auto rounded-none border-0 bg-transparent p-0 font-heading text-xl font-semibold text-foreground shadow-none focus-visible:ring-0"
+            className="mt-1 w-full border-0 bg-transparent p-0 font-heading text-xl font-semibold text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
             value={title}
             onChange={(event) => {
               latestTitleRef.current = event.target.value;
@@ -245,9 +245,9 @@ export function NoteEditorPanel({ noteId }) {
 
       {error && saveStatus === 'failed' && <p className="text-sm text-destructive">{error}</p>}
 
-      <Textarea
+      <textarea
         aria-label="Markdown note content"
-        className="min-h-0 flex-1 resize-none rounded-none border-0 bg-transparent p-0 font-mono text-sm leading-6 shadow-none focus-visible:ring-0"
+        className="min-h-0 w-full flex-1 resize-none border-0 bg-transparent p-0 font-mono text-sm leading-6 text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
         value={content}
         onChange={(event) => {
           latestContentRef.current = event.target.value;
