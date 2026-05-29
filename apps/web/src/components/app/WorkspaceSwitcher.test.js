@@ -21,6 +21,13 @@ describe('WorkspaceSwitcher HeroUI migration boundary', () => {
     expect(source).toContain('TextField');
   });
 
+  it('renders workspace API errors without field validation components', () => {
+    const source = fs.readFileSync(workspaceSwitcherPath, 'utf8');
+
+    expect(source).toContain('AppApiErrorMessage');
+    expect(source).not.toContain('FieldError');
+  });
+
   it('keeps the workspace dropdown trigger tactile when pressed', () => {
     const source = fs.readFileSync(workspaceSwitcherPath, 'utf8');
 

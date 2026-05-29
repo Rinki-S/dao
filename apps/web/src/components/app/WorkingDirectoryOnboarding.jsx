@@ -4,6 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import FolderOpenIcon from '@hugeicons/core-free-icons/FolderOpenIcon';
 import { DirectoryPickerResultSchema } from '@/features/settings/schemas.js';
 import { cn } from '@/lib/utils.js';
+import { AppApiErrorMessage } from './AppApiErrorMessage.jsx';
 
 const ONBOARDING_STEP_ORDER = {
   directory: 0,
@@ -31,6 +32,11 @@ export function WorkingDirectoryOnboarding({
   const [error, setError] = useState('');
   const [isChoosing, setIsChoosing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const workspaceNameError =
+    !hasWorkspace && workspaceName.trim() === '' && error === 'Workspace name is required.'
+      ? error
+      : '';
+  const workspaceApiError = workspaceNameError ? '' : error;
 
   function goToStep(nextStep) {
     const direction =
@@ -170,7 +176,7 @@ export function WorkingDirectoryOnboarding({
                 {selectedPath || 'No directory selected'}
               </Surface>
 
-              {error && <FieldError>{error}</FieldError>}
+              <AppApiErrorMessage>{error}</AppApiErrorMessage>
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
@@ -238,7 +244,7 @@ export function WorkingDirectoryOnboarding({
                 </Button>
               </div>
 
-              {error && <FieldError>{error}</FieldError>}
+              <AppApiErrorMessage>{error}</AppApiErrorMessage>
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button isDisabled={isSaving} type="button" onPress={handleContinueFromStrategy}>
@@ -272,7 +278,7 @@ export function WorkingDirectoryOnboarding({
                 <div className="flex flex-col gap-4">
                   <TextField
                     isDisabled={isSaving}
-                    isInvalid={Boolean(error && workspaceName.trim() === '')}
+                    isInvalid={Boolean(workspaceNameError)}
                     isRequired
                     name="workspaceName"
                     value={workspaceName}
@@ -286,6 +292,7 @@ export function WorkingDirectoryOnboarding({
                       placeholder="Personal"
                       variant="secondary"
                     />
+                    <FieldError>{workspaceNameError}</FieldError>
                   </TextField>
                   <TextField
                     isDisabled={isSaving}
@@ -304,7 +311,7 @@ export function WorkingDirectoryOnboarding({
                 </div>
               )}
 
-              {error && <FieldError>{error}</FieldError>}
+              <AppApiErrorMessage>{workspaceApiError}</AppApiErrorMessage>
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button

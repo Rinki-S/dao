@@ -1,7 +1,6 @@
 import {
   Button,
   Dropdown,
-  FieldError,
   Header,
   Input,
   Label,
@@ -18,6 +17,7 @@ import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
 import CheckmarkSquare01Icon from '@hugeicons/core-free-icons/CheckmarkSquare01Icon';
 import SquareStackIcon from '@hugeicons/core-free-icons/SquareStackIcon';
 import { cn } from '@/lib/utils.js';
+import { AppApiErrorMessage } from './AppApiErrorMessage.jsx';
 
 export function WorkspaceSwitcher({
   workspaces,
@@ -63,6 +63,7 @@ export function WorkspaceSwitcher({
     const actionKey = String(key);
 
     if (actionKey === 'create-workspace') {
+      setCreateError('');
       onCreateDialogOpenChange(true);
       onMenuOpenChange?.(false);
       return;
@@ -209,7 +210,7 @@ export function WorkspaceSwitcher({
                     <Input placeholder="Description" variant="secondary" />
                   </TextField>
 
-                  {createError && <FieldError>{createError}</FieldError>}
+                  <AppApiErrorMessage>{createError}</AppApiErrorMessage>
                 </Modal.Body>
 
                 <Modal.Footer>

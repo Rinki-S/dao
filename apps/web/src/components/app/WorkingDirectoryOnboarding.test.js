@@ -24,4 +24,13 @@ describe('WorkingDirectoryOnboarding HeroUI migration boundary', () => {
     expect(source).toContain('motion-reduce:transition-none');
     expect(source).not.toContain('max-w-xl overflow-hidden');
   });
+
+  it('uses field validation errors only for the workspace name field', () => {
+    const source = fs.readFileSync(onboardingPath, 'utf8');
+
+    expect(source).toContain('AppApiErrorMessage');
+    expect(source).toContain('workspaceNameError');
+    expect(source).toContain('<FieldError>{workspaceNameError}</FieldError>');
+    expect(source).not.toContain('{error && <FieldError>{error}</FieldError>}');
+  });
 });

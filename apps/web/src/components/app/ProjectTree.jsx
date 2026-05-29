@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
-  FieldError,
   Input,
   Label,
   ListBox,
@@ -21,6 +20,7 @@ import { notifyActivityChanged, subscribeToActivityChanged } from '@/features/ac
 import { createNote, listNotes } from '@/features/notes/api.js';
 import { createProject, listProjects } from '@/features/projects/api.js';
 import { cn } from '@/lib/utils.js';
+import { AppApiErrorMessage } from './AppApiErrorMessage.jsx';
 
 const noteTypeOptions = [
   { label: 'General', value: 'general' },
@@ -194,7 +194,6 @@ export function ProjectTree({
       notifyActivityChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create project');
-      setStatus('error');
     } finally {
       setIsCreatingProject(false);
     }
@@ -245,7 +244,6 @@ export function ProjectTree({
       onContentCreated?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create content');
-      setStatus('error');
     } finally {
       setIsCreatingContent(false);
     }
@@ -308,7 +306,9 @@ export function ProjectTree({
 
           {status === 'error' && (
             <li className="relative">
-              <span className="block px-2 py-1 text-xs text-destructive">{error}</span>
+              <AppApiErrorMessage className="block px-2 py-1 text-xs">
+                {error}
+              </AppApiErrorMessage>
             </li>
           )}
 
@@ -427,7 +427,7 @@ export function ProjectTree({
                     <Input placeholder="Description" variant="secondary" />
                   </TextField>
 
-                  {error && <FieldError>{error}</FieldError>}
+                  <AppApiErrorMessage>{error}</AppApiErrorMessage>
                 </Modal.Body>
 
                 <Modal.Footer>
@@ -575,7 +575,7 @@ export function ProjectTree({
                     />
                   </TextField>
 
-                  {error && <FieldError>{error}</FieldError>}
+                  <AppApiErrorMessage>{error}</AppApiErrorMessage>
                 </Modal.Body>
 
                 <Modal.Footer>

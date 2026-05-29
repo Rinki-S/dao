@@ -23,6 +23,15 @@ describe('ProjectTree HeroUI migration boundary', () => {
     expect(source).toContain('TextArea');
   });
 
+  it('renders project tree API errors without field validation components', () => {
+    const source = fs.readFileSync(projectTreePath, 'utf8');
+
+    expect(source).toContain('AppApiErrorMessage');
+    expect(source).not.toContain('FieldError');
+    expect(source).not.toContain("setStatus('error');\n    } finally {\n      setIsCreatingProject(false);");
+    expect(source).not.toContain("setStatus('error');\n    } finally {\n      setIsCreatingContent(false);");
+  });
+
   it('keeps project tree actions tactile when pressed', () => {
     const source = fs.readFileSync(projectTreePath, 'utf8');
 
