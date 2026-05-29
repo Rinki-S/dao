@@ -52,6 +52,8 @@ export function AppSidebar({
 }) {
   const sidebarRef = useRef(null);
   const hasMountedRef = useRef(false);
+  const isResizingRef = useRef(false);
+  const hasAnimatedResizeRevealRef = useRef(false);
   const [isSidebarVisuallyOpen, setIsSidebarVisuallyOpen] = useState(isSidebarOpen);
 
   useGSAP(
@@ -64,6 +66,42 @@ export function AppSidebar({
       if (!hasMountedRef.current) {
         hasMountedRef.current = true;
         gsap.set(sidebar, { width: targetWidth });
+        return;
+      }
+
+      if (isResizingRef.current) {
+        if (isSidebarOpen && !isSidebarVisuallyOpen) {
+          setIsSidebarVisuallyOpen(true);
+          return;
+        }
+
+        if (!isSidebarOpen && isSidebarVisuallyOpen) {
+          hasAnimatedResizeRevealRef.current = false;
+          gsap.set(sidebar, { width: '0px' });
+          setIsSidebarVisuallyOpen(false);
+          return;
+        }
+
+        gsap.set(sidebar, isSidebarOpen ? { clearProps: 'width' } : { width: '0px' });
+
+        if (isSidebarOpen && !hasAnimatedResizeRevealRef.current) {
+          hasAnimatedResizeRevealRef.current = true;
+          const resizeContentElements = sidebar.querySelectorAll('[data-sidebar-content]');
+
+          gsap.fromTo(
+            resizeContentElements,
+            { autoAlpha: 0, x: -8 },
+            {
+              autoAlpha: 1,
+              x: 0,
+              duration: 0.2,
+              stagger: 0.04,
+              ease: 'power2.out',
+              overwrite: 'auto',
+            },
+          );
+        }
+
         return;
       }
 
@@ -166,9 +204,11 @@ export function AppSidebar({
     let latestClientX = event.clientX;
     let isCollapsedDuringResize = !isSidebarOpen;
 
+    isResizingRef.current = true;
     sidebarWrapper.classList.add('app-sidebar-resizing');
 
     function stopResize() {
+      isResizingRef.current = false;
       sidebarWrapper.classList.remove('app-sidebar-resizing');
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
