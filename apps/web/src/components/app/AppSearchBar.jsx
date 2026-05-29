@@ -63,8 +63,20 @@ export function AppSearchBar() {
 
   useEffect(() => {
     if (selectedIndex < 0 || !listRef.current) return;
-    const items = listRef.current.querySelectorAll('li');
-    items[selectedIndex]?.scrollIntoView({ block: 'nearest' });
+    const container = listRef.current;
+    const items = container.querySelectorAll('li');
+    const item = items[selectedIndex];
+    if (!item) return;
+
+    const SCROLL_OFFSET = 4; // matches p-1
+    const containerRect = container.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+
+    if (itemRect.bottom > containerRect.bottom) {
+      container.scrollTop += itemRect.bottom - containerRect.bottom + SCROLL_OFFSET;
+    } else if (itemRect.top < containerRect.top) {
+      container.scrollTop -= containerRect.top - itemRect.top + SCROLL_OFFSET;
+    }
   }, [selectedIndex]);
 
   useEffect(() => {
@@ -121,17 +133,13 @@ export function AppSearchBar() {
         onChange={handleQueryChange}
         onKeyDown={(e) => {
           if (!isPanelVisible || displayStatus !== 'ready') return;
-          
+
           if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setSelectedIndex((prev) => 
-              prev < results.length - 1 ? prev + 1 : 0
-            );
+            setSelectedIndex((prev) => (prev < results.length - 1 ? prev + 1 : 0));
           } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setSelectedIndex((prev) => 
-              prev > 0 ? prev - 1 : results.length - 1
-            );
+            setSelectedIndex((prev) => (prev > 0 ? prev - 1 : results.length - 1));
           } else if (e.key === 'Enter' && selectedIndex >= 0) {
             e.preventDefault();
             const selected = results[selectedIndex];
