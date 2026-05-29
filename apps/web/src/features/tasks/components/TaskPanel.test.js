@@ -120,6 +120,17 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).toContain('className="h-full min-h-0 overflow-y-auto"');
   });
 
+  it('keeps task details inside the parent task row instead of adding sibling table rows', () => {
+    const source = fs.readFileSync(taskPanelPath, 'utf8');
+
+    expect(source).toContain('data-slot="task-row-layout"');
+    expect(source).toContain('data-slot="task-detail"');
+    expect(source).toContain('data-slot="task-children"');
+    expect(source).not.toContain('id={`${task.id}-description`}');
+    expect(source).not.toContain('id={`${task.id}-child-form`}');
+    expect(source).not.toContain('id={`${childTask.id}-description`}');
+  });
+
   it('keeps the quick add input group full width while the add button stays fixed', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
