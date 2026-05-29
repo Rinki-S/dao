@@ -2,6 +2,9 @@ package tasks
 
 import (
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -195,6 +198,81 @@ func TestRepositoryDeleteChildRecalculatesParentStatus(t *testing.T) {
 	}
 	if parentStatus != "todo" {
 		t.Fatalf("parent status = %q, want todo", parentStatus)
+	}
+}
+
+func TestHandlerDeleteTaskReturnsNoContent(t *testing.T) {
+	db := openTasksTestDB(t)
+	repo := NewRepository(db, &captureTaskIndexer{}, activities.NewRepository(db))
+
+	insertTasksTestWorkspace(t, db, "workspace-1")
+	insertTasksTestTask(t, db, Task{
+		ID:          "task-1",
+		WorkspaceID: "workspace-1",
+		Title:       "Task",
+		Status:      "todo",
+		Priority:    "medium",
+	})
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/task-1", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusNoContent, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != "" {
+		t.Fatalf("body = %q, want empty", body)
+	}
+}
+
+func TestHandlerDeleteTaskNotFound(t *testing.T) {
+	db := openTasksTestDB(t)
+	repo := NewRepository(db, &captureTaskIndexer{}, activities.NewRepository(db))
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/missing-task", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "task not found") {
+		t.Fatalf("body = %q, want task not found", body)
+	}
+}
+
+func TestHandlerDeleteTaskInternalErrorUsesGenericResponse(t *testing.T) {
+	db := openTasksTestDB(t)
+	repo := NewRepository(db, &captureTaskIndexer{}, activities.NewRepository(db))
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	if err := db.Close(); err != nil {
+		t.Fatalf("close db: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/task-1", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "failed to delete task") {
+		t.Fatalf("body = %q, want generic delete error", body)
+	}
+	if strings.Contains(body, "database is closed") {
+		t.Fatalf("body = %q, should not leak internal database error", body)
 	}
 }
 
