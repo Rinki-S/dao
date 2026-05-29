@@ -599,375 +599,377 @@ export function TaskPanel({ currentWorkspace }) {
             )}
 
           {status === 'ready' && parentTasks.length > 0 && (
-            <Table className="border-b">
-              <Table.ScrollContainer className="w-full overflow-x-auto">
-                <Table.Content aria-label="Tasks" className="w-full min-w-full">
-                  <Table.Header className="sr-only">
-                    <Table.Column isRowHeader>Task</Table.Column>
-                    <Table.Column>Due</Table.Column>
-                    <Table.Column>Actions</Table.Column>
-                  </Table.Header>
-                  <Table.Body>
-                    {parentTasks.map((task) => {
-                      const taskChildren = childrenByParentId.get(task.id) ?? [];
-                      const projectName = task.projectId
-                        ? projectNameById.get(task.projectId)
-                        : null;
-                      const dueDate = formatDate(task.dueDate);
-                      const isDone = task.status === 'done';
-                      const isUpdating = updatingTaskIds.has(task.id);
-                      const isAddingChild = childTaskParentId === task.id;
-                      const hasChildren = taskChildren.length > 0;
-                      const isCollapsed = collapsedTaskIds.has(task.id);
-                      const hasDescription = task.description.trim() !== '';
-                      const isDescriptionExpanded = expandedDescriptionTaskIds.has(task.id);
-                      const hasVisibleChildren = hasChildren && !isCollapsed;
-                      const isChildFormVisible = isAddingChild && !isCollapsed;
-                      const isTaskDetailVisible =
-                        (hasDescription && isDescriptionExpanded) ||
-                        isChildFormVisible ||
-                        hasVisibleChildren;
+            <div className="px-8">
+              <Table className="border-b" variant="secondary">
+                <Table.ScrollContainer className="w-full overflow-x-auto">
+                  <Table.Content aria-label="Tasks" className="w-full min-w-full">
+                    <Table.Header className="sr-only">
+                      <Table.Column isRowHeader>Task</Table.Column>
+                      <Table.Column>Due</Table.Column>
+                      <Table.Column>Actions</Table.Column>
+                    </Table.Header>
+                    <Table.Body>
+                      {parentTasks.map((task) => {
+                        const taskChildren = childrenByParentId.get(task.id) ?? [];
+                        const projectName = task.projectId
+                          ? projectNameById.get(task.projectId)
+                          : null;
+                        const dueDate = formatDate(task.dueDate);
+                        const isDone = task.status === 'done';
+                        const isUpdating = updatingTaskIds.has(task.id);
+                        const isAddingChild = childTaskParentId === task.id;
+                        const hasChildren = taskChildren.length > 0;
+                        const isCollapsed = collapsedTaskIds.has(task.id);
+                        const hasDescription = task.description.trim() !== '';
+                        const isDescriptionExpanded = expandedDescriptionTaskIds.has(task.id);
+                        const hasVisibleChildren = hasChildren && !isCollapsed;
+                        const isChildFormVisible = isAddingChild && !isCollapsed;
+                        const isTaskDetailVisible =
+                          (hasDescription && isDescriptionExpanded) ||
+                          isChildFormVisible ||
+                          hasVisibleChildren;
 
-                      return (
-                        <Table.Row key={task.id} id={task.id}>
-                          <Table.Cell className="p-0" colSpan={3}>
-                            <div data-slot="task-row-layout" className="flex min-w-0 flex-col">
-                              <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_7rem_5rem] items-center">
-                                <div className="relative min-w-0 py-2 pl-8">
-                                  {hasChildren ? (
-                                    <Button
-                                      aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${task.title}`}
-                                      className={cn(
-                                        taskRowIconButtonClassName,
-                                        'absolute top-1/2 left-1 -translate-y-1/2',
-                                      )}
-                                      isIconOnly
-                                      size="sm"
-                                      type="button"
-                                      variant="ghost"
-                                      onPress={() => toggleTaskCollapse(task.id)}
-                                    >
-                                      <HugeiconsIcon
-                                        icon={ArrowRight01Icon}
-                                        aria-hidden="true"
-                                        className={cn(
-                                          'size-[18px] shrink-0 transform-gpu transition-transform duration-150 ease-out',
-                                          !isCollapsed && 'rotate-90',
-                                        )}
-                                      />
-                                    </Button>
-                                  ) : null}
-                                  <div className="flex min-w-0 items-center gap-3">
-                                    {renderTaskCheckbox(task, isUpdating)}
-
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex min-w-0 items-center gap-2">
-                                        <div
-                                          className={cn(
-                                            'min-w-0 truncate text-sm font-medium text-foreground',
-                                            isDone && 'text-muted-foreground line-through',
-                                          )}
-                                        >
-                                          {task.title}
-                                          {projectName && (
-                                            <span className="font-normal text-muted-foreground">
-                                              /{projectName}
-                                            </span>
-                                          )}
-                                        </div>
-                                        <Chip
-                                          color={task.priority === 'high' ? 'accent' : 'default'}
-                                          size="sm"
-                                          variant={task.priority === 'high' ? 'primary' : 'soft'}
-                                        >
-                                          {priorityLabels[task.priority]}
-                                        </Chip>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="px-2 text-muted-foreground">
-                                  {dueDate && (
-                                    <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
-                                      <HugeiconsIcon
-                                        icon={Calendar03Icon}
-                                        aria-hidden="true"
-                                        className="size-3 shrink-0"
-                                      />
-                                      {dueDate}
-                                    </span>
-                                  )}
-                                </div>
-
-                                <div className="pr-8 text-right">
-                                  <div className="flex justify-end gap-1">
-                                    {hasDescription && (
+                        return (
+                          <Table.Row key={task.id} id={task.id}>
+                            <Table.Cell className="p-0" colSpan={3}>
+                              <div data-slot="task-row-layout" className="flex min-w-0 flex-col">
+                                <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_7rem_5rem] items-center">
+                                  <div className="relative min-w-0 py-2 pl-8">
+                                    {hasChildren ? (
                                       <Button
-                                        aria-label={`${isDescriptionExpanded ? 'Hide' : 'Show'} notes for ${task.title}`}
-                                        className={taskRowIconButtonClassName}
+                                        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${task.title}`}
+                                        className={cn(
+                                          taskRowIconButtonClassName,
+                                          'absolute top-1/2 left-1 -translate-y-1/2',
+                                        )}
                                         isIconOnly
                                         size="sm"
                                         type="button"
                                         variant="ghost"
-                                        onPress={() => toggleTaskDescription(task.id)}
+                                        onPress={() => toggleTaskCollapse(task.id)}
                                       >
                                         <HugeiconsIcon
-                                          icon={MoreHorizontalIcon}
+                                          icon={ArrowRight01Icon}
+                                          aria-hidden="true"
+                                          className={cn(
+                                            'size-[18px] shrink-0 transform-gpu transition-transform duration-150 ease-out',
+                                            !isCollapsed && 'rotate-90',
+                                          )}
+                                        />
+                                      </Button>
+                                    ) : null}
+                                    <div className="flex min-w-0 items-center gap-3">
+                                      {renderTaskCheckbox(task, isUpdating)}
+
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex min-w-0 items-center gap-2">
+                                          <div
+                                            className={cn(
+                                              'min-w-0 truncate text-sm font-medium text-foreground',
+                                              isDone && 'text-muted-foreground line-through',
+                                            )}
+                                          >
+                                            {task.title}
+                                            {projectName && (
+                                              <span className="font-normal text-muted-foreground">
+                                                /{projectName}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <Chip
+                                            color={task.priority === 'high' ? 'accent' : 'default'}
+                                            size="sm"
+                                            variant={task.priority === 'high' ? 'primary' : 'soft'}
+                                          >
+                                            {priorityLabels[task.priority]}
+                                          </Chip>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="px-2 text-muted-foreground">
+                                    {dueDate && (
+                                      <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
+                                        <HugeiconsIcon
+                                          icon={Calendar03Icon}
+                                          aria-hidden="true"
+                                          className="size-3 shrink-0"
+                                        />
+                                        {dueDate}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="pr-8 text-right">
+                                    <div className="flex justify-end gap-1">
+                                      {hasDescription && (
+                                        <Button
+                                          aria-label={`${isDescriptionExpanded ? 'Hide' : 'Show'} notes for ${task.title}`}
+                                          className={taskRowIconButtonClassName}
+                                          isIconOnly
+                                          size="sm"
+                                          type="button"
+                                          variant="ghost"
+                                          onPress={() => toggleTaskDescription(task.id)}
+                                        >
+                                          <HugeiconsIcon
+                                            icon={MoreHorizontalIcon}
+                                            aria-hidden="true"
+                                            className="size-[18px] shrink-0 translate-y-px"
+                                          />
+                                        </Button>
+                                      )}
+
+                                      <Button
+                                        aria-label={`Add child todo to ${task.title}`}
+                                        className={taskRowIconButtonClassName}
+                                        isDisabled={isCreatingChild}
+                                        isIconOnly
+                                        size="sm"
+                                        type="button"
+                                        variant="ghost"
+                                        onPress={() => openChildTaskForm(task.id)}
+                                      >
+                                        <HugeiconsIcon
+                                          icon={Add01Icon}
                                           aria-hidden="true"
                                           className="size-[18px] shrink-0 translate-y-px"
                                         />
                                       </Button>
-                                    )}
-
-                                    <Button
-                                      aria-label={`Add child todo to ${task.title}`}
-                                      className={taskRowIconButtonClassName}
-                                      isDisabled={isCreatingChild}
-                                      isIconOnly
-                                      size="sm"
-                                      type="button"
-                                      variant="ghost"
-                                      onPress={() => openChildTaskForm(task.id)}
-                                    >
-                                      <HugeiconsIcon
-                                        icon={Add01Icon}
-                                        aria-hidden="true"
-                                        className="size-[18px] shrink-0 translate-y-px"
-                                      />
-                                    </Button>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
 
-                              <div
-                                data-slot="task-detail"
-                                aria-hidden={!isTaskDetailVisible}
-                                className={cn(
-                                  'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
-                                  isTaskDetailVisible ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
-                                )}
-                                {...(!isTaskDetailVisible ? { inert: '' } : {})}
-                              >
                                 <div
+                                  data-slot="task-detail"
+                                  aria-hidden={!isTaskDetailVisible}
                                   className={cn(
-                                    'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
-                                    isTaskDetailVisible
-                                      ? 'translate-y-0 opacity-100'
-                                      : '-translate-y-1 opacity-0',
+                                    'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
+                                    isTaskDetailVisible ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
                                   )}
+                                  {...(!isTaskDetailVisible ? { inert: '' } : {})}
                                 >
-                                  <div className="flex flex-col gap-2 pb-2 pl-15 pr-8">
-                                    {hasDescription && (
-                                      <div
-                                        className={cn(
-                                          'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
-                                          isDescriptionExpanded || !isTaskDetailVisible
-                                            ? 'grid-rows-[1fr]'
-                                            : 'grid-rows-[0fr]',
-                                        )}
-                                      >
-                                        <div
-                                          className={cn(
-                                            'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
-                                            isDescriptionExpanded
-                                              ? 'translate-y-0 opacity-100'
-                                              : '-translate-y-1 opacity-0',
-                                          )}
-                                        >
-                                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                                            {task.description}
-                                          </p>
-                                        </div>
-                                      </div>
+                                  <div
+                                    className={cn(
+                                      'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
+                                      isTaskDetailVisible
+                                        ? 'translate-y-0 opacity-100'
+                                        : '-translate-y-1 opacity-0',
                                     )}
-
-                                    {isAddingChild && (
-                                      <div
-                                        aria-hidden={!isChildFormVisible}
-                                        className={cn(
-                                          'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
-                                          isChildFormVisible
-                                            ? 'grid-rows-[1fr]'
-                                            : 'grid-rows-[0fr]',
-                                        )}
-                                        {...(!isChildFormVisible ? { inert: '' } : {})}
-                                      >
+                                  >
+                                    <div className="flex flex-col gap-2 pb-2 pl-15 pr-8">
+                                      {hasDescription && (
                                         <div
                                           className={cn(
-                                            'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
-                                            isChildFormVisible
-                                              ? 'translate-y-0 opacity-100'
-                                              : '-translate-y-1 opacity-0',
+                                            'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
+                                            isDescriptionExpanded || !isTaskDetailVisible
+                                              ? 'grid-rows-[1fr]'
+                                              : 'grid-rows-[0fr]',
                                           )}
                                         >
-                                          <form
-                                            className="flex items-center gap-2"
-                                            onSubmit={(event) => {
-                                              void handleCreateChildTask(event, task);
-                                            }}
+                                          <div
+                                            className={cn(
+                                              'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
+                                              isDescriptionExpanded
+                                                ? 'translate-y-0 opacity-100'
+                                                : '-translate-y-1 opacity-0',
+                                            )}
                                           >
-                                            <TextField
-                                              aria-label={`Child todo for ${task.title}`}
-                                              className="min-w-0 flex-1"
-                                              fullWidth
-                                              isDisabled={isCreatingChild}
-                                              value={childTaskTitle}
-                                              onChange={setChildTaskTitle}
-                                            >
-                                              <InputGroup className="h-8 min-h-8" fullWidth>
-                                                <InputGroup.Input placeholder="Add child todo..." />
-                                              </InputGroup>
-                                            </TextField>
-                                            <Button
-                                              isDisabled={isCreatingChild}
-                                              size="sm"
-                                              type="submit"
-                                            >
-                                              Add
-                                            </Button>
-                                            <Button
-                                              isDisabled={isCreatingChild}
-                                              size="sm"
-                                              type="button"
-                                              variant="ghost"
-                                              onPress={closeChildTaskForm}
-                                            >
-                                              Cancel
-                                            </Button>
-                                          </form>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {hasChildren && (
-                                      <div
-                                        data-slot="task-children"
-                                        aria-hidden={!hasVisibleChildren}
-                                        className={cn(
-                                          'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
-                                          hasVisibleChildren || !isTaskDetailVisible
-                                            ? 'grid-rows-[1fr]'
-                                            : 'grid-rows-[0fr]',
-                                        )}
-                                        {...(!hasVisibleChildren ? { inert: '' } : {})}
-                                      >
-                                        <div
-                                          className={cn(
-                                            'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
-                                            hasVisibleChildren
-                                              ? 'translate-y-0 opacity-100'
-                                              : '-translate-y-1 opacity-0',
-                                          )}
-                                        >
-                                          <div className="flex flex-col">
-                                            {taskChildren.map((childTask) => {
-                                              const childProjectName = childTask.projectId
-                                                ? projectNameById.get(childTask.projectId)
-                                                : null;
-                                              const childDueDate = formatDate(childTask.dueDate);
-                                              const isChildDone = childTask.status === 'done';
-                                              const isChildUpdating = updatingTaskIds.has(
-                                                childTask.id,
-                                              );
-                                              const hasChildDescription =
-                                                childTask.description.trim() !== '';
-                                              const isChildDescriptionExpanded =
-                                                expandedDescriptionTaskIds.has(childTask.id);
-
-                                              return (
-                                                <div
-                                                  key={childTask.id}
-                                                  id={childTask.id}
-                                                  data-slot="task-child-row"
-                                                  className="grid min-h-10 grid-cols-[minmax(0,1fr)_7rem_5rem] items-start"
-                                                >
-                                                  <div className="min-w-0 py-1.5 pl-1">
-                                                    <div className="flex min-w-0 items-center gap-3">
-                                                      {renderTaskCheckbox(
-                                                        childTask,
-                                                        isChildUpdating,
-                                                      )}
-
-                                                      <div className="min-w-0 flex-1">
-                                                        <div
-                                                          className={cn(
-                                                            'min-w-0 truncate text-sm font-medium text-foreground',
-                                                            isChildDone &&
-                                                              'text-muted-foreground line-through',
-                                                          )}
-                                                        >
-                                                          {childTask.title}
-                                                          {childProjectName && (
-                                                            <span className="font-normal text-muted-foreground">
-                                                              /{childProjectName}
-                                                            </span>
-                                                          )}
-                                                        </div>
-                                                      </div>
-                                                    </div>
-
-                                                    {hasChildDescription &&
-                                                      isChildDescriptionExpanded && (
-                                                        <p className="mt-1 whitespace-pre-wrap pl-8 text-sm leading-relaxed text-muted-foreground">
-                                                          {childTask.description}
-                                                        </p>
-                                                      )}
-                                                  </div>
-
-                                                  <div className="px-2 py-2 text-muted-foreground">
-                                                    {childDueDate && (
-                                                      <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
-                                                        <HugeiconsIcon
-                                                          icon={Calendar03Icon}
-                                                          aria-hidden="true"
-                                                          className="size-3 shrink-0"
-                                                        />
-                                                        {childDueDate}
-                                                      </span>
-                                                    )}
-                                                  </div>
-
-                                                  <div className="py-1.5 text-right">
-                                                    {hasChildDescription && (
-                                                      <Button
-                                                        aria-label={`${isChildDescriptionExpanded ? 'Hide' : 'Show'} notes for ${childTask.title}`}
-                                                        className={taskRowIconButtonClassName}
-                                                        isIconOnly
-                                                        size="sm"
-                                                        type="button"
-                                                        variant="ghost"
-                                                        onPress={() =>
-                                                          toggleTaskDescription(childTask.id)
-                                                        }
-                                                      >
-                                                        <HugeiconsIcon
-                                                          icon={MoreHorizontalIcon}
-                                                          aria-hidden="true"
-                                                          className="size-[18px] shrink-0 translate-y-px"
-                                                        />
-                                                      </Button>
-                                                    )}
-                                                  </div>
-                                                </div>
-                                              );
-                                            })}
+                                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                                              {task.description}
+                                            </p>
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
+
+                                      {isAddingChild && (
+                                        <div
+                                          aria-hidden={!isChildFormVisible}
+                                          className={cn(
+                                            'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
+                                            isChildFormVisible
+                                              ? 'grid-rows-[1fr]'
+                                              : 'grid-rows-[0fr]',
+                                          )}
+                                          {...(!isChildFormVisible ? { inert: '' } : {})}
+                                        >
+                                          <div
+                                            className={cn(
+                                              'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
+                                              isChildFormVisible
+                                                ? 'translate-y-0 opacity-100'
+                                                : '-translate-y-1 opacity-0',
+                                            )}
+                                          >
+                                            <form
+                                              className="flex items-center gap-2"
+                                              onSubmit={(event) => {
+                                                void handleCreateChildTask(event, task);
+                                              }}
+                                            >
+                                              <TextField
+                                                aria-label={`Child todo for ${task.title}`}
+                                                className="min-w-0 flex-1"
+                                                fullWidth
+                                                isDisabled={isCreatingChild}
+                                                value={childTaskTitle}
+                                                onChange={setChildTaskTitle}
+                                              >
+                                                <InputGroup className="h-8 min-h-8" fullWidth>
+                                                  <InputGroup.Input placeholder="Add child todo..." />
+                                                </InputGroup>
+                                              </TextField>
+                                              <Button
+                                                isDisabled={isCreatingChild}
+                                                size="sm"
+                                                type="submit"
+                                              >
+                                                Add
+                                              </Button>
+                                              <Button
+                                                isDisabled={isCreatingChild}
+                                                size="sm"
+                                                type="button"
+                                                variant="ghost"
+                                                onPress={closeChildTaskForm}
+                                              >
+                                                Cancel
+                                              </Button>
+                                            </form>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {hasChildren && (
+                                        <div
+                                          data-slot="task-children"
+                                          aria-hidden={!hasVisibleChildren}
+                                          className={cn(
+                                            'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
+                                            hasVisibleChildren || !isTaskDetailVisible
+                                              ? 'grid-rows-[1fr]'
+                                              : 'grid-rows-[0fr]',
+                                          )}
+                                          {...(!hasVisibleChildren ? { inert: '' } : {})}
+                                        >
+                                          <div
+                                            className={cn(
+                                              'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
+                                              hasVisibleChildren
+                                                ? 'translate-y-0 opacity-100'
+                                                : '-translate-y-1 opacity-0',
+                                            )}
+                                          >
+                                            <div className="flex flex-col">
+                                              {taskChildren.map((childTask) => {
+                                                const childProjectName = childTask.projectId
+                                                  ? projectNameById.get(childTask.projectId)
+                                                  : null;
+                                                const childDueDate = formatDate(childTask.dueDate);
+                                                const isChildDone = childTask.status === 'done';
+                                                const isChildUpdating = updatingTaskIds.has(
+                                                  childTask.id,
+                                                );
+                                                const hasChildDescription =
+                                                  childTask.description.trim() !== '';
+                                                const isChildDescriptionExpanded =
+                                                  expandedDescriptionTaskIds.has(childTask.id);
+
+                                                return (
+                                                  <div
+                                                    key={childTask.id}
+                                                    id={childTask.id}
+                                                    data-slot="task-child-row"
+                                                    className="grid min-h-10 grid-cols-[minmax(0,1fr)_7rem_5rem] items-start"
+                                                  >
+                                                    <div className="min-w-0 py-1.5 pl-1">
+                                                      <div className="flex min-w-0 items-center gap-3">
+                                                        {renderTaskCheckbox(
+                                                          childTask,
+                                                          isChildUpdating,
+                                                        )}
+
+                                                        <div className="min-w-0 flex-1">
+                                                          <div
+                                                            className={cn(
+                                                              'min-w-0 truncate text-sm font-medium text-foreground',
+                                                              isChildDone &&
+                                                                'text-muted-foreground line-through',
+                                                            )}
+                                                          >
+                                                            {childTask.title}
+                                                            {childProjectName && (
+                                                              <span className="font-normal text-muted-foreground">
+                                                                /{childProjectName}
+                                                              </span>
+                                                            )}
+                                                          </div>
+                                                        </div>
+                                                      </div>
+
+                                                      {hasChildDescription &&
+                                                        isChildDescriptionExpanded && (
+                                                          <p className="mt-1 whitespace-pre-wrap pl-8 text-sm leading-relaxed text-muted-foreground">
+                                                            {childTask.description}
+                                                          </p>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="px-2 py-2 text-muted-foreground">
+                                                      {childDueDate && (
+                                                        <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
+                                                          <HugeiconsIcon
+                                                            icon={Calendar03Icon}
+                                                            aria-hidden="true"
+                                                            className="size-3 shrink-0"
+                                                          />
+                                                          {childDueDate}
+                                                        </span>
+                                                      )}
+                                                    </div>
+
+                                                    <div className="py-1.5 text-right">
+                                                      {hasChildDescription && (
+                                                        <Button
+                                                          aria-label={`${isChildDescriptionExpanded ? 'Hide' : 'Show'} notes for ${childTask.title}`}
+                                                          className={taskRowIconButtonClassName}
+                                                          isIconOnly
+                                                          size="sm"
+                                                          type="button"
+                                                          variant="ghost"
+                                                          onPress={() =>
+                                                            toggleTaskDescription(childTask.id)
+                                                          }
+                                                        >
+                                                          <HugeiconsIcon
+                                                            icon={MoreHorizontalIcon}
+                                                            aria-hidden="true"
+                                                            className="size-[18px] shrink-0 translate-y-px"
+                                                          />
+                                                        </Button>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          </Table.Cell>
-                        </Table.Row>
-                      );
-                    })}
-                  </Table.Body>
-                </Table.Content>
-              </Table.ScrollContainer>
-            </Table>
+                            </Table.Cell>
+                          </Table.Row>
+                        );
+                      })}
+                    </Table.Body>
+                  </Table.Content>
+                </Table.ScrollContainer>
+              </Table>
+            </div>
           )}
         </div>
       </div>

@@ -160,6 +160,15 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).toContain('className="h-9 shrink-0"');
   });
 
+  it('aligns the task table inset with the quick add area', () => {
+    const source = fs.readFileSync(taskPanelPath, 'utf8');
+
+    expect(source).toContain('className="flex shrink-0 flex-col gap-3 px-8 py-4"');
+    expect(source).toMatch(
+      /\{status === 'ready' && parentTasks\.length > 0 && \(\s+<div className="px-8">\s+<Table className="border-b" variant="secondary">/,
+    );
+  });
+
   it('keeps the quick add button visible and disables it until a title is entered', async () => {
     const user = userEvent.setup();
     render(createElement(TaskPanel, { currentWorkspace }));
