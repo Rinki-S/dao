@@ -134,13 +134,23 @@ describe('TaskPanel table migration boundary', () => {
   it('animates task row expansion with explicit height and content transitions', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
+    expect(source.match(/transition-\[grid-template-rows\] duration-200 ease-out/g)).toHaveLength(
+      1,
+    );
     expect(source).toContain('transition-[grid-template-rows] duration-200 ease-out');
     expect(source).toContain("isTaskDetailVisible ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'");
     expect(source).toContain(
       'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
     );
+    expect(source).toContain('data-slot="task-child-form"');
+    expect(source).toContain('isChildFormVisible &&');
+    expect(source).toContain('hasVisibleChildren &&');
     expect(source).toContain('data-slot="task-details-trigger"');
     expect(source).toContain('transition-[background-color,scale] duration-150 ease-out');
+    expect(source).toContain('transform-gpu');
+    expect(source).toContain('active:scale-[0.96]');
+    expect(source).toContain('data-[pressed=true]:scale-[0.96]');
+    expect(source).not.toContain('scale-[0.99]');
     expect(source).toContain('transition-[opacity,transform] duration-150 ease-out');
     expect(source).toContain("'translate-y-0 opacity-100'");
     expect(source).toContain("'-translate-y-1 opacity-0'");
