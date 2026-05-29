@@ -297,6 +297,14 @@ export function TaskPanel({ currentWorkspace }) {
     return nextChildrenByParentId;
   }, [visibleTasks]);
 
+  const taskPendingDeleteChildCount = useMemo(() => {
+    if (!taskPendingDelete) {
+      return 0;
+    }
+
+    return childrenByParentId.get(taskPendingDelete.id)?.length ?? 0;
+  }, [childrenByParentId, taskPendingDelete]);
+
   async function loadTaskData({ showLoading = true } = {}) {
     if (showLoading) {
       setStatus('loading');
@@ -1287,7 +1295,16 @@ export function TaskPanel({ currentWorkspace }) {
               <Modal.Body>
                 <p>
                   This will delete{' '}
-                  <span className="font-medium text-foreground">{taskPendingDelete?.title}</span>.
+                  <span className="font-medium text-foreground">{taskPendingDelete?.title}</span>
+                  {taskPendingDeleteChildCount > 0 ? (
+                    <>
+                      {' '}
+                      and {taskPendingDeleteChildCount} child{' '}
+                      {taskPendingDeleteChildCount === 1 ? 'todo' : 'todos'}.
+                    </>
+                  ) : (
+                    '.'
+                  )}
                 </p>
               </Modal.Body>
 

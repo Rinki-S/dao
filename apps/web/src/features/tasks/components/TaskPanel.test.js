@@ -427,9 +427,59 @@ describe('TaskPanel table migration boundary', () => {
     });
   });
 
-  it('asks for confirmation before deleting a task from the right-click menu', async () => {
+  it('asks for confirmation before deleting a task and its child todos from the right-click menu', async () => {
     const user = userEvent.setup();
     deleteTask.mockResolvedValue(undefined);
+    listTasks.mockResolvedValueOnce([
+      {
+        id: 'task-1',
+        workspaceId: 'workspace-1',
+        projectId: 'project-1',
+        parentId: null,
+        title: 'Review HeroUI migration',
+        description: 'Check the row trigger behavior.',
+        status: 'doing',
+        priority: 'high',
+        dueDate: null,
+        createdAt: '2026-05-25T00:00:00Z',
+        updatedAt: '2026-05-25T00:00:00Z',
+        deletedAt: null,
+        version: 1,
+        syncStatus: 'synced',
+      },
+      {
+        id: 'task-2',
+        workspaceId: 'workspace-1',
+        projectId: 'project-1',
+        parentId: 'task-1',
+        title: 'Check context menu',
+        description: '',
+        status: 'todo',
+        priority: 'high',
+        dueDate: null,
+        createdAt: '2026-05-25T00:00:00Z',
+        updatedAt: '2026-05-25T00:00:00Z',
+        deletedAt: null,
+        version: 1,
+        syncStatus: 'synced',
+      },
+      {
+        id: 'task-3',
+        workspaceId: 'workspace-1',
+        projectId: 'project-1',
+        parentId: 'task-1',
+        title: 'Check delete modal',
+        description: '',
+        status: 'done',
+        priority: 'high',
+        dueDate: null,
+        createdAt: '2026-05-25T00:00:00Z',
+        updatedAt: '2026-05-25T00:00:00Z',
+        deletedAt: null,
+        version: 1,
+        syncStatus: 'synced',
+      },
+    ]);
 
     render(createElement(TaskPanel, { currentWorkspace }));
 
@@ -444,6 +494,7 @@ describe('TaskPanel table migration boundary', () => {
     const deleteDialog = await screen.findByRole('dialog', { name: 'Delete task' });
     expect(deleteDialog).toBeInTheDocument();
     expect(within(deleteDialog).getByText('Review HeroUI migration')).toBeInTheDocument();
+    expect(within(deleteDialog).getByText(/and 2 child todos/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
