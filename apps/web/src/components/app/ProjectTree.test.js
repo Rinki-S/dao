@@ -17,17 +17,21 @@ describe('ProjectTree HeroUI migration boundary', () => {
     const source = fs.readFileSync(projectTreePath, 'utf8');
 
     expect(source).toContain('Button');
+    expect(source).toContain('Form');
     expect(source).toContain('Modal');
     expect(source).toContain('Select');
     expect(source).toContain('TextField');
     expect(source).toContain('TextArea');
   });
 
-  it('renders project tree API errors without field validation components', () => {
+  it('separates project tree API errors from field validation errors', () => {
     const source = fs.readFileSync(projectTreePath, 'utf8');
 
+    expect(source).toContain('FieldError');
     expect(source).toContain('AppApiErrorMessage');
-    expect(source).not.toContain('FieldError');
+    expect(source).toContain('<AppApiErrorMessage>{projectCreateError}</AppApiErrorMessage>');
+    expect(source).toContain('<AppApiErrorMessage>{contentCreateError}</AppApiErrorMessage>');
+    expect(source).toContain('{treeError}');
     expect(source).not.toContain("setStatus('error');\n    } finally {\n      setIsCreatingProject(false);");
     expect(source).not.toContain("setStatus('error');\n    } finally {\n      setIsCreatingContent(false);");
   });

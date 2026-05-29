@@ -109,7 +109,7 @@ describe('ProjectTree interactions', () => {
     await user.click(screen.getByRole('button', { name: 'Create project' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Create project' });
-    await user.type(within(dialog).getByPlaceholderText('Project name'), 'New Project');
+    await user.type(within(dialog).getByLabelText('Project name'), 'New Project');
     await user.click(within(dialog).getByRole('button', { name: 'Create project' }));
 
     await waitFor(() => {
@@ -136,7 +136,7 @@ describe('ProjectTree interactions', () => {
     await user.click(screen.getByRole('button', { name: 'Create content' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Create content' });
-    await user.type(within(dialog).getByPlaceholderText('Note title'), 'New Note');
+    await user.type(within(dialog).getByLabelText('Note title'), 'New Note');
     await user.click(within(dialog).getByRole('button', { name: 'Create content' }));
 
     await waitFor(() => {

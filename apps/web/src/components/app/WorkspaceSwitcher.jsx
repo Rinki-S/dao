@@ -1,6 +1,8 @@
 import {
   Button,
   Dropdown,
+  FieldError,
+  Form,
   Header,
   Input,
   Label,
@@ -174,19 +176,20 @@ export function WorkspaceSwitcher({
             <Modal.Dialog aria-label="Create workspace">
               <Modal.CloseTrigger />
               <Modal.Header>
-                <Modal.Heading>Create Workspace</Modal.Heading>
+                <Modal.Heading>Create workspace</Modal.Heading>
                 <p className="text-sm text-muted-foreground">
                   Add a top-level space for projects, tasks, and notes.
                 </p>
               </Modal.Header>
 
-              <form onSubmit={handleCreateWorkspace}>
+              <Form validationBehavior="native" onSubmit={handleCreateWorkspace}>
                 <Modal.Body className="flex flex-col gap-3">
                   <TextField
                     fullWidth
                     isDisabled={isCreating}
                     isRequired
                     name="workspace-name"
+                    validate={(value) => (value.trim() ? null : 'Workspace name is required')}
                     value={workspaceName}
                     onChange={setWorkspaceName}
                   >
@@ -197,6 +200,7 @@ export function WorkspaceSwitcher({
                       placeholder="Workspace name"
                       variant="secondary"
                     />
+                    <FieldError />
                   </TextField>
 
                   <TextField
@@ -218,7 +222,7 @@ export function WorkspaceSwitcher({
                     {isCreating ? 'Creating...' : 'Create workspace'}
                   </Button>
                 </Modal.Footer>
-              </form>
+              </Form>
             </Modal.Dialog>
           </Modal.Container>
         </Modal.Backdrop>

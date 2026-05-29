@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
+  FieldError,
+  Form,
   Input,
   Label,
   ListBox,
@@ -43,7 +45,9 @@ export function ProjectTree({
   const [notes, setNotes] = useState([]);
   const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set());
   const [status, setStatus] = useState('idle');
-  const [error, setError] = useState('');
+  const [treeError, setTreeError] = useState('');
+  const [projectCreateError, setProjectCreateError] = useState('');
+  const [contentCreateError, setContentCreateError] = useState('');
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [isContentDialogOpen, setIsContentDialogOpen] = useState(false);
   const [projectName, setProjectName] = useState('');
@@ -101,7 +105,7 @@ export function ProjectTree({
     }
 
     setStatus('loading');
-    setError('');
+    setTreeError('');
 
     const [nextProjects, nextNotes] = await Promise.all([listProjects(), listNotes()]);
 
@@ -118,7 +122,7 @@ export function ProjectTree({
         await loadTreeData();
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load project tree');
+          setTreeError(err instanceof Error ? err.message : 'Failed to load project tree');
           setStatus('error');
         }
       }
@@ -142,7 +146,7 @@ export function ProjectTree({
     setNoteTitle('');
     setNoteContent('');
     setNoteType('general');
-    setError('');
+    setContentCreateError('');
     setIsContentDialogOpen(true);
   }
 
@@ -166,13 +170,13 @@ export function ProjectTree({
     event.preventDefault();
 
     if (!currentWorkspace) {
-      setError('Create a workspace before adding projects');
+      setProjectCreateError('Create a workspace before adding projects');
       return;
     }
 
     try {
       setIsCreatingProject(true);
-      setError('');
+      setProjectCreateError('');
 
       const createdProject = await createProject({
         workspaceId: currentWorkspace.id,
@@ -193,7 +197,7 @@ export function ProjectTree({
       await loadTreeData();
       notifyActivityChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create project');
+      setProjectCreateError(err instanceof Error ? err.message : 'Failed to create project');
     } finally {
       setIsCreatingProject(false);
     }
@@ -203,18 +207,18 @@ export function ProjectTree({
     event.preventDefault();
 
     if (!currentWorkspace) {
-      setError('Create a workspace before adding content');
+      setContentCreateError('Create a workspace before adding content');
       return;
     }
 
     if (contentType !== 'note') {
-      setError('Only notes can be created in this milestone');
+      setContentCreateError('Only notes can be created in this milestone');
       return;
     }
 
     try {
       setIsCreatingContent(true);
-      setError('');
+      setContentCreateError('');
 
       const createdNote = await createNote({
         workspaceId: currentWorkspace.id,
@@ -243,7 +247,7 @@ export function ProjectTree({
       notifyActivityChanged();
       onContentCreated?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create content');
+      setContentCreateError(err instanceof Error ? err.message : 'Failed to create content');
     } finally {
       setIsCreatingContent(false);
     }
@@ -268,7 +272,7 @@ export function ProjectTree({
             type="button"
             variant="ghost"
             onPress={() => {
-              setError('');
+              setProjectCreateError('');
               setIsProjectDialogOpen(true);
             }}
           >
@@ -307,7 +311,7 @@ export function ProjectTree({
           {status === 'error' && (
             <li className="relative">
               <AppApiErrorMessage className="block px-2 py-1 text-xs">
-                {error}
+                {treeError}
               </AppApiErrorMessage>
             </li>
           )}
@@ -402,18 +406,20 @@ export function ProjectTree({
                 </p>
               </Modal.Header>
 
-              <form onSubmit={handleCreateProject}>
+              <Form validationBehavior="native" onSubmit={handleCreateProject}>
                 <Modal.Body className="flex flex-col gap-3">
                   <TextField
                     fullWidth
                     isDisabled={!currentWorkspace || isCreatingProject}
                     isRequired
                     name="sidebar-project-name"
+                    validate={(value) => (value.trim() ? null : 'Project name is required')}
                     value={projectName}
                     onChange={setProjectName}
                   >
-                    <Label className="sr-only">Project name</Label>
+                    <Label>Project name</Label>
                     <Input placeholder="Project name" variant="secondary" />
+                    <FieldError />
                   </TextField>
 
                   <TextField
@@ -423,11 +429,11 @@ export function ProjectTree({
                     value={projectDescription}
                     onChange={setProjectDescription}
                   >
-                    <Label className="sr-only">Description</Label>
+                    <Label>Description</Label>
                     <Input placeholder="Description" variant="secondary" />
                   </TextField>
 
-                  <AppApiErrorMessage>{error}</AppApiErrorMessage>
+                  <AppApiErrorMessage>{projectCreateError}</AppApiErrorMessage>
                 </Modal.Body>
 
                 <Modal.Footer>
@@ -439,7 +445,7 @@ export function ProjectTree({
                     {isCreatingProject ? 'Creating...' : 'Create project'}
                   </Button>
                 </Modal.Footer>
-              </form>
+              </Form>
             </Modal.Dialog>
           </Modal.Container>
         </Modal.Backdrop>
@@ -457,7 +463,7 @@ export function ProjectTree({
                 </p>
               </Modal.Header>
 
-              <form onSubmit={handleCreateContent}>
+              <Form validationBehavior="native" onSubmit={handleCreateContent}>
                 <Modal.Body className="flex flex-col gap-3">
                   <Select
                     fullWidth
@@ -525,11 +531,13 @@ export function ProjectTree({
                     isDisabled={!currentWorkspace || isCreatingContent}
                     isRequired
                     name="sidebar-note-title"
+                    validate={(value) => (value.trim() ? null : 'Note title is required')}
                     value={noteTitle}
                     onChange={setNoteTitle}
                   >
-                    <Label className="sr-only">Note title</Label>
+                    <Label>Note title</Label>
                     <Input placeholder="Note title" variant="secondary" />
+                    <FieldError />
                   </TextField>
 
                   <Select
@@ -566,7 +574,7 @@ export function ProjectTree({
                     value={noteContent}
                     onChange={setNoteContent}
                   >
-                    <Label className="sr-only">Content</Label>
+                    <Label>Content</Label>
                     <TextArea
                       fullWidth
                       className="min-h-28 resize-y"
@@ -575,7 +583,7 @@ export function ProjectTree({
                     />
                   </TextField>
 
-                  <AppApiErrorMessage>{error}</AppApiErrorMessage>
+                  <AppApiErrorMessage>{contentCreateError}</AppApiErrorMessage>
                 </Modal.Body>
 
                 <Modal.Footer>
@@ -587,7 +595,7 @@ export function ProjectTree({
                     {isCreatingContent ? 'Creating...' : 'Create content'}
                   </Button>
                 </Modal.Footer>
-              </form>
+              </Form>
             </Modal.Dialog>
           </Modal.Container>
         </Modal.Backdrop>
