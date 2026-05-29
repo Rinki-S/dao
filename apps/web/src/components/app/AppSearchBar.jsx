@@ -1,9 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Chip, Label, SearchField } from '@heroui/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
 import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
 import { searchAll } from '@/features/search/api.js';
+import { gsap } from 'gsap';
+
+function prefersReducedMotion() {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+}
 
 export function AppSearchBar() {
   const [query, setQuery] = useState('');
@@ -12,6 +17,8 @@ export function AppSearchBar() {
   const [error, setError] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const listRef = useRef(null);
+  const panelRef = useRef(null);
+  const [shouldRender, setShouldRender] = useState(false);
   const trimmedQuery = query.trim();
   const isPanelVisible = trimmedQuery !== '';
   const displayStatus = isPanelVisible && status === 'idle' ? 'pending' : status;
@@ -80,6 +87,62 @@ export function AppSearchBar() {
   }, [selectedIndex]);
 
   useEffect(() => {
+    if (isPanelVisible) {
+      setShouldRender(true);
+    }
+  }, [isPanelVisible]);
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    gsap.killTweensOf(panel);
+
+    if (isPanelVisible) {
+      if (prefersReducedMotion()) {
+        gsap.set(panel, { autoAlpha: 1, y: 0, scale: 1 });
+      } else {
+        gsap.fromTo(
+          panel,
+          { autoAlpha: 0, y: -8, scale: 0.96 },
+          {
+            autoAlpha: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.2,
+            ease: 'power2.out',
+            overwrite: 'auto',
+          },
+        );
+      }
+    } else {
+      if (prefersReducedMotion()) {
+        gsap.set(panel, { autoAlpha: 0 });
+        setShouldRender(false);
+      } else {
+        gsap.to(panel, {
+          autoAlpha: 0,
+          y: -4,
+          scale: 0.98,
+          duration: 0.15,
+          ease: 'power2.in',
+          overwrite: 'auto',
+          onComplete: () => {
+            setShouldRender(false);
+            setResults([]);
+            setError('');
+            setStatus('idle');
+          },
+        });
+      }
+    }
+
+    return () => {
+      gsap.killTweensOf(panel);
+    };
+  }, [isPanelVisible, shouldRender]);
+
+  useEffect(() => {
     if (trimmedQuery === '') {
       return;
     }
@@ -115,12 +178,6 @@ export function AppSearchBar() {
   function handleQueryChange(nextQuery) {
     setQuery(nextQuery);
     setSelectedIndex(-1);
-
-    if (nextQuery.trim() === '') {
-      setResults([]);
-      setError('');
-      setStatus('idle');
-    }
   }
 
   return (
@@ -150,8 +207,6 @@ export function AppSearchBar() {
           } else if (e.key === 'Escape') {
             e.preventDefault();
             setQuery('');
-            setResults([]);
-            setStatus('idle');
             setSelectedIndex(-1);
           }
         }}
@@ -172,8 +227,8 @@ export function AppSearchBar() {
         </SearchField.Group>
       </SearchField>
 
-      {isPanelVisible && (
-        <div className="absolute top-10 left-0 z-[100] w-full rounded-xl bg-overlay text-overlay-foreground shadow-md ring-1 ring-border">
+      {shouldRender && (
+        <div ref={panelRef} className="absolute top-10 left-0 z-[100] w-full rounded-xl bg-overlay text-overlay-foreground shadow-md ring-1 ring-border">
           {panelContent}
         </div>
       )}
