@@ -124,35 +124,39 @@ describe('TaskPanel table migration boundary', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
     expect(source).toContain('data-slot="task-row-layout"');
-    expect(source).toContain('data-slot="task-detail"');
+    expect(source).toContain('dataSlot="task-detail"');
     expect(source).toContain('data-slot="task-children"');
     expect(source).not.toContain('id={`${task.id}-description`}');
     expect(source).not.toContain('id={`${task.id}-child-form`}');
     expect(source).not.toContain('id={`${childTask.id}-description`}');
   });
 
-  it('animates task row expansion with compositor transitions instead of layout transitions', () => {
+  it('animates task row expansion with GSAP instead of CSS transitions', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
+    expect(source).toContain("import { gsap } from 'gsap'");
+    expect(source).toContain('function GsapDisclosure');
+    expect(source).toContain('gsap.fromTo');
+    expect(source).toContain('gsap.to');
+    expect(source).toContain('gsap.set');
+    expect(source).toContain("overwrite: 'auto'");
+    expect(source).toContain('autoAlpha');
+    expect(source).toContain('height');
+    expect(source).toContain('prefers-reduced-motion: reduce');
     expect(source).not.toContain('grid-template-rows');
     expect(source.match(/transition-\[grid-template-rows\] duration-150 ease-out/g)).toBeNull();
     expect(source.match(/transition-\[grid-template-rows\] duration-200 ease-out/g)).toBeNull();
-    expect(source).toMatch(/isTaskDetailVisible\s+\?\s+'overflow-visible'\s+:\s+'h-0 overflow-hidden'/);
-    expect(source).toContain(
-      'min-h-0 transform-gpu overflow-visible transition-[opacity,transform] duration-150 ease-out',
-    );
-    expect(source).toContain('[will-change:transform,opacity]');
-    expect(source).toContain('data-slot="task-child-form"');
-    expect(source).toContain('hasVisibleChildren &&');
+    expect(source).toContain('dataSlot="task-child-form"');
+    expect(source).toContain('hasChildren &&');
     expect(source).toContain('data-slot="task-details-trigger"');
     expect(source).toContain('transition-[background-color,scale] duration-150 ease-out');
     expect(source).toContain('transform-gpu');
     expect(source).toContain('active:scale-[0.96]');
     expect(source).toContain('data-[pressed=true]:scale-[0.96]');
     expect(source).not.toContain('scale-[0.99]');
-    expect(source).toContain('transition-[opacity,transform] duration-150 ease-out');
-    expect(source).toContain("'translate-y-0 opacity-100'");
-    expect(source).toContain("'-translate-y-1 opacity-0'");
+    expect(source).not.toContain('transition-[opacity,transform] duration-150 ease-out');
+    expect(source).not.toContain("'translate-y-0 opacity-100'");
+    expect(source).not.toContain("'-translate-y-1 opacity-0'");
     expect(source).not.toContain('taskDetailExitDurationMs');
     expect(source).not.toContain('renderedTaskDetailIds');
     expect(source).not.toContain('scale-y-');
@@ -162,14 +166,13 @@ describe('TaskPanel table migration boundary', () => {
   it('keeps the child todo input visually flat while the child form animates independently', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
-    expect(source).toContain('data-slot="task-child-form"');
+    expect(source).toContain('dataSlot="task-child-form"');
     expect(source).toContain('visibleChildTaskParentId');
     expect(source).toContain('setVisibleChildTaskParentId');
     expect(source).toContain('window.requestAnimationFrame');
     expect(source).toContain('window.cancelAnimationFrame');
     expect(source).toContain('px-0.5 py-0.5');
     expect(source).toContain('overflow-visible');
-    expect(source).toContain('[will-change:transform,opacity]');
     expect(source).toContain('className="h-8 min-h-8 shadow-none"');
     expect(source).not.toContain(
       "'grid overflow-hidden transition-[grid-template-rows] duration-150 ease-out'",
