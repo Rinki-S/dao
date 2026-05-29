@@ -27,6 +27,10 @@ describe('TaskPanel interactions', () => {
   beforeEach(() => {
     listProjects.mockResolvedValue([projectFixture()]);
     listTasks.mockResolvedValue([taskFixture()]);
+    createTask.mockResolvedValue(taskFixture());
+    updateTask.mockResolvedValue(taskFixture());
+    updateTaskStatus.mockResolvedValue(taskFixture({ status: 'done' }));
+    deleteTask.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -49,6 +53,27 @@ describe('TaskPanel interactions', () => {
       priority: 'medium',
       dueDate: null,
     });
+  });
+
+  it('keeps the task list mounted when quick add fails', async () => {
+    const user = userEvent.setup();
+    createTask.mockRejectedValue(new Error('Unable to create task'));
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const titleInput = await screen.findByPlaceholderText('Add a task...');
+    await user.type(titleInput, 'Write failure notes');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    await waitFor(() => {
+      expect(createTask).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText('Unable to create task')).toBeInTheDocument();
+    expect(screen.getByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.getByText('Review HeroUI migration')).toBeInTheDocument();
+    expect(titleInput).toHaveValue('Write failure notes');
+    expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled();
+    expect(listTasks).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the task list mounted while creating a child todo', async () => {
@@ -94,6 +119,34 @@ describe('TaskPanel interactions', () => {
     ]);
   });
 
+  it('keeps the child todo form open when creating a child todo fails', async () => {
+    const user = userEvent.setup();
+    createTask.mockRejectedValue(new Error('Unable to create child todo'));
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const addChildButton = await screen.findByRole('button', {
+      name: 'Add child todo to Review HeroUI migration',
+    });
+
+    await user.click(addChildButton);
+    const childInput = await screen.findByLabelText('Child todo for Review HeroUI migration');
+    await user.type(childInput, 'ShipChildTodo');
+    await user.click(screen.getAllByRole('button', { name: 'Add' }).at(-1));
+
+    await waitFor(() => {
+      expect(createTask).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText('Unable to create child todo')).toBeInTheDocument();
+    expect(screen.getByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.getByText('Review HeroUI migration')).toBeInTheDocument();
+    expect(childInput).toHaveValue('ShipChildTodo');
+    expect(
+      screen.getByRole('button', { name: 'Add child todo to Review HeroUI migration' }),
+    ).toBeEnabled();
+    expect(listTasks).toHaveBeenCalledTimes(1);
+  });
+
   it('toggles a todo task checkbox to done', async () => {
     const user = userEvent.setup();
     updateTaskStatus.mockResolvedValue(taskFixture({ status: 'done' }));
@@ -107,6 +160,29 @@ describe('TaskPanel interactions', () => {
     await waitFor(() => {
       expect(updateTaskStatus).toHaveBeenCalledWith('task-1', { status: 'done' });
     });
+  });
+
+  it('clears checkbox pending state and keeps the task list mounted when toggle fails', async () => {
+    const user = userEvent.setup();
+    updateTaskStatus.mockRejectedValue(new Error('Unable to update task status'));
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const checkbox = await screen.findByRole('checkbox', {
+      name: 'Toggle Review HeroUI migration',
+    });
+
+    await user.click(checkbox);
+
+    await waitFor(() => {
+      expect(updateTaskStatus).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText('Unable to update task status')).toBeInTheDocument();
+    expect(screen.getByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.getByText('Review HeroUI migration')).toBeInTheDocument();
+    expect(checkbox).toBeEnabled();
+    expect(checkbox).not.toBeChecked();
+    expect(listTasks).toHaveBeenCalledTimes(1);
   });
 
   it('toggles a child todo checkbox with the child task id', async () => {
@@ -252,6 +328,35 @@ describe('TaskPanel interactions', () => {
     );
   });
 
+  it('keeps the edit task dialog open and avoids reloading when saving fails', async () => {
+    const user = userEvent.setup();
+    updateTask.mockRejectedValue(new Error('Unable to update task'));
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const trigger = await screen.findByRole('button', {
+      name: 'Expand details for Review HeroUI migration',
+    });
+
+    fireEvent.contextMenu(trigger, { clientX: 120, clientY: 160 });
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Edit task' });
+    const titleInput = within(dialog).getByLabelText('Title');
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Failed task update');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(updateTask).toHaveBeenCalledTimes(1);
+    });
+    expect(await within(dialog).findByText('Unable to update task')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Edit task' })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Title')).toHaveValue('Failed task update');
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled();
+    expect(listTasks).toHaveBeenCalledTimes(1);
+  });
+
   it('asks for confirmation before deleting a task and its child todos from the right-click menu', async () => {
     const user = userEvent.setup();
     deleteTask.mockResolvedValue(undefined);
@@ -345,5 +450,33 @@ describe('TaskPanel interactions', () => {
       expect(screen.queryByRole('dialog', { name: 'Delete task' })).not.toBeInTheDocument();
     });
     expect(deleteTask).not.toHaveBeenCalled();
+  });
+
+  it('shows a page error and avoids reloading when deleting a task fails', async () => {
+    const user = userEvent.setup();
+    deleteTask.mockRejectedValue(new Error('Unable to delete task'));
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const trigger = await screen.findByRole('button', {
+      name: 'Expand details for Review HeroUI migration',
+    });
+
+    fireEvent.contextMenu(trigger, { clientX: 120, clientY: 160 });
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+
+    const deleteDialog = await screen.findByRole('dialog', { name: 'Delete task' });
+    await user.click(within(deleteDialog).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(deleteTask).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText('Unable to delete task')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Delete task' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.getByText('Review HeroUI migration')).toBeInTheDocument();
+    expect(listTasks).toHaveBeenCalledTimes(1);
   });
 });

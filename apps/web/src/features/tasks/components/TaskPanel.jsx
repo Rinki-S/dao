@@ -11,7 +11,6 @@ import {
   Checkbox,
   Chip,
   Dropdown,
-  FieldError,
   InputGroup,
   Label,
   Modal,
@@ -419,7 +418,6 @@ export function TaskPanel({ currentWorkspace }) {
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create task');
-      setStatus('error');
     } finally {
       setIsCreating(false);
     }
@@ -823,7 +821,11 @@ export function TaskPanel({ currentWorkspace }) {
             </div>
           </TextField>
 
-          {error && <FieldError>{error}</FieldError>}
+          {error && (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
         </div>
       </form>
 
@@ -1263,7 +1265,11 @@ export function TaskPanel({ currentWorkspace }) {
                     </Dropdown.Popover>
                   </Dropdown>
 
-                  {editTaskError && <FieldError>{editTaskError}</FieldError>}
+                  {editTaskError && (
+                    <p role="alert" className="text-sm text-danger">
+                      {editTaskError}
+                    </p>
+                  )}
                 </Modal.Body>
 
                 <Modal.Footer>
