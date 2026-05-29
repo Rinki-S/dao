@@ -22,7 +22,6 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
-import { cn } from '@/lib/utils';
 import { notifyActivityChanged } from '../../activities/events.js';
 import { listProjects } from '../../projects/api.js';
 import { createTask, deleteTask, listTasks, updateTask, updateTaskStatus } from '../api.js';
@@ -196,15 +195,12 @@ function GsapDisclosure({ children, className, contentClassName, dataSlot, isOpe
       ref={rootRef}
       data-slot={dataSlot}
       aria-hidden={!isOpen}
-      className={cn('overflow-hidden', className)}
+      className={`overflow-hidden ${className ?? ''}`}
       {...(!isOpen ? { inert: true } : {})}
     >
       <div
         ref={contentRef}
-        className={cn(
-          'min-h-0 transform-gpu overflow-visible [will-change:transform,opacity]',
-          contentClassName,
-        )}
+        className={`min-h-0 transform-gpu overflow-visible [will-change:transform,opacity] ${contentClassName ?? ''}`}
       >
         {children}
       </div>
@@ -218,7 +214,7 @@ function TaskApiErrorMessage({ children, className }) {
   }
 
   return (
-    <p role="alert" className={cn('text-sm text-danger', className)}>
+    <p role="alert" className={`text-sm text-danger ${className ?? ''}`}>
       {children}
     </p>
   );
@@ -732,7 +728,7 @@ export function TaskPanel({ currentWorkspace }) {
                       variant="ghost"
                     >
                       {({ isPressed }) => (
-                        <span className={cn(isPressed && 'scale-[0.97]')}>
+                        <span className={isPressed ? 'scale-[0.97]' : undefined}>
                           {selectedWorkspaceProjectId
                             ? (projectNameById.get(selectedWorkspaceProjectId) ?? 'Project')
                             : 'No project'}
@@ -771,7 +767,7 @@ export function TaskPanel({ currentWorkspace }) {
                       variant="ghost"
                     >
                       {({ isPressed }) => (
-                        <span className={cn(isPressed && 'scale-[0.97]')}>
+                        <span className={isPressed ? 'scale-[0.97]' : undefined}>
                           {priorityLabels[taskPriority]}
                         </span>
                       )}
@@ -936,12 +932,7 @@ export function TaskPanel({ currentWorkspace }) {
                                       <Button
                                         aria-expanded={canShowTaskDetails ? isExpanded : undefined}
                                         aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${task.title}`}
-                                        className={cn(
-                                          'min-w-0 flex-1 transform-gpu justify-start rounded-md px-2 py-1.5 text-left transition-[background-color,scale] duration-150 ease-out active:scale-[0.96] data-[pressed=true]:scale-[0.96]',
-                                          canShowTaskDetails
-                                            ? 'hover:bg-surface-secondary focus-visible:ring-2 focus-visible:ring-focus'
-                                            : 'pointer-events-none opacity-100',
-                                        )}
+                                        className={`min-w-0 flex-1 transform-gpu justify-start rounded-md px-2 py-1.5 text-left transition-[background-color,scale] duration-150 ease-out active:scale-[0.96] data-[pressed=true]:scale-[0.96] ${canShowTaskDetails ? 'hover:bg-surface-secondary focus-visible:ring-2 focus-visible:ring-focus' : 'pointer-events-none opacity-100'}`}
                                         data-slot="task-details-trigger"
                                         aria-disabled={!canShowTaskDetails}
                                         type="button"
@@ -954,10 +945,7 @@ export function TaskPanel({ currentWorkspace }) {
                                       >
                                         <div className="flex min-w-0 items-center gap-2">
                                           <div
-                                            className={cn(
-                                              'min-w-0 truncate text-sm font-medium text-foreground',
-                                              isDone && 'text-muted-foreground line-through',
-                                            )}
+                                            className={`min-w-0 truncate text-sm font-medium ${isDone ? 'text-muted-foreground line-through' : 'text-foreground'}`}
                                           >
                                             {task.title}
                                             {projectName && (
@@ -1124,11 +1112,7 @@ export function TaskPanel({ currentWorkspace }) {
 
                                                     <div className="min-w-0 flex-1">
                                                       <div
-                                                        className={cn(
-                                                          'min-w-0 truncate text-sm font-medium text-foreground',
-                                                          isChildDone &&
-                                                            'text-muted-foreground line-through',
-                                                        )}
+                                                        className={`min-w-0 truncate text-sm font-medium ${isChildDone ? 'text-muted-foreground line-through' : 'text-foreground'}`}
                                                       >
                                                         {childTask.title}
                                                         {childProjectName && (
