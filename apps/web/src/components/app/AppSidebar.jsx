@@ -1,7 +1,6 @@
 import { Button, Tooltip } from '@heroui/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Layers01Icon from '@hugeicons/core-free-icons/Layers01Icon';
-import { cn } from '@/lib/utils.js';
 import { ProjectTree } from './ProjectTree.jsx';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx';
 
@@ -107,10 +106,7 @@ export function AppSidebar({
 
   return (
     <aside
-      className={cn(
-        'relative hidden h-[calc(100dvh-3rem)] shrink-0 flex-col border-r border-border bg-background text-sidebar-foreground transition-[width] duration-200 ease-linear md:flex',
-        isSidebarOpen ? 'w-(--sidebar-width)' : 'w-(--sidebar-width-icon)',
-      )}
+      className={`relative hidden h-[calc(100dvh-3rem)] shrink-0 flex-col border-r border-border bg-background text-sidebar-foreground transition-[width] duration-200 ease-linear md:flex ${isSidebarOpen ? 'w-(--sidebar-width)' : 'w-(--sidebar-width-icon)'}`}
       data-collapsible={isSidebarOpen ? '' : 'icon'}
       data-sidebar-state={isSidebarOpen ? 'expanded' : 'collapsed'}
       data-slot="app-sidebar"
@@ -138,10 +134,7 @@ export function AppSidebar({
       <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-0 overflow-auto data-[collapsed=true]:overflow-hidden">
         <section className="relative flex w-full min-w-0 flex-col p-2">
           <div
-            className={cn(
-              'flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 transition-[margin,opacity] duration-200 ease-linear',
-              !isSidebarOpen && '-mt-8 opacity-0',
-            )}
+            className={`flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 transition-[margin,opacity] duration-200 ease-linear ${!isSidebarOpen ? '-mt-8 opacity-0' : ''}`}
           >
             Workspace
           </div>
@@ -154,17 +147,13 @@ export function AppSidebar({
                 const isActive = surfaceId === activeSurfaceId;
                 const surfaceButton = (
                   <Button
-                    className={cn(
-                      sidebarSurfaceButtonBase,
-                      !isSidebarOpen && 'size-8 justify-center p-2',
-                      isActive ? activeSurfaceButtonClass : inactiveSurfaceButtonClass,
-                    )}
+                    className={`${sidebarSurfaceButtonBase} ${!isSidebarOpen ? 'size-8 justify-center p-2' : 'justify-start'} ${isActive ? `font-medium ${activeSurfaceButtonClass}` : inactiveSurfaceButtonClass}`}
                     type="button"
                     variant="ghost"
                     onPress={() => onSelectSurface(surfaceId)}
                   >
                     <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
-                    <span className={cn('truncate', !isSidebarOpen && 'sr-only')}>
+                    <span className={`truncate ${!isSidebarOpen ? 'sr-only' : ''}`}>
                       {item.label}
                     </span>
                   </Button>
@@ -207,10 +196,7 @@ export function AppSidebar({
               const surfaceButton = (
                 <Button
                   aria-label={item.label}
-                  className={cn(
-                    sidebarIconButtonBase,
-                    isActive ? activeSurfaceButtonClass : inactiveSurfaceButtonClass,
-                  )}
+                  className={`${sidebarIconButtonBase} ${isActive ? activeSurfaceButtonClass : inactiveSurfaceButtonClass}`}
                   isIconOnly
                   size="sm"
                   type="button"

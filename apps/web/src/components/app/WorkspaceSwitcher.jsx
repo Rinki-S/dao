@@ -18,7 +18,6 @@ import AlertCircleIcon from '@hugeicons/core-free-icons/AlertCircleIcon';
 import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
 import CheckmarkSquare01Icon from '@hugeicons/core-free-icons/CheckmarkSquare01Icon';
 import SquareStackIcon from '@hugeicons/core-free-icons/SquareStackIcon';
-import { cn } from '@/lib/utils.js';
 import { AppApiErrorMessage } from './AppApiErrorMessage.jsx';
 
 export function WorkspaceSwitcher({
@@ -82,11 +81,7 @@ export function WorkspaceSwitcher({
       <Dropdown isOpen={menuOpen} onOpenChange={onMenuOpenChange}>
         <Dropdown.Trigger
           aria-label="Switch workspace"
-          className={cn(
-            'app-no-drag flex h-12 w-full transform-gpu items-center gap-2 overflow-hidden rounded-md p-2 text-left font-heading text-sm ring-sidebar-ring outline-hidden transition-[transform,scale,background-color,color,width,height,padding] duration-[250ms] ease-[var(--ease-smooth)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[focus-visible=true]:ring-2 active:scale-[0.97] data-[pressed=true]:scale-[0.97] data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100',
-            menuOpen && 'bg-sidebar-accent text-sidebar-accent-foreground',
-            !isSidebarOpen && 'size-8 justify-center p-0',
-          )}
+          className={`app-no-drag flex h-12 w-full transform-gpu items-center gap-2 overflow-hidden rounded-md p-2 text-left font-heading text-sm ring-sidebar-ring outline-hidden transition-[transform,scale,background-color,color,width,height,padding] duration-[250ms] ease-[var(--ease-smooth)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[focus-visible=true]:ring-2 active:scale-[0.97] data-[pressed=true]:scale-[0.97] data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100 ${menuOpen ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''} ${!isSidebarOpen ? 'size-8 justify-center p-0' : ''}`}
         >
           {({ isPressed }) => (
             <>
@@ -101,7 +96,7 @@ export function WorkspaceSwitcher({
                   {currentWorkspace?.name ?? 'Workspace'}
                 </Tooltip.Content>
               </Tooltip>
-              <span className={cn('flex min-w-0 flex-1 flex-col', !isSidebarOpen && 'sr-only')}>
+              <span className={`flex min-w-0 flex-1 flex-col ${!isSidebarOpen ? 'sr-only' : ''}`}>
                 <span className="truncate text-sm font-semibold tracking-normal">
                   {currentWorkspace?.name ?? 'No workspace'}
                 </span>
@@ -111,11 +106,7 @@ export function WorkspaceSwitcher({
               </span>
               <HugeiconsIcon
                 icon={ArrowDown01Icon}
-                className={cn(
-                  'size-[18px] shrink-0 translate-y-px transition-transform',
-                  (isPressed || menuOpen) && 'rotate-180',
-                  !isSidebarOpen && 'hidden',
-                )}
+                className={`size-[18px] shrink-0 translate-y-px transition-transform ${(isPressed || menuOpen) ? 'rotate-180' : ''} ${!isSidebarOpen ? 'hidden' : ''}`}
               />
             </>
           )}

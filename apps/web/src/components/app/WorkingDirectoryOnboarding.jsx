@@ -3,7 +3,6 @@ import { Button, FieldError, Input, Label, Surface, TextField } from '@heroui/re
 import { HugeiconsIcon } from '@hugeicons/react';
 import FolderOpenIcon from '@hugeicons/core-free-icons/FolderOpenIcon';
 import { DirectoryPickerResultSchema } from '@/features/settings/schemas.js';
-import { cn } from '@/lib/utils.js';
 import { AppApiErrorMessage } from './AppApiErrorMessage.jsx';
 
 const ONBOARDING_STEP_ORDER = {
@@ -136,10 +135,7 @@ export function WorkingDirectoryOnboarding({
           key={step}
           data-direction={stepDirection}
           data-step-transition
-          className={cn(
-            stepDirection !== 'none' &&
-              'animate-in fade-in-0 duration-150 ease-out data-[direction=backward]:slide-in-from-left-4 data-[direction=forward]:slide-in-from-right-4 motion-reduce:animate-none motion-reduce:transition-none',
-          )}
+          className={stepDirection !== 'none' ? 'animate-in fade-in-0 duration-150 ease-out data-[direction=backward]:slide-in-from-left-4 data-[direction=forward]:slide-in-from-right-4 motion-reduce:animate-none motion-reduce:transition-none' : undefined}
         >
           <div className="mb-6 flex flex-col gap-2" data-step-header>
             <p className="text-sm text-muted-foreground">
@@ -373,20 +369,12 @@ function OnboardingStepIndicator({ currentStep }) {
             <div className="flex items-center gap-2">
               <span
                 aria-current={isActive ? 'step' : undefined}
-                className={cn(
-                  'flex size-6 items-center justify-center rounded-full text-xs font-medium tabular-nums transition-[background-color,color,opacity] duration-150 motion-reduce:transition-none',
-                  isActive || isComplete
-                    ? 'bg-accent text-accent-foreground'
-                    : 'bg-default text-default-foreground opacity-60',
-                )}
+                className={`flex size-6 items-center justify-center rounded-full text-xs font-medium tabular-nums transition-[background-color,color,opacity] duration-150 motion-reduce:transition-none ${isActive || isComplete ? 'bg-accent text-accent-foreground' : 'bg-default text-default-foreground opacity-60'}`}
               >
                 {index + 1}
               </span>
               <span
-                className={cn(
-                  'text-xs font-medium transition-[color,opacity] duration-150 motion-reduce:transition-none',
-                  isActive ? 'text-foreground' : 'text-muted opacity-70',
-                )}
+                className={`text-xs font-medium transition-[color,opacity] duration-150 motion-reduce:transition-none ${isActive ? 'text-foreground' : 'text-muted opacity-70'}`}
               >
                 {step.label}
               </span>
@@ -394,10 +382,7 @@ function OnboardingStepIndicator({ currentStep }) {
             {index < steps.length - 1 && (
               <span
                 aria-hidden="true"
-                className={cn(
-                  'h-px w-8 rounded-full transition-[background-color,opacity] duration-150 motion-reduce:transition-none',
-                  isComplete ? 'bg-accent' : 'bg-border opacity-70',
-                )}
+                className={`h-px w-8 rounded-full transition-[background-color,opacity] duration-150 motion-reduce:transition-none ${isComplete ? 'bg-accent' : 'bg-border opacity-70'}`}
               />
             )}
           </div>
