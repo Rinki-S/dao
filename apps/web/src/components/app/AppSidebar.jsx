@@ -106,7 +106,7 @@ export function AppSidebar({
 
   return (
     <aside
-      className={`relative hidden h-[calc(100dvh-3rem)] shrink-0 flex-col border-r border-border bg-background text-sidebar-foreground transition-[width] duration-200 ease-linear md:flex ${isSidebarOpen ? 'w-(--sidebar-width)' : 'w-(--sidebar-width-icon)'}`}
+      className={`relative hidden h-[calc(100dvh-3rem)] shrink-0 flex-col border-r border-border bg-surface text-sidebar-foreground transition-[width] duration-200 ease-linear md:flex ${isSidebarOpen ? 'w-(--sidebar-width)' : 'w-(--sidebar-width-icon)'}`}
       data-collapsible={isSidebarOpen ? '' : 'icon'}
       data-sidebar-state={isSidebarOpen ? 'expanded' : 'collapsed'}
       data-slot="app-sidebar"
