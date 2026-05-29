@@ -488,17 +488,44 @@ Expected behavior:
 
 ## 10. UI Structure
 
-### Sidebar
+### Current Shell
 
 ```txt
-Dashboard
-Projects
-Tasks
-Notes
-Search
-Extensions
-Settings
+Titlebar
+  Sidebar toggle
+  App name
+  Global search
+
+Sidebar
+  Workspace switcher
+  Workspace
+    Tasks
+  Projects
+    Project folders
+    Project notes
+    Workspace-root notes
+  Settings
+
+Main content
+  Fixed surface title
+  Active surface body
 ```
+
+The current product shell intentionally keeps the sidebar focused on Tasks, project folders, note files, and Settings. Dashboard, standalone Notes, and extension browsing surfaces are deferred until the core workstation loop is stronger.
+
+Unassigned notes are shown directly at the workspace root in the sidebar file tree rather than under a synthetic "No Project" folder.
+
+### Command Palette
+
+The command palette should stay global and keyboard-first.
+
+Implementation direction:
+
+- use `cmdk` for command search, selection, and keyboard interaction
+- use HeroUI for the modal shell, keyboard hint styling, overlay behavior, and semantic colors
+- center the palette above the app shell
+- keep the backdrop above the titlebar
+- use HeroUI surface, field, focus, muted, danger, separator, and accent-soft tokens instead of shadcn-era color names
 
 ### Dashboard
 
@@ -528,6 +555,8 @@ Notes page should show:
 - project notes
 - learning notes
 - interview notes later
+
+The current MVP does not expose a standalone Notes page. Notes are accessed through the workspace/project file tree and opened in the note editor surface.
 
 ## 11. Product Milestones
 
@@ -734,11 +763,11 @@ Dao should demonstrate:
 The immediate goal is:
 
 ```txt
-Build the smallest Electron + React + Go + SQLite loop.
+Finish the HeroUI product-shell migration and note editor loop.
 ```
 
-The first meaningful demo should prove:
+The current meaningful demo should prove:
 
 ```txt
-Dao can open as a desktop app, create a workspace, save it to SQLite, and display it in React.
+Dao can open as a desktop app, configure a working directory, create a workspace, manage tasks, create project-backed or workspace-root markdown notes, search local data, and navigate through the sidebar and command palette.
 ```

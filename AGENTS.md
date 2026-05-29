@@ -35,6 +35,9 @@ Important choices:
 - SQLite is the first local database.
 - Zod validates runtime data at system boundaries.
 - JSDoc documents object shapes in JavaScript.
+- HeroUI is the current React component foundation.
+- hugeicons is the current icon library.
+- `cmdk` remains the command palette interaction core.
 - Cloud sync is deferred.
 - AI Agent features are deferred until core data exists.
 
@@ -637,10 +640,10 @@ thoughtful
 The current highest priority is:
 
 ```txt
-Build the smallest Electron + React + Go + SQLite loop.
+Finish the HeroUI product-shell migration and note editor loop.
 ```
 
-The first technical milestone:
+The first technical milestone is complete:
 
 ```txt
 Dao desktop app starts.
@@ -649,6 +652,14 @@ Go service starts.
 SQLite stores a workspace.
 React displays that workspace.
 ```
+
+Current immediate work should focus on:
+
+- completing the remaining HeroUI migration
+- removing unused shadcn-era compatibility files only after import checks
+- keeping `cmdk` for command palette behavior while using HeroUI for styling and overlay shell
+- preserving filesystem-backed workspace, project, and markdown note behavior
+- improving the note editor without introducing AI features yet
 
 Do not prioritize AI, cloud sync, or extensions before this loop works.
 

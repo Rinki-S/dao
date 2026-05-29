@@ -44,6 +44,7 @@ Dao brings these fragments into one calm, local-first workspace.
 - Go
 - SQLite
 - HeroUI
+- hugeicons
 - Tailwind CSS
 - Zod
 - JSDoc
@@ -77,11 +78,14 @@ React lists notes
 React creates notes
 React searches projects, tasks, and notes
 React exposes core actions through a command palette
-React is migrating from a shadcn-style UI foundation to HeroUI
-SQLite persists workspace data locally
+React runs a product-shell style layout with titlebar, sidebar, file tree, active surfaces, onboarding, and settings
+React is migrating the remaining shadcn-era UI pieces to HeroUI
+Workspaces and projects are backed by folders in a user-selected working directory
+Markdown note bodies are stored as files on disk while SQLite stores note metadata
+SQLite persists local metadata, search indexes, tasks, projects, workspaces, settings, and activities
 ```
 
-The current renderer UI is a foundation layer rather than the final product experience. The next product UI phase should turn the existing stacked MVP surfaces into a real workspace shell with active navigation, a stronger dashboard, and domain-specific project/task/note experiences.
+The current renderer UI has moved from stacked MVP panels toward a real product shell. Tasks, settings, onboarding, project tree, project contents, and the command palette now use the HeroUI direction. The note editor and some old local UI compatibility files remain to be migrated.
 
 ## MVP Scope
 
@@ -123,8 +127,11 @@ These features are planned for later stages:
 - [x] Add activity log
 - [x] Add extension system
 - [x] Add initial UI foundation
-- [ ] Migrate component foundation to HeroUI
-- [ ] Build product app shell
+- [x] Add filesystem-backed workspace/project folders
+- [x] Add filesystem-backed markdown note storage
+- [x] Build initial product app shell
+- [ ] Finish component foundation migration to HeroUI
+- [ ] Finish note editor experience
 - [ ] Add AI summary features
 - [ ] Add contextual AI workflow features
 

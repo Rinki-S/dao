@@ -468,7 +468,9 @@ Notes:
 
 ## Active Foundation Migration: HeroUI and hugeicons
 
-Recommended branch:
+Status: in progress
+
+Branch:
 
 ```txt
 feat/heroui-hugeicons
@@ -484,20 +486,36 @@ Direction:
 
 - use HeroUI as the maintained accessible primitive layer for buttons, inputs, overlays, tables, menus, keyboard hints, and related controls
 - keep Dao-specific layout and product composition in app-owned components
-- migrate gradually through compatibility wrappers instead of rewriting every product surface at once
-- keep `cmdk` for the command palette until a HeroUI-backed command composition is designed
+- import HeroUI components directly in migrated or new UI code instead of creating shadcn-compatible wrapper layers
+- keep `cmdk` as the command palette interaction core; use HeroUI for the modal shell, keyboard hints, colors, and overlay behavior
+- import hugeicons directly where icons are used; do not add a centralized icon gateway
 - replace `@nine-thirty-five/material-symbols-react` with `@hugeicons/react` and `@hugeicons/core-free-icons`
 - remove shadcn, Radix, class-variance-authority, and tailwind-merge only after no current component imports depend on them
 
-First migration slice:
+Completed so far:
 
 - install HeroUI and hugeicons dependencies
 - import HeroUI styles after Tailwind CSS
-- update project documentation to describe the new UI and icon direction
+- define Dao's HeroUI theme variables in `apps/web/src/index.css`
+- set the current app font to Funnel Sans Variable
+- migrate the titlebar, sidebar, workspace switcher, project tree, project contents, task panel, settings panel, onboarding, and command palette shell toward HeroUI
+- replace Material Symbols usage with direct hugeicons imports
+- keep extension-owned content format icons in the extension registry, including the built-in `markdown` content format
+- keep the command palette on `cmdk` while styling it with HeroUI surface, field, focus, muted, danger, separator, and accent-soft tokens
+- center the command palette and keep its global overlay above the app titlebar
 
-## Next Milestone: Product Shell
+Remaining migration work:
 
-Recommended branch:
+- migrate `NoteEditorPanel` away from old local `Input` and `Textarea` wrappers
+- remove unused shadcn-era files under `apps/web/src/components/ui/*` after import checks prove they are dead
+- remove Radix, shadcn, class-variance-authority, and tailwind-merge dependencies only after no current code needs them
+- run visual QA for the migrated shell, dialogs, tables, command palette, onboarding, and task interactions
+
+## Milestone 9: Product Shell
+
+Status: in progress
+
+Branch:
 
 ```txt
 feat/product-shell
@@ -513,10 +531,56 @@ Planned scope:
 
 - replace the stacked all-surfaces page with route-like active surface navigation
 - make the sidebar communicate the current workspace structure and active surface
-- turn Dashboard into the first real product home surface
+- keep Tasks as the primary MVP surface for now
 - keep command palette as the global action entry point
 - preserve existing API contracts and MVP create/list behavior while reorganizing the UI
 - avoid AI features until the product shell can carry existing local context clearly
+
+Completed so far:
+
+- add a fixed app titlebar with sidebar toggle and global search
+- add a resizable/collapsible sidebar
+- keep the main sidebar navigation focused on Tasks and Settings
+- render projects as folders in the sidebar file tree
+- render project notes under their project folder and unassigned notes at the workspace root
+- open project folders into a project contents surface
+- open notes from the file tree into the note editor surface
+- keep page title/header areas fixed while scrollable content stays inside the active surface
+- add a settings surface with iOS-style sections for storage and debug actions
+- add full-window onboarding for first working directory selection and first workspace creation
+- add replay onboarding from Settings
+- add a development-only Go service restart action through the desktop preload bridge
+
+Product shell work still deferred:
+
+- a real Dashboard/home surface
+- richer project detail editing
+- finished note editor experience
+- route capability support in the extension registry
+- browser-level visual QA across desktop and narrow viewports
+
+## Next Milestone: Note Editor and Remaining HeroUI Migration
+
+Recommended branch:
+
+```txt
+feat/note-editor-heroui
+```
+
+Goal:
+
+```txt
+Dao finishes the notes surface and removes the remaining shadcn-era UI dependencies.
+```
+
+Planned scope:
+
+- migrate `NoteEditorPanel` to HeroUI fields or a proper markdown editor surface
+- keep markdown content filesystem-backed through the Go service
+- preserve debounced autosave and visible save state
+- decide the next markdown editor implementation path before reintroducing a rich editor
+- remove dead compatibility wrappers and dependencies after import checks
+- keep AI features deferred
 
 ## Later Milestone: AI Summary Loop
 
