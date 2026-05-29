@@ -18,6 +18,7 @@ export function AppSearchBar() {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const listRef = useRef(null);
   const panelRef = useRef(null);
+  const containerRef = useRef(null);
   const [shouldRender, setShouldRender] = useState(false);
   const trimmedQuery = query.trim();
   const isPanelVisible = trimmedQuery !== '';
@@ -67,6 +68,20 @@ export function AppSearchBar() {
 
     return null;
   }, [displayStatus, error, results, selectedIndex]);
+
+  useEffect(() => {
+    if (!isPanelVisible) return;
+
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setQuery('');
+        setSelectedIndex(-1);
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [isPanelVisible]);
 
   useEffect(() => {
     if (selectedIndex < 0 || !listRef.current) return;
@@ -181,7 +196,7 @@ export function AppSearchBar() {
   }
 
   return (
-    <div className="app-no-drag relative w-full max-w-md">
+    <div ref={containerRef} className="app-no-drag relative w-full max-w-md">
       <SearchField
         className="w-full"
         name="app-search"
@@ -228,7 +243,10 @@ export function AppSearchBar() {
       </SearchField>
 
       {shouldRender && (
-        <div ref={panelRef} className="absolute top-10 left-0 z-[100] w-full rounded-xl bg-overlay text-overlay-foreground shadow-md ring-1 ring-border">
+        <div
+          ref={panelRef}
+          className="absolute top-10 left-0 z-[100] w-full rounded-xl bg-overlay text-overlay-foreground shadow-md ring-1 ring-border"
+        >
           {panelContent}
         </div>
       )}
