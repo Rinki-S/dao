@@ -38,7 +38,7 @@ vi.mock('../api.js', () => ({
       projectId: 'project-1',
       parentId: null,
       title: 'Review HeroUI migration',
-      description: '',
+      description: 'Check the row trigger behavior.',
       status: 'todo',
       priority: 'high',
       dueDate: null,
@@ -136,10 +136,11 @@ describe('TaskPanel table migration boundary', () => {
 
     expect(source).toContain('transition-[grid-template-rows] duration-200 ease-out');
     expect(source).toContain("isTaskDetailVisible ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'");
-    expect(source).toContain('shrink-0 transform-gpu transition-transform duration-150 ease-out');
     expect(source).toContain(
       'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
     );
+    expect(source).toContain('data-slot="task-details-trigger"');
+    expect(source).toContain('transition-[background-color,scale] duration-150 ease-out');
     expect(source).toContain('transition-[opacity,transform] duration-150 ease-out');
     expect(source).toContain("'translate-y-0 opacity-100'");
     expect(source).toContain("'-translate-y-1 opacity-0'");
@@ -167,6 +168,29 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).toMatch(
       /\{status === 'ready' && parentTasks\.length > 0 && \(\s+<div className="px-8">\s+<Table className="border-b" variant="secondary">/,
     );
+  });
+
+  it('uses the task title area as the details trigger instead of caret and note menu buttons', async () => {
+    const user = userEvent.setup();
+    const source = fs.readFileSync(taskPanelPath, 'utf8');
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const trigger = await screen.findByRole('button', {
+      name: 'Expand details for Review HeroUI migration',
+    });
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /Expand Review HeroUI migration/ })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /Show notes for Review HeroUI migration/ }),
+    ).toBeNull();
+    expect(source).not.toContain('ArrowRight01Icon');
+    expect(source).not.toContain('MoreHorizontalIcon');
+
+    await user.click(trigger);
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('keeps the quick add button visible and disables it until a title is entered', async () => {

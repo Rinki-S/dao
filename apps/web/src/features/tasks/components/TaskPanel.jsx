@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
-import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
 import Calendar03Icon from '@hugeicons/core-free-icons/Calendar03Icon';
-import MoreHorizontalIcon from '@hugeicons/core-free-icons/MoreHorizontalIcon';
 import TaskDone01Icon from '@hugeicons/core-free-icons/TaskDone01Icon';
 import {
   Button,
@@ -102,8 +100,7 @@ export function TaskPanel({ currentWorkspace }) {
   const [childTaskParentId, setChildTaskParentId] = useState('');
   const [childTaskTitle, setChildTaskTitle] = useState('');
   const [isCreatingChild, setIsCreatingChild] = useState(false);
-  const [collapsedTaskIds, setCollapsedTaskIds] = useState(() => new Set());
-  const [expandedDescriptionTaskIds, setExpandedDescriptionTaskIds] = useState(() => new Set());
+  const [expandedTaskIds, setExpandedTaskIds] = useState(() => new Set());
   const [hasTaskScrollOffset, setHasTaskScrollOffset] = useState(false);
   const taskTitleInputRef = useRef(null);
 
@@ -288,9 +285,9 @@ export function TaskPanel({ currentWorkspace }) {
   }
 
   function openChildTaskForm(parentTaskId) {
-    setCollapsedTaskIds((currentIds) => {
+    setExpandedTaskIds((currentIds) => {
       const nextIds = new Set(currentIds);
-      nextIds.delete(parentTaskId);
+      nextIds.add(parentTaskId);
       return nextIds;
     });
     setChildTaskParentId(parentTaskId);
@@ -363,22 +360,8 @@ export function TaskPanel({ currentWorkspace }) {
     );
   }
 
-  function toggleTaskCollapse(taskId) {
-    setCollapsedTaskIds((currentIds) => {
-      const nextIds = new Set(currentIds);
-
-      if (nextIds.has(taskId)) {
-        nextIds.delete(taskId);
-      } else {
-        nextIds.add(taskId);
-      }
-
-      return nextIds;
-    });
-  }
-
-  function toggleTaskDescription(taskId) {
-    setExpandedDescriptionTaskIds((currentIds) => {
+  function toggleTaskDetails(taskId) {
+    setExpandedTaskIds((currentIds) => {
       const nextIds = new Set(currentIds);
 
       if (nextIds.has(taskId)) {
@@ -619,49 +602,44 @@ export function TaskPanel({ currentWorkspace }) {
                         const isUpdating = updatingTaskIds.has(task.id);
                         const isAddingChild = childTaskParentId === task.id;
                         const hasChildren = taskChildren.length > 0;
-                        const isCollapsed = collapsedTaskIds.has(task.id);
+                        const isExpanded = expandedTaskIds.has(task.id);
                         const hasDescription = task.description.trim() !== '';
-                        const isDescriptionExpanded = expandedDescriptionTaskIds.has(task.id);
-                        const hasVisibleChildren = hasChildren && !isCollapsed;
-                        const isChildFormVisible = isAddingChild && !isCollapsed;
-                        const isTaskDetailVisible =
-                          (hasDescription && isDescriptionExpanded) ||
-                          isChildFormVisible ||
-                          hasVisibleChildren;
+                        const hasVisibleChildren = hasChildren && isExpanded;
+                        const isChildFormVisible = isAddingChild && isExpanded;
+                        const canShowTaskDetails = hasDescription || hasChildren || isAddingChild;
+                        const isTaskDetailVisible = isExpanded && canShowTaskDetails;
+                        const completedChildCount = taskChildren.filter(
+                          (childTask) => childTask.status === 'done',
+                        ).length;
 
                         return (
                           <Table.Row key={task.id} id={task.id}>
                             <Table.Cell className="p-0" colSpan={3}>
                               <div data-slot="task-row-layout" className="flex min-w-0 flex-col">
                                 <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_7rem_5rem] items-center">
-                                  <div className="relative min-w-0 py-2 pl-8">
-                                    {hasChildren ? (
-                                      <Button
-                                        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${task.title}`}
-                                        className={cn(
-                                          taskRowIconButtonClassName,
-                                          'absolute top-1/2 left-1 -translate-y-1/2',
-                                        )}
-                                        isIconOnly
-                                        size="sm"
-                                        type="button"
-                                        variant="ghost"
-                                        onPress={() => toggleTaskCollapse(task.id)}
-                                      >
-                                        <HugeiconsIcon
-                                          icon={ArrowRight01Icon}
-                                          aria-hidden="true"
-                                          className={cn(
-                                            'size-[18px] shrink-0 transform-gpu transition-transform duration-150 ease-out',
-                                            !isCollapsed && 'rotate-90',
-                                          )}
-                                        />
-                                      </Button>
-                                    ) : null}
+                                  <div className="relative min-w-0 py-1.5 pl-8">
                                     <div className="flex min-w-0 items-center gap-3">
                                       {renderTaskCheckbox(task, isUpdating)}
 
-                                      <div className="min-w-0 flex-1">
+                                      <Button
+                                        aria-expanded={canShowTaskDetails ? isExpanded : undefined}
+                                        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${task.title}`}
+                                        className={cn(
+                                          'min-w-0 flex-1 justify-start rounded-md px-2 py-1.5 text-left transition-[background-color,scale] duration-150 ease-out active:scale-[0.99] data-[pressed=true]:scale-[0.99]',
+                                          canShowTaskDetails
+                                            ? 'hover:bg-surface-secondary focus-visible:ring-2 focus-visible:ring-focus'
+                                            : 'pointer-events-none opacity-100',
+                                        )}
+                                        data-slot="task-details-trigger"
+                                        aria-disabled={!canShowTaskDetails}
+                                        type="button"
+                                        variant="ghost"
+                                        onPress={() => {
+                                          if (canShowTaskDetails) {
+                                            toggleTaskDetails(task.id);
+                                          }
+                                        }}
+                                      >
                                         <div className="flex min-w-0 items-center gap-2">
                                           <div
                                             className={cn(
@@ -683,8 +661,18 @@ export function TaskPanel({ currentWorkspace }) {
                                           >
                                             {priorityLabels[task.priority]}
                                           </Chip>
+                                          {hasDescription && (
+                                            <span className="shrink-0 text-xs font-normal text-muted-foreground">
+                                              Note
+                                            </span>
+                                          )}
+                                          {hasChildren && (
+                                            <span className="shrink-0 text-xs font-normal text-muted-foreground tabular-nums">
+                                              {completedChildCount}/{taskChildren.length}
+                                            </span>
+                                          )}
                                         </div>
-                                      </div>
+                                      </Button>
                                     </div>
                                   </div>
 
@@ -703,24 +691,6 @@ export function TaskPanel({ currentWorkspace }) {
 
                                   <div className="pr-8 text-right">
                                     <div className="flex justify-end gap-1">
-                                      {hasDescription && (
-                                        <Button
-                                          aria-label={`${isDescriptionExpanded ? 'Hide' : 'Show'} notes for ${task.title}`}
-                                          className={taskRowIconButtonClassName}
-                                          isIconOnly
-                                          size="sm"
-                                          type="button"
-                                          variant="ghost"
-                                          onPress={() => toggleTaskDescription(task.id)}
-                                        >
-                                          <HugeiconsIcon
-                                            icon={MoreHorizontalIcon}
-                                            aria-hidden="true"
-                                            className="size-[18px] shrink-0 translate-y-px"
-                                          />
-                                        </Button>
-                                      )}
-
                                       <Button
                                         aria-label={`Add child todo to ${task.title}`}
                                         className={taskRowIconButtonClassName}
@@ -748,7 +718,7 @@ export function TaskPanel({ currentWorkspace }) {
                                     'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
                                     isTaskDetailVisible ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
                                   )}
-                                  {...(!isTaskDetailVisible ? { inert: '' } : {})}
+                                  {...(!isTaskDetailVisible ? { inert: true } : {})}
                                 >
                                   <div
                                     className={cn(
@@ -760,27 +730,9 @@ export function TaskPanel({ currentWorkspace }) {
                                   >
                                     <div className="flex flex-col gap-2 pb-2 pl-15 pr-8">
                                       {hasDescription && (
-                                        <div
-                                          className={cn(
-                                            'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
-                                            isDescriptionExpanded || !isTaskDetailVisible
-                                              ? 'grid-rows-[1fr]'
-                                              : 'grid-rows-[0fr]',
-                                          )}
-                                        >
-                                          <div
-                                            className={cn(
-                                              'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
-                                              isDescriptionExpanded
-                                                ? 'translate-y-0 opacity-100'
-                                                : '-translate-y-1 opacity-0',
-                                            )}
-                                          >
-                                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                                              {task.description}
-                                            </p>
-                                          </div>
-                                        </div>
+                                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                                          {task.description}
+                                        </p>
                                       )}
 
                                       {isAddingChild && (
@@ -792,7 +744,7 @@ export function TaskPanel({ currentWorkspace }) {
                                               ? 'grid-rows-[1fr]'
                                               : 'grid-rows-[0fr]',
                                           )}
-                                          {...(!isChildFormVisible ? { inert: '' } : {})}
+                                          {...(!isChildFormVisible ? { inert: true } : {})}
                                         >
                                           <div
                                             className={cn(
@@ -851,7 +803,7 @@ export function TaskPanel({ currentWorkspace }) {
                                               ? 'grid-rows-[1fr]'
                                               : 'grid-rows-[0fr]',
                                           )}
-                                          {...(!hasVisibleChildren ? { inert: '' } : {})}
+                                          {...(!hasVisibleChildren ? { inert: true } : {})}
                                         >
                                           <div
                                             className={cn(
@@ -871,11 +823,6 @@ export function TaskPanel({ currentWorkspace }) {
                                                 const isChildUpdating = updatingTaskIds.has(
                                                   childTask.id,
                                                 );
-                                                const hasChildDescription =
-                                                  childTask.description.trim() !== '';
-                                                const isChildDescriptionExpanded =
-                                                  expandedDescriptionTaskIds.has(childTask.id);
-
                                                 return (
                                                   <div
                                                     key={childTask.id}
@@ -908,12 +855,11 @@ export function TaskPanel({ currentWorkspace }) {
                                                         </div>
                                                       </div>
 
-                                                      {hasChildDescription &&
-                                                        isChildDescriptionExpanded && (
-                                                          <p className="mt-1 whitespace-pre-wrap pl-8 text-sm leading-relaxed text-muted-foreground">
-                                                            {childTask.description}
-                                                          </p>
-                                                        )}
+                                                      {childTask.description.trim() !== '' && (
+                                                        <p className="mt-1 whitespace-pre-wrap pl-8 text-sm leading-relaxed text-muted-foreground">
+                                                          {childTask.description}
+                                                        </p>
+                                                      )}
                                                     </div>
 
                                                     <div className="px-2 py-2 text-muted-foreground">
@@ -929,27 +875,7 @@ export function TaskPanel({ currentWorkspace }) {
                                                       )}
                                                     </div>
 
-                                                    <div className="py-1.5 text-right">
-                                                      {hasChildDescription && (
-                                                        <Button
-                                                          aria-label={`${isChildDescriptionExpanded ? 'Hide' : 'Show'} notes for ${childTask.title}`}
-                                                          className={taskRowIconButtonClassName}
-                                                          isIconOnly
-                                                          size="sm"
-                                                          type="button"
-                                                          variant="ghost"
-                                                          onPress={() =>
-                                                            toggleTaskDescription(childTask.id)
-                                                          }
-                                                        >
-                                                          <HugeiconsIcon
-                                                            icon={MoreHorizontalIcon}
-                                                            aria-hidden="true"
-                                                            className="size-[18px] shrink-0 translate-y-px"
-                                                          />
-                                                        </Button>
-                                                      )}
-                                                    </div>
+                                                    <div className="py-1.5 text-right" />
                                                   </div>
                                                 );
                                               })}
