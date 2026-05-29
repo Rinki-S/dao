@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -273,6 +274,175 @@ func TestHandlerDeleteTaskInternalErrorUsesGenericResponse(t *testing.T) {
 	}
 	if strings.Contains(body, "database is closed") {
 		t.Fatalf("body = %q, should not leak internal database error", body)
+	}
+}
+
+func TestHandlerUpdateTaskReturnsUpdatedTask(t *testing.T) {
+	db := openTasksTestDB(t)
+	repo := NewRepository(db, &captureTaskIndexer{}, activities.NewRepository(db))
+
+	insertTasksTestWorkspace(t, db, "workspace-1")
+	insertTasksTestTask(t, db, Task{
+		ID:          "task-1",
+		WorkspaceID: "workspace-1",
+		Title:       "Old task",
+		Description: "Old description",
+		Status:      "todo",
+		Priority:    "medium",
+	})
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/tasks/task-1",
+		strings.NewReader(`{"title":" Updated task ","description":" Updated description ","priority":"high"}`),
+	)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var task Task
+	if err := json.NewDecoder(rec.Body).Decode(&task); err != nil {
+		t.Fatalf("decode task: %v", err)
+	}
+	if task.Title != "Updated task" {
+		t.Fatalf("title = %q, want Updated task", task.Title)
+	}
+	if task.Description != "Updated description" {
+		t.Fatalf("description = %q, want Updated description", task.Description)
+	}
+	if task.Priority != "high" {
+		t.Fatalf("priority = %q, want high", task.Priority)
+	}
+}
+
+func TestHandlerUpdateTaskRejectsEmptyPayload(t *testing.T) {
+	db := openTasksTestDB(t)
+	repo := NewRepository(db, &captureTaskIndexer{}, activities.NewRepository(db))
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/task-1", strings.NewReader(`{}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "task update payload is required") {
+		t.Fatalf("body = %q, want task update payload is required", body)
+	}
+}
+
+func TestHandlerUpdateTaskNotFound(t *testing.T) {
+	db := openTasksTestDB(t)
+	repo := NewRepository(db, &captureTaskIndexer{}, activities.NewRepository(db))
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/tasks/missing-task",
+		strings.NewReader(`{"title":"Updated task"}`),
+	)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "task not found") {
+		t.Fatalf("body = %q, want task not found", body)
+	}
+}
+
+func TestHandlerUpdateTaskStatusReturnsUpdatedTask(t *testing.T) {
+	db := openTasksTestDB(t)
+	repo := NewRepository(db, &captureTaskIndexer{}, activities.NewRepository(db))
+
+	insertTasksTestWorkspace(t, db, "workspace-1")
+	insertTasksTestTask(t, db, Task{
+		ID:          "task-1",
+		WorkspaceID: "workspace-1",
+		Title:       "Task",
+		Status:      "todo",
+		Priority:    "medium",
+	})
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/tasks/task-1/status",
+		strings.NewReader(`{"status":"done"}`),
+	)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var task Task
+	if err := json.NewDecoder(rec.Body).Decode(&task); err != nil {
+		t.Fatalf("decode task: %v", err)
+	}
+	if task.Status != "done" {
+		t.Fatalf("status = %q, want done", task.Status)
+	}
+}
+
+func TestHandlerUpdateTaskStatusRejectsInvalidStatus(t *testing.T) {
+	db := openTasksTestDB(t)
+	repo := NewRepository(db, &captureTaskIndexer{}, activities.NewRepository(db))
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/tasks/task-1/status",
+		strings.NewReader(`{"status":"doing"}`),
+	)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "task status is invalid") {
+		t.Fatalf("body = %q, want task status is invalid", body)
+	}
+}
+
+func TestHandlerUpdateTaskStatusNotFound(t *testing.T) {
+	db := openTasksTestDB(t)
+	repo := NewRepository(db, &captureTaskIndexer{}, activities.NewRepository(db))
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/tasks/missing-task/status",
+		strings.NewReader(`{"status":"done"}`),
+	)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "task not found") {
+		t.Fatalf("body = %q, want task not found", body)
 	}
 }
 
