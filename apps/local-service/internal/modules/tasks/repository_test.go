@@ -107,6 +107,48 @@ func TestRepositoryDeleteParentSoftDeletesChildren(t *testing.T) {
 	if len(indexer.deletedEntries) != 2 {
 		t.Fatalf("deleted search entries = %d, want 2", len(indexer.deletedEntries))
 	}
+	if !indexer.deletedTaskEntry("parent-1") {
+		t.Fatalf("deleted search entries = %#v, want parent-1", indexer.deletedEntries)
+	}
+	if !indexer.deletedTaskEntry("child-1") {
+		t.Fatalf("deleted search entries = %#v, want child-1", indexer.deletedEntries)
+	}
+
+	var deletedActivityCount int
+	if err := db.QueryRow(`
+		SELECT COUNT(*)
+		FROM activities
+		WHERE entity_type = 'task' AND action = 'deleted'
+	`).Scan(&deletedActivityCount); err != nil {
+		t.Fatalf("count delete activities: %v", err)
+	}
+	if deletedActivityCount != 1 {
+		t.Fatalf("delete activities = %d, want 1 parent event", deletedActivityCount)
+	}
+
+	var parentDeletedActivityCount int
+	if err := db.QueryRow(`
+		SELECT COUNT(*)
+		FROM activities
+		WHERE entity_type = 'task' AND entity_id = 'parent-1' AND action = 'deleted'
+	`).Scan(&parentDeletedActivityCount); err != nil {
+		t.Fatalf("count parent delete activity: %v", err)
+	}
+	if parentDeletedActivityCount != 1 {
+		t.Fatalf("parent delete activities = %d, want 1", parentDeletedActivityCount)
+	}
+
+	var childDeletedActivityCount int
+	if err := db.QueryRow(`
+		SELECT COUNT(*)
+		FROM activities
+		WHERE entity_type = 'task' AND entity_id = 'child-1' AND action = 'deleted'
+	`).Scan(&childDeletedActivityCount); err != nil {
+		t.Fatalf("count child delete activity: %v", err)
+	}
+	if childDeletedActivityCount != 0 {
+		t.Fatalf("child delete activities = %d, want 0", childDeletedActivityCount)
+	}
 }
 
 func TestRepositoryDeleteChildRecalculatesParentStatus(t *testing.T) {
@@ -183,6 +225,16 @@ func (i *captureTaskIndexer) DeleteTx(_ *sql.Tx, entityType string, entityID str
 		entityID:   entityID,
 	})
 	return nil
+}
+
+func (i *captureTaskIndexer) deletedTaskEntry(entityID string) bool {
+	for _, entry := range i.deletedEntries {
+		if entry.entityType == "task" && entry.entityID == entityID {
+			return true
+		}
+	}
+
+	return false
 }
 
 func openTasksTestDB(t *testing.T) *sql.DB {
