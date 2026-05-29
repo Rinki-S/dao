@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { createElement } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createTask } from '../api.js';
+import { createTask, listTasks } from '../api.js';
 import { TaskPanel } from './TaskPanel.jsx';
 
 vi.mock('../../projects/api.js', () => ({
@@ -279,5 +279,88 @@ describe('TaskPanel table migration boundary', () => {
       priority: 'medium',
       dueDate: null,
     });
+  });
+
+  it('keeps the task list mounted while creating a child todo', async () => {
+    const user = userEvent.setup();
+    let resolveTaskReload;
+
+    listTasks
+      .mockResolvedValueOnce([
+        {
+          id: 'task-1',
+          workspaceId: 'workspace-1',
+          projectId: 'project-1',
+          parentId: null,
+          title: 'Review HeroUI migration',
+          description: 'Check the row trigger behavior.',
+          status: 'todo',
+          priority: 'high',
+          dueDate: null,
+          createdAt: '2026-05-25T00:00:00Z',
+          updatedAt: '2026-05-25T00:00:00Z',
+          deletedAt: null,
+          version: 1,
+          syncStatus: 'synced',
+        },
+      ])
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveTaskReload = resolve;
+          }),
+      );
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const addChildButton = await screen.findByRole('button', {
+      name: 'Add child todo to Review HeroUI migration',
+    });
+
+    await user.click(addChildButton);
+    await user.type(await screen.findByLabelText('Child todo for Review HeroUI migration'), 'Ship');
+    await user.click(screen.getAllByRole('button', { name: 'Add' }).at(-1));
+
+    await waitFor(() => {
+      expect(listTasks).toHaveBeenCalledTimes(2);
+    });
+
+    expect(screen.queryByText('Loading tasks...')).not.toBeInTheDocument();
+    expect(screen.getByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
+
+    resolveTaskReload([
+      {
+        id: 'task-1',
+        workspaceId: 'workspace-1',
+        projectId: 'project-1',
+        parentId: null,
+        title: 'Review HeroUI migration',
+        description: 'Check the row trigger behavior.',
+        status: 'doing',
+        priority: 'high',
+        dueDate: null,
+        createdAt: '2026-05-25T00:00:00Z',
+        updatedAt: '2026-05-25T00:00:00Z',
+        deletedAt: null,
+        version: 2,
+        syncStatus: 'synced',
+      },
+      {
+        id: 'task-2',
+        workspaceId: 'workspace-1',
+        projectId: 'project-1',
+        parentId: 'task-1',
+        title: 'Ship',
+        description: '',
+        status: 'todo',
+        priority: 'high',
+        dueDate: null,
+        createdAt: '2026-05-25T00:00:00Z',
+        updatedAt: '2026-05-25T00:00:00Z',
+        deletedAt: null,
+        version: 1,
+        syncStatus: 'synced',
+      },
+    ]);
   });
 });

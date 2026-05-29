@@ -472,7 +472,7 @@ export function TaskPanel({ currentWorkspace }) {
       });
 
       closeChildTaskForm();
-      await loadTaskData();
+      await loadTaskData({ showLoading: false });
       notifyActivityChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create child task');
