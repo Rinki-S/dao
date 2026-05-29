@@ -1,28 +1,14 @@
 import { createElement } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { listProjects } from '../../projects/api.js';
 import { createTask, deleteTask, listTasks, updateTask } from '../api.js';
 import { TaskPanel } from './TaskPanel.jsx';
+import { currentWorkspace, projectFixture, taskFixture } from './TaskPanel.test-utils.js';
 
 vi.mock('../../projects/api.js', () => ({
-  listProjects: vi.fn(async () => [
-    {
-      id: 'project-1',
-      workspaceId: 'workspace-1',
-      name: 'Dao Project',
-      description: '',
-      folderPath: '/tmp/dao-test/personal-workspace-1/dao-project',
-      status: 'active',
-      startedAt: null,
-      endedAt: null,
-      createdAt: '2026-05-25T00:00:00Z',
-      updatedAt: '2026-05-25T00:00:00Z',
-      deletedAt: null,
-      version: 1,
-      syncStatus: 'synced',
-    },
-  ]),
+  listProjects: vi.fn(),
 }));
 
 vi.mock('../api.js', () => ({
@@ -30,43 +16,19 @@ vi.mock('../api.js', () => ({
   deleteTask: vi.fn(),
   updateTask: vi.fn(),
   updateTaskStatus: vi.fn(),
-  listTasks: vi.fn(async () => [
-    {
-      id: 'task-1',
-      workspaceId: 'workspace-1',
-      projectId: 'project-1',
-      parentId: null,
-      title: 'Review HeroUI migration',
-      description: 'Check the row trigger behavior.',
-      status: 'todo',
-      priority: 'high',
-      dueDate: null,
-      createdAt: '2026-05-25T00:00:00Z',
-      updatedAt: '2026-05-25T00:00:00Z',
-      deletedAt: null,
-      version: 1,
-      syncStatus: 'synced',
-    },
-  ]),
+  listTasks: vi.fn(),
 }));
 
 vi.mock('../../activities/events.js', () => ({
   notifyActivityChanged: vi.fn(),
 }));
 
-const currentWorkspace = {
-  id: 'workspace-1',
-  name: 'Personal',
-  description: '',
-  rootPath: '/tmp/dao-test/personal-workspace-1',
-  createdAt: '2026-05-25T00:00:00Z',
-  updatedAt: '2026-05-25T00:00:00Z',
-  deletedAt: null,
-  version: 1,
-  syncStatus: 'synced',
-};
-
 describe('TaskPanel interactions', () => {
+  beforeEach(() => {
+    listProjects.mockResolvedValue([projectFixture()]);
+    listTasks.mockResolvedValue([taskFixture()]);
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
   });
@@ -93,31 +55,12 @@ describe('TaskPanel interactions', () => {
     const user = userEvent.setup();
     let resolveTaskReload;
 
-    listTasks
-      .mockResolvedValueOnce([
-        {
-          id: 'task-1',
-          workspaceId: 'workspace-1',
-          projectId: 'project-1',
-          parentId: null,
-          title: 'Review HeroUI migration',
-          description: 'Check the row trigger behavior.',
-          status: 'todo',
-          priority: 'high',
-          dueDate: null,
-          createdAt: '2026-05-25T00:00:00Z',
-          updatedAt: '2026-05-25T00:00:00Z',
-          deletedAt: null,
-          version: 1,
-          syncStatus: 'synced',
-        },
-      ])
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveTaskReload = resolve;
-          }),
-      );
+    listTasks.mockResolvedValueOnce([taskFixture()]).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveTaskReload = resolve;
+        }),
+    );
 
     render(createElement(TaskPanel, { currentWorkspace }));
 
@@ -137,59 +80,31 @@ describe('TaskPanel interactions', () => {
     expect(screen.getByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
 
     resolveTaskReload([
-      {
-        id: 'task-1',
-        workspaceId: 'workspace-1',
-        projectId: 'project-1',
-        parentId: null,
-        title: 'Review HeroUI migration',
-        description: 'Check the row trigger behavior.',
+      taskFixture({
         status: 'doing',
-        priority: 'high',
-        dueDate: null,
-        createdAt: '2026-05-25T00:00:00Z',
-        updatedAt: '2026-05-25T00:00:00Z',
-        deletedAt: null,
         version: 2,
-        syncStatus: 'synced',
-      },
-      {
+      }),
+      taskFixture({
         id: 'task-2',
-        workspaceId: 'workspace-1',
-        projectId: 'project-1',
         parentId: 'task-1',
         title: 'Ship',
         description: '',
         status: 'todo',
-        priority: 'high',
-        dueDate: null,
-        createdAt: '2026-05-25T00:00:00Z',
-        updatedAt: '2026-05-25T00:00:00Z',
-        deletedAt: null,
-        version: 1,
-        syncStatus: 'synced',
-      },
+      }),
     ]);
   });
 
   it('opens a right-click task menu and edits the task', async () => {
     const user = userEvent.setup();
-    updateTask.mockResolvedValue({
-      id: 'task-1',
-      workspaceId: 'workspace-1',
-      projectId: 'project-1',
-      parentId: null,
-      title: 'Updated task',
-      description: 'Updated description',
-      status: 'todo',
-      priority: 'high',
-      dueDate: null,
-      createdAt: '2026-05-25T00:00:00Z',
-      updatedAt: '2026-05-25T01:00:00Z',
-      deletedAt: null,
-      version: 2,
-      syncStatus: 'local',
-    });
+    updateTask.mockResolvedValue(
+      taskFixture({
+        title: 'Updated task',
+        description: 'Updated description',
+        updatedAt: '2026-05-25T01:00:00Z',
+        version: 2,
+        syncStatus: 'local',
+      }),
+    );
 
     render(createElement(TaskPanel, { currentWorkspace }));
 
@@ -222,54 +137,23 @@ describe('TaskPanel interactions', () => {
     const user = userEvent.setup();
     deleteTask.mockResolvedValue(undefined);
     listTasks.mockResolvedValueOnce([
-      {
-        id: 'task-1',
-        workspaceId: 'workspace-1',
-        projectId: 'project-1',
-        parentId: null,
-        title: 'Review HeroUI migration',
-        description: 'Check the row trigger behavior.',
+      taskFixture({
         status: 'doing',
-        priority: 'high',
-        dueDate: null,
-        createdAt: '2026-05-25T00:00:00Z',
-        updatedAt: '2026-05-25T00:00:00Z',
-        deletedAt: null,
-        version: 1,
-        syncStatus: 'synced',
-      },
-      {
+      }),
+      taskFixture({
         id: 'task-2',
-        workspaceId: 'workspace-1',
-        projectId: 'project-1',
         parentId: 'task-1',
         title: 'Check context menu',
         description: '',
         status: 'todo',
-        priority: 'high',
-        dueDate: null,
-        createdAt: '2026-05-25T00:00:00Z',
-        updatedAt: '2026-05-25T00:00:00Z',
-        deletedAt: null,
-        version: 1,
-        syncStatus: 'synced',
-      },
-      {
+      }),
+      taskFixture({
         id: 'task-3',
-        workspaceId: 'workspace-1',
-        projectId: 'project-1',
         parentId: 'task-1',
         title: 'Check delete modal',
         description: '',
         status: 'done',
-        priority: 'high',
-        dueDate: null,
-        createdAt: '2026-05-25T00:00:00Z',
-        updatedAt: '2026-05-25T00:00:00Z',
-        deletedAt: null,
-        version: 1,
-        syncStatus: 'synced',
-      },
+      }),
     ]);
 
     render(createElement(TaskPanel, { currentWorkspace }));
