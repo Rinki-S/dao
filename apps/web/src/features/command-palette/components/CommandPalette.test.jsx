@@ -1,7 +1,12 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CommandPalette } from './CommandPalette.jsx';
+
+const commandPalettePath = path.resolve(import.meta.dirname, 'CommandPalette.jsx');
 
 function renderCommandPaletteWithTargets() {
   return render(
@@ -23,6 +28,18 @@ describe('CommandPalette', () => {
   afterEach(() => {
     window.history.replaceState(null, '', '/');
     vi.restoreAllMocks();
+  });
+
+  it('uses cmdk directly with a HeroUI shell instead of the legacy command wrappers', () => {
+    const source = fs.readFileSync(commandPalettePath, 'utf8');
+
+    expect(source).toContain("from '@heroui/react'");
+    expect(source).toContain("from 'cmdk'");
+    expect(source).toContain('CommandPrimitive');
+    expect(source).toContain('Modal');
+    expect(source).toContain('Kbd');
+    expect(source).not.toContain('@/components/ui/command');
+    expect(source).not.toContain('@/components/ui/kbd');
   });
 
   it('opens with the command palette shortcut and closes with Escape', async () => {
