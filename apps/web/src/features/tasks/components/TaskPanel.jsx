@@ -52,6 +52,8 @@ const quickAddAccessoryButtonClassName =
 const taskRowIconButtonClassName =
   'size-7 min-w-0 p-0 [--button-fg:var(--muted)] hover:[--button-fg:var(--foreground)] focus-visible:[--button-fg:var(--foreground)]';
 
+const childTaskFormAnimationDurationMs = 150;
+
 function compareTasks(firstTask, secondTask) {
   const statusDifference =
     (statusSortOrder[firstTask.status] ?? 99) - (statusSortOrder[secondTask.status] ?? 99);
@@ -98,6 +100,8 @@ export function TaskPanel({ currentWorkspace }) {
   const [isDescriptionPopoverOpen, setIsDescriptionPopoverOpen] = useState(false);
   const [updatingTaskIds, setUpdatingTaskIds] = useState(() => new Set());
   const [childTaskParentId, setChildTaskParentId] = useState('');
+  const [renderedChildTaskParentId, setRenderedChildTaskParentId] = useState('');
+  const [visibleChildTaskParentId, setVisibleChildTaskParentId] = useState('');
   const [childTaskTitle, setChildTaskTitle] = useState('');
   const [isCreatingChild, setIsCreatingChild] = useState(false);
   const [expandedTaskIds, setExpandedTaskIds] = useState(() => new Set());
@@ -198,6 +202,31 @@ export function TaskPanel({ currentWorkspace }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (childTaskParentId) {
+      setVisibleChildTaskParentId('');
+      setRenderedChildTaskParentId(childTaskParentId);
+
+      const frameId = window.requestAnimationFrame(() => {
+        setVisibleChildTaskParentId(childTaskParentId);
+      });
+
+      return () => {
+        window.cancelAnimationFrame(frameId);
+      };
+    }
+
+    setVisibleChildTaskParentId('');
+
+    const timeoutId = window.setTimeout(() => {
+      setRenderedChildTaskParentId('');
+    }, childTaskFormAnimationDurationMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [childTaskParentId]);
 
   function handleProjectChange(nextProjectId) {
     setSelectedProjectId(nextProjectId === 'none' ? '' : nextProjectId);
@@ -600,13 +629,15 @@ export function TaskPanel({ currentWorkspace }) {
                         const dueDate = formatDate(task.dueDate);
                         const isDone = task.status === 'done';
                         const isUpdating = updatingTaskIds.has(task.id);
-                        const isAddingChild = childTaskParentId === task.id;
+                        const isRenderingChildForm = renderedChildTaskParentId === task.id;
                         const hasChildren = taskChildren.length > 0;
                         const isExpanded = expandedTaskIds.has(task.id);
                         const hasDescription = task.description.trim() !== '';
                         const hasVisibleChildren = hasChildren && isExpanded;
-                        const isChildFormVisible = isAddingChild && isExpanded;
-                        const canShowTaskDetails = hasDescription || hasChildren || isAddingChild;
+                        const isChildFormVisible =
+                          visibleChildTaskParentId === task.id && isExpanded;
+                        const canShowTaskDetails =
+                          hasDescription || hasChildren || isRenderingChildForm;
                         const isTaskDetailVisible = isExpanded && canShowTaskDetails;
                         const completedChildCount = taskChildren.filter(
                           (childTask) => childTask.status === 'done',
@@ -715,14 +746,13 @@ export function TaskPanel({ currentWorkspace }) {
                                   data-slot="task-detail"
                                   aria-hidden={!isTaskDetailVisible}
                                   className={cn(
-                                    'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
-                                    isTaskDetailVisible ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                                    isTaskDetailVisible ? 'overflow-visible' : 'h-0 overflow-hidden',
                                   )}
                                   {...(!isTaskDetailVisible ? { inert: true } : {})}
                                 >
                                   <div
                                     className={cn(
-                                      'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
+                                      'min-h-0 transform-gpu overflow-visible transition-[opacity,transform] duration-150 ease-out [will-change:transform,opacity]',
                                       isTaskDetailVisible
                                         ? 'translate-y-0 opacity-100'
                                         : '-translate-y-1 opacity-0',
@@ -735,53 +765,60 @@ export function TaskPanel({ currentWorkspace }) {
                                         </p>
                                       )}
 
-                                      {isChildFormVisible && (
+                                      {isRenderingChildForm && (
                                         <div
                                           data-slot="task-child-form"
                                           aria-hidden={!isChildFormVisible}
-                                          className={cn(
-                                            'overflow-hidden',
-                                            isChildFormVisible
-                                              ? 'translate-y-0 opacity-100'
-                                              : '-translate-y-1 opacity-0',
-                                          )}
+                                          className="overflow-visible"
                                           {...(!isChildFormVisible ? { inert: true } : {})}
                                         >
-                                          <form
-                                            className="flex items-center gap-2"
-                                            onSubmit={(event) => {
-                                              void handleCreateChildTask(event, task);
-                                            }}
+                                          <div
+                                            className={cn(
+                                              'min-h-0 transform-gpu overflow-visible px-0.5 py-0.5 transition-[opacity,transform] duration-150 ease-out [will-change:transform,opacity]',
+                                              isChildFormVisible
+                                                ? 'translate-y-0 opacity-100'
+                                                : '-translate-y-1 opacity-0',
+                                            )}
                                           >
-                                            <TextField
-                                              aria-label={`Child todo for ${task.title}`}
-                                              className="min-w-0 flex-1"
-                                              fullWidth
-                                              isDisabled={isCreatingChild}
-                                              value={childTaskTitle}
-                                              onChange={setChildTaskTitle}
+                                            <form
+                                              className="flex items-center gap-2"
+                                              onSubmit={(event) => {
+                                                void handleCreateChildTask(event, task);
+                                              }}
                                             >
-                                              <InputGroup className="h-8 min-h-8" fullWidth>
-                                                <InputGroup.Input placeholder="Add child todo..." />
-                                              </InputGroup>
-                                            </TextField>
-                                            <Button
-                                              isDisabled={isCreatingChild}
-                                              size="sm"
-                                              type="submit"
-                                            >
-                                              Add
-                                            </Button>
-                                            <Button
-                                              isDisabled={isCreatingChild}
-                                              size="sm"
-                                              type="button"
-                                              variant="ghost"
-                                              onPress={closeChildTaskForm}
-                                            >
-                                              Cancel
-                                            </Button>
-                                          </form>
+                                              <TextField
+                                                aria-label={`Child todo for ${task.title}`}
+                                                className="min-w-0 flex-1"
+                                                fullWidth
+                                                isDisabled={isCreatingChild}
+                                                value={childTaskTitle}
+                                                onChange={setChildTaskTitle}
+                                              >
+                                                <InputGroup
+                                                  className="h-8 min-h-8 shadow-none"
+                                                  fullWidth
+                                                >
+                                                  <InputGroup.Input placeholder="Add child todo..." />
+                                                </InputGroup>
+                                              </TextField>
+                                              <Button
+                                                isDisabled={isCreatingChild}
+                                                size="sm"
+                                                type="submit"
+                                              >
+                                                Add
+                                              </Button>
+                                              <Button
+                                                isDisabled={isCreatingChild}
+                                                size="sm"
+                                                type="button"
+                                                variant="ghost"
+                                                onPress={closeChildTaskForm}
+                                              >
+                                                Cancel
+                                              </Button>
+                                            </form>
+                                          </div>
                                         </div>
                                       )}
 

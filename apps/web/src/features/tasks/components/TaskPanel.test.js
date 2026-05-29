@@ -131,19 +131,18 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).not.toContain('id={`${childTask.id}-description`}');
   });
 
-  it('animates task row expansion with explicit height and content transitions', () => {
+  it('animates task row expansion with compositor transitions instead of layout transitions', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
-    expect(source.match(/transition-\[grid-template-rows\] duration-200 ease-out/g)).toHaveLength(
-      1,
-    );
-    expect(source).toContain('transition-[grid-template-rows] duration-200 ease-out');
-    expect(source).toContain("isTaskDetailVisible ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'");
+    expect(source).not.toContain('grid-template-rows');
+    expect(source.match(/transition-\[grid-template-rows\] duration-150 ease-out/g)).toBeNull();
+    expect(source.match(/transition-\[grid-template-rows\] duration-200 ease-out/g)).toBeNull();
+    expect(source).toMatch(/isTaskDetailVisible\s+\?\s+'overflow-visible'\s+:\s+'h-0 overflow-hidden'/);
     expect(source).toContain(
-      'min-h-0 transform-gpu overflow-hidden transition-[opacity,transform] duration-150 ease-out',
+      'min-h-0 transform-gpu overflow-visible transition-[opacity,transform] duration-150 ease-out',
     );
+    expect(source).toContain('[will-change:transform,opacity]');
     expect(source).toContain('data-slot="task-child-form"');
-    expect(source).toContain('isChildFormVisible &&');
     expect(source).toContain('hasVisibleChildren &&');
     expect(source).toContain('data-slot="task-details-trigger"');
     expect(source).toContain('transition-[background-color,scale] duration-150 ease-out');
@@ -158,6 +157,23 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).not.toContain('renderedTaskDetailIds');
     expect(source).not.toContain('scale-y-');
     expect(source).not.toContain('transition-all');
+  });
+
+  it('keeps the child todo input visually flat while the child form animates independently', () => {
+    const source = fs.readFileSync(taskPanelPath, 'utf8');
+
+    expect(source).toContain('data-slot="task-child-form"');
+    expect(source).toContain('visibleChildTaskParentId');
+    expect(source).toContain('setVisibleChildTaskParentId');
+    expect(source).toContain('window.requestAnimationFrame');
+    expect(source).toContain('window.cancelAnimationFrame');
+    expect(source).toContain('px-0.5 py-0.5');
+    expect(source).toContain('overflow-visible');
+    expect(source).toContain('[will-change:transform,opacity]');
+    expect(source).toContain('className="h-8 min-h-8 shadow-none"');
+    expect(source).not.toContain(
+      "'grid overflow-hidden transition-[grid-template-rows] duration-150 ease-out'",
+    );
   });
 
   it('keeps the quick add input group full width while the add button stays fixed', () => {
