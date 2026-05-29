@@ -210,6 +210,18 @@ function GsapDisclosure({ children, className, contentClassName, dataSlot, isOpe
   );
 }
 
+function TaskApiErrorMessage({ children }) {
+  if (!children) {
+    return null;
+  }
+
+  return (
+    <p role="alert" className="text-sm text-danger">
+      {children}
+    </p>
+  );
+}
+
 export function TaskPanel({ currentWorkspace }) {
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -781,17 +793,15 @@ export function TaskPanel({ currentWorkspace }) {
                     isOpen={isDescriptionPopoverOpen}
                     onOpenChange={setIsDescriptionPopoverOpen}
                   >
-                    <Popover.Trigger>
-                      <Button
-                        aria-label="Edit description"
-                        className={quickAddAccessoryButtonClassName}
-                        isDisabled={!currentWorkspace || isCreating}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        {taskDescription.trim() ? 'Description' : 'No description'}
-                      </Button>
-                    </Popover.Trigger>
+                    <Button
+                      aria-label="Edit description"
+                      className={quickAddAccessoryButtonClassName}
+                      isDisabled={!currentWorkspace || isCreating}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      {taskDescription.trim() ? 'Description' : 'No description'}
+                    </Button>
                     <Popover.Content className="w-80" placement="bottom end">
                       <Popover.Dialog className="flex flex-col gap-2">
                         <Label htmlFor="task-description">Description</Label>
@@ -821,11 +831,7 @@ export function TaskPanel({ currentWorkspace }) {
             </div>
           </TextField>
 
-          {error && (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
+          <TaskApiErrorMessage>{error}</TaskApiErrorMessage>
         </div>
       </form>
 
@@ -1156,14 +1162,19 @@ export function TaskPanel({ currentWorkspace }) {
           }
         }}
       >
-        <Dropdown.Trigger
+        <Button
           aria-label="Task context menu"
           className="fixed z-50 size-px opacity-0"
+          isIconOnly
           style={{
             left: taskContextMenu?.x ?? 0,
             top: taskContextMenu?.y ?? 0,
           }}
-        />
+          type="button"
+          variant="ghost"
+        >
+          <span className="sr-only">Task context menu</span>
+        </Button>
         <Dropdown.Popover className="w-40" placement="bottom start">
           <Dropdown.Menu aria-label="Task actions" onAction={handleTaskContextMenuAction}>
             <Dropdown.Item id="edit" textValue="Edit">
@@ -1265,11 +1276,7 @@ export function TaskPanel({ currentWorkspace }) {
                     </Dropdown.Popover>
                   </Dropdown>
 
-                  {editTaskError && (
-                    <p role="alert" className="text-sm text-danger">
-                      {editTaskError}
-                    </p>
-                  )}
+                  <TaskApiErrorMessage>{editTaskError}</TaskApiErrorMessage>
                 </Modal.Body>
 
                 <Modal.Footer>

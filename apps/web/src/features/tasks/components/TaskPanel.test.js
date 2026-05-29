@@ -234,6 +234,16 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).not.toContain('--muted-foreground');
   });
 
+  it('renders task API errors without field validation components or empty overlay triggers', () => {
+    const source = fs.readFileSync(taskPanelPath, 'utf8');
+
+    expect(source).toContain('function TaskApiErrorMessage');
+    expect(source).toContain('role="alert"');
+    expect(source).not.toContain('FieldError');
+    expect(source).not.toContain('<Popover.Trigger>');
+    expect(source).not.toContain('<Dropdown.Trigger');
+  });
+
   it('renders task rows through the HeroUI task table', async () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
