@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AppSidebar } from '@/components/app/AppSidebar.jsx';
+import { AppTabBar } from '@/components/app/AppTabBar.jsx';
 import { AppTitleBar } from '@/components/app/AppTitleBar.jsx';
+import {
+  createNoteTab,
+  createProjectTab,
+  createSurfaceTab,
+  getActiveTab,
+  getNextActiveTabIdAfterClose,
+  openOrActivateTab,
+} from '@/components/app/app-tabs.js';
 import { ProjectContentsPanel } from '@/components/app/ProjectContentsPanel.jsx';
 import { WorkingDirectoryOnboarding } from '@/components/app/WorkingDirectoryOnboarding.jsx';
 import { NoteEditorPanel } from '@/features/notes/components/NoteEditorPanel.jsx';
@@ -31,7 +40,9 @@ function App() {
   const sidebarItems = registeredSidebarItems.filter((item) => item.id === 'tasks');
   const footerSidebarItems = registeredSidebarItems.filter((item) => item.id === 'settings');
   const surfaces = getRegisteredSurfaces();
-  const [activeSurfaceId, setActiveSurfaceId] = useState(() => getSurfaceIdFromHash(surfaces));
+  const [activeSurfaceId, setActiveSurfaceId] = useState('');
+  const [openTabs, setOpenTabs] = useState([]);
+  const [activeTabId, setActiveTabId] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [workspaces, setWorkspaces] = useState([]);
@@ -50,6 +61,7 @@ function App() {
     () => surfaces.find((surface) => surface.id === activeSurfaceId) ?? null,
     [activeSurfaceId, surfaces],
   );
+  const activeTab = useMemo(() => getActiveTab(openTabs, activeTabId), [activeTabId, openTabs]);
   const currentWorkspace = useMemo(() => {
     return workspaces.find((workspace) => workspace.id === currentWorkspaceId) ?? null;
   }, [workspaces, currentWorkspaceId]);
@@ -153,29 +165,91 @@ function App() {
     }
   }
 
-  function handleSelectSurface(surfaceId) {
-    if (!surfaces.some((surface) => surface.id === surfaceId)) {
+  function applyTab(tab) {
+    setActiveSurfaceId(tab.surfaceId);
+
+    if (tab.resourceType === 'project') {
+      setSelectedProjectId(tab.resourceId);
+      setSelectedNoteId('');
+    } else if (tab.resourceType === 'note') {
+      setSelectedNoteId(tab.resourceId);
+      setSelectedProjectId('');
+    } else {
+      setSelectedProjectId('');
+      setSelectedNoteId('');
+    }
+
+    window.history.replaceState(null, '', `#${tab.surfaceId}`);
+  }
+
+  function openTab(tab) {
+    setOpenTabs((currentTabs) => {
+      const nextState = openOrActivateTab(currentTabs, activeTabId, tab);
+      setActiveTabId(nextState.activeTabId);
+      return nextState.openTabs;
+    });
+    applyTab(tab);
+  }
+
+  function handleSelectTab(tabId) {
+    const tab = openTabs.find((openTabItem) => openTabItem.id === tabId);
+
+    if (!tab) {
       return;
     }
 
-    setSelectedProjectId('');
-    setSelectedNoteId('');
-    setActiveSurfaceId(surfaceId);
-    window.history.replaceState(null, '', `#${surfaceId}`);
+    setActiveTabId(tab.id);
+    applyTab(tab);
+  }
+
+  function handleCloseTab(tabId) {
+    const nextActiveTabId = getNextActiveTabIdAfterClose(openTabs, tabId, activeTabId);
+    const nextOpenTabs = openTabs.filter((tab) => tab.id !== tabId);
+
+    setOpenTabs(nextOpenTabs);
+    setActiveTabId(nextActiveTabId);
+
+    if (!nextActiveTabId) {
+      setActiveSurfaceId('');
+      setSelectedProjectId('');
+      setSelectedNoteId('');
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+
+    const nextActiveTab = nextOpenTabs.find((tab) => tab.id === nextActiveTabId);
+
+    if (nextActiveTab) {
+      applyTab(nextActiveTab);
+    }
+  }
+
+  function handleSelectSurface(surfaceId) {
+    const surface = surfaces.find((nextSurface) => nextSurface.id === surfaceId);
+
+    if (!surface) {
+      return;
+    }
+
+    openTab(createSurfaceTab(surface));
   }
 
   function handleSelectProject(projectId) {
-    setSelectedProjectId(projectId);
-    setSelectedNoteId('');
-    setActiveSurfaceId('project-contents');
-    window.history.replaceState(null, '', '#project-contents');
+    openTab(
+      createProjectTab({
+        id: projectId,
+        name: 'Project',
+      }),
+    );
   }
 
   function handleSelectNote(noteId) {
-    setSelectedNoteId(noteId);
-    setSelectedProjectId('');
-    setActiveSurfaceId('note-editor');
-    window.history.replaceState(null, '', '#note-editor');
+    openTab(
+      createNoteTab({
+        id: noteId,
+        title: 'Note',
+      }),
+    );
   }
 
   function handleSidebarOpenChange(nextIsSidebarOpen) {
@@ -308,17 +382,12 @@ function App() {
             resizeCollapseThreshold={SIDEBAR_COLLAPSE_THRESHOLD}
           />
           <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-sidebar">
-            <header className="flex h-14 shrink-0 items-center border-b border-border px-8">
-              <div className="min-w-0">
-                <h1 className="truncate text-lg font-heading font-semibold tracking-normal text-foreground">
-                  {activeSurfaceId === 'project-contents'
-                    ? 'Project'
-                    : activeSurfaceId === 'note-editor'
-                      ? 'Note'
-                      : (activeSurface?.label ?? 'Dao')}
-                </h1>
-              </div>
-            </header>
+            <AppTabBar
+              tabs={openTabs}
+              activeTabId={activeTabId}
+              onSelectTab={handleSelectTab}
+              onCloseTab={handleCloseTab}
+            />
 
             <section
               className={
@@ -327,7 +396,19 @@ function App() {
                   : 'flex min-h-0 flex-1 flex-col overflow-hidden px-8 py-7'
               }
             >
-              {activeSurfaceId === 'project-contents' ? (
+              {!activeTab ? (
+                <div className="flex min-h-0 flex-1 items-center justify-center px-8 py-7">
+                  <div className="max-w-sm rounded-xl border border-border bg-surface p-6 text-center shadow-sm">
+                    <h1 className="font-heading text-lg font-semibold text-foreground">
+                      No page open
+                    </h1>
+                    <p className="mt-2 text-sm text-muted-foreground text-pretty">
+                      Open a page from the sidebar or command palette to start working in this
+                      workspace.
+                    </p>
+                  </div>
+                </div>
+              ) : activeSurfaceId === 'project-contents' ? (
                 <div className="min-h-0 flex-1 overflow-y-auto">
                   <ProjectContentsPanel
                     currentWorkspace={currentWorkspace}

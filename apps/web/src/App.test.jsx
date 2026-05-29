@@ -75,34 +75,74 @@ describe('App', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders only the active surface from the sidebar', async () => {
+  it('starts with no open tabs and opens surfaces from the sidebar', async () => {
     const user = userEvent.setup();
 
     renderApp();
 
-    expect(await screen.findByRole('heading', { name: 'Tasks' })).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: 'Dao Project' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Settings' })).not.toBeInTheDocument();
+    expect(await screen.findByText('No tab open')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'No page open' })).toBeInTheDocument();
+    expect(screen.queryByText('No tasks yet')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Tasks' }));
+
+    expect(screen.getByRole('tab', { name: /Tasks/ })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByText('No tasks yet')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Settings' }));
 
     expect(window.location.hash).toBe('#settings');
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Tasks' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Settings/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Working Directory')).toBeInTheDocument();
+    expect(screen.queryByText('No tasks yet')).not.toBeInTheDocument();
   });
 
-  it('switches surfaces from the command palette', async () => {
+  it('opens a surface tab from the command palette', async () => {
     const user = userEvent.setup();
 
     renderApp();
 
+    await screen.findByText('No tab open');
     await user.keyboard('{Control>}{Shift>}p{/Shift}{/Control}');
     await user.type(screen.getByPlaceholderText('Type a command'), 'open settings');
     await user.keyboard('{Enter}');
 
     expect(window.location.hash).toBe('#settings');
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Settings/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Working Directory')).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+  });
+
+  it('reuses existing surface tabs and closes active tabs to the left neighbor', async () => {
+    const user = userEvent.setup();
+
+    renderApp();
+
+    await screen.findByText('No tab open');
+    await user.click(screen.getByRole('button', { name: 'Tasks' }));
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
+    await user.click(screen.getByRole('button', { name: 'Tasks' }));
+
+    expect(screen.getAllByRole('tab', { name: /Tasks/ })).toHaveLength(1);
+    expect(screen.getByRole('tab', { name: /Tasks/ })).toHaveAttribute('aria-selected', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Close Tasks tab' }));
+
+    expect(screen.queryByRole('tab', { name: /Tasks/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Settings/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('shows the empty state after closing the final tab', async () => {
+    const user = userEvent.setup();
+
+    renderApp();
+
+    await screen.findByText('No tab open');
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
+    await user.click(screen.getByRole('button', { name: 'Close Settings tab' }));
+
+    expect(screen.getByText('No tab open')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'No page open' })).toBeInTheDocument();
   });
 
   it('does not depend on the legacy shadcn sidebar provider in the app shell', async () => {
