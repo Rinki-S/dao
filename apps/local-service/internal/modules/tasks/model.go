@@ -30,3 +30,13 @@ type CreateTaskRequest struct {
 type UpdateTaskStatusRequest struct {
 	Status string `json:"status"`
 }
+
+type UpdateTaskRequest struct {
+	ProjectID    *string `json:"projectId"`
+	Title        *string `json:"title"`
+	Description  *string `json:"description"`
+	Priority     *string `json:"priority"`
+	DueDate      *string `json:"dueDate"`
+	ProjectIDSet bool    `json:"-"`
+	DueDateSet   bool    `json:"-"`
+}

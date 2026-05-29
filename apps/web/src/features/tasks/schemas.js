@@ -32,3 +32,23 @@ export const CreateTaskInputSchema = z.object({
 export const UpdateTaskStatusInputSchema = z.object({
   status: z.enum(['todo', 'done']),
 });
+
+export const UpdateTaskInputSchema = z
+  .object({
+    projectId: z.string().trim().nullable().optional(),
+    title: z.string().trim().min(1, { error: 'Task title is required' }).optional(),
+    description: z.string().trim().optional(),
+    priority: z.enum(['low', 'medium', 'high']).optional(),
+    dueDate: z.string().trim().nullable().optional(),
+  })
+  .refine(
+    (input) =>
+      input.projectId !== undefined ||
+      input.title !== undefined ||
+      input.description !== undefined ||
+      input.priority !== undefined ||
+      input.dueDate !== undefined,
+    {
+      error: 'Task update payload is required',
+    },
+  );

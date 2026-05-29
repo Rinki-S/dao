@@ -468,6 +468,10 @@ func (i *captureIndexer) ReplaceTx(_ *sql.Tx, entry search.IndexEntry) error {
 	return nil
 }
 
+func (i *captureIndexer) DeleteTx(_ *sql.Tx, _ string, _ string) error {
+	return nil
+}
+
 func openNotesTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 

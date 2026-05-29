@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
 import Calendar03Icon from '@hugeicons/core-free-icons/Calendar03Icon';
+import Delete02Icon from '@hugeicons/core-free-icons/Delete02Icon';
+import Edit02Icon from '@hugeicons/core-free-icons/Edit02Icon';
 import TaskDone01Icon from '@hugeicons/core-free-icons/TaskDone01Icon';
 import { gsap } from 'gsap';
 import {
@@ -12,6 +14,7 @@ import {
   FieldError,
   InputGroup,
   Label,
+  Modal,
   Popover,
   ScrollShadow,
   Table,
@@ -21,7 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import { notifyActivityChanged } from '../../activities/events.js';
 import { listProjects } from '../../projects/api.js';
-import { createTask, listTasks, updateTaskStatus } from '../api.js';
+import { createTask, deleteTask, listTasks, updateTask, updateTaskStatus } from '../api.js';
 
 const priorityLabels = {
   low: 'Low',
@@ -226,6 +229,13 @@ export function TaskPanel({ currentWorkspace }) {
   const [childTaskTitle, setChildTaskTitle] = useState('');
   const [isCreatingChild, setIsCreatingChild] = useState(false);
   const [expandedTaskIds, setExpandedTaskIds] = useState(() => new Set());
+  const [taskContextMenu, setTaskContextMenu] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
+  const [editTaskDescription, setEditTaskDescription] = useState('');
+  const [editTaskPriority, setEditTaskPriority] = useState('medium');
+  const [editTaskError, setEditTaskError] = useState('');
+  const [isSavingTaskEdit, setIsSavingTaskEdit] = useState(false);
   const taskTitleInputRef = useRef(null);
 
   const workspaceProjects = useMemo(() => {
@@ -259,6 +269,14 @@ export function TaskPanel({ currentWorkspace }) {
   const parentTasks = useMemo(() => {
     return visibleTasks.filter((task) => task.parentId === null).toSorted(compareTasks);
   }, [visibleTasks]);
+
+  const taskContextMenuTask = useMemo(() => {
+    if (!taskContextMenu) {
+      return null;
+    }
+
+    return visibleTasks.find((task) => task.id === taskContextMenu.taskId) ?? null;
+  }, [taskContextMenu, visibleTasks]);
 
   const childrenByParentId = useMemo(() => {
     const nextChildrenByParentId = new Map();
@@ -323,6 +341,7 @@ export function TaskPanel({ currentWorkspace }) {
     };
   }, []);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- The child form keeps separate mounted and visible state so its enter and exit animations can both run. */
   useEffect(() => {
     if (childTaskParentId) {
       setVisibleChildTaskParentId('');
@@ -347,6 +366,7 @@ export function TaskPanel({ currentWorkspace }) {
       window.clearTimeout(timeoutId);
     };
   }, [childTaskParentId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleProjectChange(nextProjectId) {
     setSelectedProjectId(nextProjectId === 'none' ? '' : nextProjectId);
@@ -521,6 +541,103 @@ export function TaskPanel({ currentWorkspace }) {
 
       return nextIds;
     });
+  }
+
+  function openTaskContextMenu(event, task) {
+    event.preventDefault();
+    event.stopPropagation();
+    setTaskContextMenu({
+      taskId: task.id,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }
+
+  function closeTaskContextMenu() {
+    setTaskContextMenu(null);
+  }
+
+  function openEditTaskDialog(task) {
+    closeTaskContextMenu();
+    setEditingTask(task);
+    setEditTaskTitle(task.title);
+    setEditTaskDescription(task.description);
+    setEditTaskPriority(task.priority);
+    setEditTaskError('');
+  }
+
+  function closeEditTaskDialog() {
+    if (isSavingTaskEdit) {
+      return;
+    }
+
+    setEditingTask(null);
+    setEditTaskTitle('');
+    setEditTaskDescription('');
+    setEditTaskPriority('medium');
+    setEditTaskError('');
+  }
+
+  async function handleSaveTaskEdit(event) {
+    event.preventDefault();
+
+    if (!editingTask) {
+      return;
+    }
+
+    if (editTaskTitle.trim() === '') {
+      setEditTaskError('Task title is required');
+      return;
+    }
+
+    try {
+      setIsSavingTaskEdit(true);
+      setEditTaskError('');
+
+      await updateTask(editingTask.id, {
+        title: editTaskTitle,
+        description: editTaskDescription,
+        priority: editTaskPriority,
+        dueDate: editingTask.dueDate,
+        projectId: editingTask.projectId,
+      });
+
+      setEditingTask(null);
+      await loadTaskData({ showLoading: false });
+      notifyActivityChanged();
+    } catch (err) {
+      setEditTaskError(err instanceof Error ? err.message : 'Failed to update task');
+    } finally {
+      setIsSavingTaskEdit(false);
+    }
+  }
+
+  async function handleDeleteTask(task) {
+    closeTaskContextMenu();
+    setError('');
+
+    try {
+      await deleteTask(task.id);
+      await loadTaskData({ showLoading: false });
+      notifyActivityChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete task');
+    }
+  }
+
+  function handleTaskContextMenuAction(actionKey) {
+    if (!taskContextMenuTask) {
+      return;
+    }
+
+    if (actionKey === 'edit') {
+      openEditTaskDialog(taskContextMenuTask);
+      return;
+    }
+
+    if (actionKey === 'delete') {
+      void handleDeleteTask(taskContextMenuTask);
+    }
   }
 
   return (
@@ -749,7 +866,11 @@ export function TaskPanel({ currentWorkspace }) {
                         return (
                           <Table.Row key={task.id} id={task.id}>
                             <Table.Cell className="p-0" colSpan={3}>
-                              <div data-slot="task-row-layout" className="flex min-w-0 flex-col">
+                              <div
+                                data-slot="task-row-layout"
+                                className="flex min-w-0 flex-col"
+                                onContextMenu={(event) => openTaskContextMenu(event, task)}
+                              >
                                 <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_7rem_5rem] items-center">
                                   <div className="relative min-w-0 py-1.5 pl-4">
                                     <div className="flex min-w-0 items-center gap-3">
@@ -924,6 +1045,9 @@ export function TaskPanel({ currentWorkspace }) {
                                                 id={childTask.id}
                                                 data-slot="task-child-row"
                                                 className="grid min-h-10 grid-cols-[minmax(0,1fr)_7rem_5rem] items-start"
+                                                onContextMenu={(event) =>
+                                                  openTaskContextMenu(event, childTask)
+                                                }
                                               >
                                                 <div className="min-w-0 py-1.5 pl-1">
                                                   <div className="flex min-w-0 items-center gap-3">
@@ -989,6 +1113,141 @@ export function TaskPanel({ currentWorkspace }) {
           )}
         </ScrollShadow>
       </div>
+
+      <Dropdown
+        isOpen={Boolean(taskContextMenu && taskContextMenuTask)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            closeTaskContextMenu();
+          }
+        }}
+      >
+        <Dropdown.Trigger
+          aria-label="Task context menu"
+          className="fixed z-50 size-px opacity-0"
+          style={{
+            left: taskContextMenu?.x ?? 0,
+            top: taskContextMenu?.y ?? 0,
+          }}
+        />
+        <Dropdown.Popover className="w-40" placement="bottom start">
+          <Dropdown.Menu aria-label="Task actions" onAction={handleTaskContextMenuAction}>
+            <Dropdown.Item id="edit" textValue="Edit">
+              <HugeiconsIcon icon={Edit02Icon} aria-hidden="true" className="size-4" />
+              <Label>Edit</Label>
+            </Dropdown.Item>
+            <Dropdown.Item
+              id="delete"
+              className="hover:bg-danger-soft-hover data-[hovered=true]:bg-danger-soft-hover data-[pressed=true]:bg-danger-soft-hover"
+              textValue="Delete"
+              variant="danger"
+            >
+              <HugeiconsIcon
+                icon={Delete02Icon}
+                aria-hidden="true"
+                className="size-4 text-danger"
+              />
+              <Label>Delete</Label>
+            </Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown>
+
+      <Modal
+        isOpen={Boolean(editingTask)}
+        onOpenChange={(isOpen) => !isOpen && closeEditTaskDialog()}
+      >
+        <Modal.Backdrop>
+          <Modal.Container size="sm">
+            <Modal.Dialog aria-label="Edit task">
+              <Modal.CloseTrigger />
+              <Modal.Header>
+                <Modal.Heading>Edit task</Modal.Heading>
+              </Modal.Header>
+
+              <form onSubmit={handleSaveTaskEdit}>
+                <Modal.Body className="flex flex-col gap-3">
+                  <TextField
+                    fullWidth
+                    isDisabled={isSavingTaskEdit}
+                    isRequired
+                    name="edit-task-title"
+                    value={editTaskTitle}
+                    onChange={setEditTaskTitle}
+                  >
+                    <Label htmlFor="edit-task-title">Title</Label>
+                    <InputGroup fullWidth>
+                      <InputGroup.Input id="edit-task-title" />
+                    </InputGroup>
+                  </TextField>
+
+                  <TextField
+                    fullWidth
+                    isDisabled={isSavingTaskEdit}
+                    name="edit-task-description"
+                    value={editTaskDescription}
+                    onChange={setEditTaskDescription}
+                  >
+                    <Label>Description</Label>
+                    <TextArea
+                      fullWidth
+                      className="max-h-48 min-h-28 resize-none overflow-y-auto"
+                      variant="secondary"
+                    />
+                  </TextField>
+
+                  <Dropdown>
+                    <Button
+                      className="justify-between"
+                      fullWidth
+                      isDisabled={isSavingTaskEdit}
+                      type="button"
+                      variant="secondary"
+                    >
+                      Priority: {priorityLabels[editTaskPriority]}
+                    </Button>
+                    <Dropdown.Popover className="w-40" placement="bottom start">
+                      <Dropdown.Menu
+                        selectedKeys={new Set([editTaskPriority])}
+                        selectionMode="single"
+                        onSelectionChange={(keys) => {
+                          const [nextPriority] = [...keys];
+                          if (nextPriority) {
+                            setEditTaskPriority(String(nextPriority));
+                          }
+                        }}
+                      >
+                        {priorityOptions.map((option) => (
+                          <Dropdown.Item
+                            id={option.value}
+                            key={option.value}
+                            textValue={option.label}
+                          >
+                            <Dropdown.ItemIndicator />
+                            <Label>{option.label}</Label>
+                          </Dropdown.Item>
+                        ))}
+                      </Dropdown.Menu>
+                    </Dropdown.Popover>
+                  </Dropdown>
+
+                  {editTaskError && <FieldError>{editTaskError}</FieldError>}
+                </Modal.Body>
+
+                <Modal.Footer>
+                  <Button
+                    isDisabled={isSavingTaskEdit || editTaskTitle.trim() === ''}
+                    isPending={isSavingTaskEdit}
+                    type="submit"
+                  >
+                    {isSavingTaskEdit ? 'Saving...' : 'Save'}
+                  </Button>
+                </Modal.Footer>
+              </form>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
     </section>
   );
 }

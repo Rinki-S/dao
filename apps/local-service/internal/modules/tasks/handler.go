@@ -32,6 +32,8 @@ func NewHandler(repo *Repository) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/tasks", h.list)
 	mux.HandleFunc("POST /api/tasks", h.create)
+	mux.HandleFunc("PATCH /api/tasks/{id}", h.update)
+	mux.HandleFunc("DELETE /api/tasks/{id}", h.delete)
 	mux.HandleFunc("PATCH /api/tasks/{id}/status", h.updateStatus)
 }
 
@@ -123,6 +125,135 @@ func (h *Handler) updateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.JSON(w, http.StatusOK, task)
+}
+
+func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		httpx.Error(w, http.StatusBadRequest, "task id is required")
+		return
+	}
+
+	var raw map[string]*json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	req := UpdateTaskRequest{}
+
+	if value, ok := raw["projectId"]; ok {
+		req.ProjectIDSet = true
+		if value != nil && string(*value) != "null" {
+			var projectID string
+			if err := json.Unmarshal(*value, &projectID); err != nil {
+				httpx.Error(w, http.StatusBadRequest, "task projectId is invalid")
+				return
+			}
+			req.ProjectID = trimOptionalString(&projectID)
+		}
+	}
+
+	if value, ok := raw["title"]; ok {
+		if value == nil || string(*value) == "null" {
+			httpx.Error(w, http.StatusBadRequest, "task title is required")
+			return
+		}
+		var title string
+		if err := json.Unmarshal(*value, &title); err != nil {
+			httpx.Error(w, http.StatusBadRequest, "task title is invalid")
+			return
+		}
+		title = strings.TrimSpace(title)
+		if title == "" {
+			httpx.Error(w, http.StatusBadRequest, "task title is required")
+			return
+		}
+		req.Title = &title
+	}
+
+	if value, ok := raw["description"]; ok {
+		if value == nil || string(*value) == "null" {
+			description := ""
+			req.Description = &description
+		} else {
+			var description string
+			if err := json.Unmarshal(*value, &description); err != nil {
+				httpx.Error(w, http.StatusBadRequest, "task description is invalid")
+				return
+			}
+			description = strings.TrimSpace(description)
+			req.Description = &description
+		}
+	}
+
+	if value, ok := raw["priority"]; ok {
+		if value == nil || string(*value) == "null" {
+			httpx.Error(w, http.StatusBadRequest, "task priority is invalid")
+			return
+		}
+		var priority string
+		if err := json.Unmarshal(*value, &priority); err != nil {
+			httpx.Error(w, http.StatusBadRequest, "task priority is invalid")
+			return
+		}
+		priority = strings.TrimSpace(priority)
+		if _, ok := allowedPriorities[priority]; !ok {
+			httpx.Error(w, http.StatusBadRequest, "task priority is invalid")
+			return
+		}
+		req.Priority = &priority
+	}
+
+	if value, ok := raw["dueDate"]; ok {
+		req.DueDateSet = true
+		if value != nil && string(*value) != "null" {
+			var dueDate string
+			if err := json.Unmarshal(*value, &dueDate); err != nil {
+				httpx.Error(w, http.StatusBadRequest, "task dueDate is invalid")
+				return
+			}
+			req.DueDate = trimOptionalString(&dueDate)
+		}
+	}
+
+	if req.Title == nil && req.Description == nil && req.Priority == nil && !req.ProjectIDSet && !req.DueDateSet {
+		httpx.Error(w, http.StatusBadRequest, "task update payload is required")
+		return
+	}
+
+	task, err := h.repo.Update(id, req)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			httpx.Error(w, http.StatusNotFound, "task not found")
+			return
+		}
+
+		httpx.Error(w, http.StatusInternalServerError, "failed to update task")
+		return
+	}
+
+	httpx.JSON(w, http.StatusOK, task)
+}
+
+func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		httpx.Error(w, http.StatusBadRequest, "task id is required")
+		return
+	}
+
+	if err := h.repo.Delete(id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			httpx.Error(w, http.StatusNotFound, "task not found")
+			return
+		}
+
+		httpx.Error(w, http.StatusInternalServerError, "failed to delete task")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func trimOptionalString(value *string) *string {

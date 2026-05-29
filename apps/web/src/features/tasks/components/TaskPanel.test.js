@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { createElement } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createTask, listTasks } from '../api.js';
+import { createTask, deleteTask, listTasks, updateTask } from '../api.js';
 import { TaskPanel } from './TaskPanel.jsx';
 
 vi.mock('../../projects/api.js', () => ({
@@ -30,6 +30,8 @@ vi.mock('../../projects/api.js', () => ({
 
 vi.mock('../api.js', () => ({
   createTask: vi.fn(),
+  deleteTask: vi.fn(),
+  updateTask: vi.fn(),
   updateTaskStatus: vi.fn(),
   listTasks: vi.fn(async () => [
     {
@@ -225,6 +227,21 @@ describe('TaskPanel table migration boundary', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('keeps task context menu icon colors aligned with their labels', () => {
+    const source = fs.readFileSync(taskPanelPath, 'utf8');
+
+    expect(source).toContain(
+      '<HugeiconsIcon icon={Edit02Icon} aria-hidden="true" className="size-4" />',
+    );
+    expect(source).toContain('className="hover:bg-danger-soft-hover');
+    expect(source).toMatch(
+      /<HugeiconsIcon\s+icon=\{Delete02Icon\}\s+aria-hidden="true"\s+className="size-4 text-danger"\s+\/>/,
+    );
+    expect(source).not.toContain(
+      'icon={Edit02Icon} aria-hidden="true" className="size-4 text-muted"',
+    );
+  });
+
   it('keeps the quick add button visible and disables it until a title is entered', async () => {
     const user = userEvent.setup();
     render(createElement(TaskPanel, { currentWorkspace }));
@@ -362,5 +379,67 @@ describe('TaskPanel table migration boundary', () => {
         syncStatus: 'synced',
       },
     ]);
+  });
+
+  it('opens a right-click task menu and edits the task', async () => {
+    const user = userEvent.setup();
+    updateTask.mockResolvedValue({
+      id: 'task-1',
+      workspaceId: 'workspace-1',
+      projectId: 'project-1',
+      parentId: null,
+      title: 'Updated task',
+      description: 'Updated description',
+      status: 'todo',
+      priority: 'high',
+      dueDate: null,
+      createdAt: '2026-05-25T00:00:00Z',
+      updatedAt: '2026-05-25T01:00:00Z',
+      deletedAt: null,
+      version: 2,
+      syncStatus: 'local',
+    });
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const trigger = await screen.findByRole('button', {
+      name: 'Expand details for Review HeroUI migration',
+    });
+
+    fireEvent.contextMenu(trigger, { clientX: 120, clientY: 160 });
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Edit task' })).toBeInTheDocument();
+
+    const titleInput = screen.getByLabelText('Title');
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Updated task');
+    await user.clear(screen.getByLabelText('Description'));
+    await user.type(screen.getByLabelText('Description'), 'Updated description');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(updateTask).toHaveBeenCalledWith('task-1', {
+      title: 'Updated task',
+      description: 'Updated description',
+      priority: 'high',
+      dueDate: null,
+      projectId: 'project-1',
+    });
+  });
+
+  it('opens a right-click task menu and deletes the task', async () => {
+    const user = userEvent.setup();
+    deleteTask.mockResolvedValue(undefined);
+
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const trigger = await screen.findByRole('button', {
+      name: 'Expand details for Review HeroUI migration',
+    });
+
+    fireEvent.contextMenu(trigger, { clientX: 120, clientY: 160 });
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+
+    expect(deleteTask).toHaveBeenCalledWith('task-1');
   });
 });

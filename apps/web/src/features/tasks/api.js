@@ -3,6 +3,7 @@ import {
   CreateTaskInputSchema,
   TaskListSchema,
   TaskSchema,
+  UpdateTaskInputSchema,
   UpdateTaskStatusInputSchema,
 } from './schemas.js';
 
@@ -53,4 +54,33 @@ export async function updateTaskStatus(taskId, input) {
 
   const data = await response.json();
   return TaskSchema.parse(data);
+}
+
+export async function updateTask(taskId, input) {
+  const payload = UpdateTaskInputSchema.parse(input);
+
+  const response = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update task: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return TaskSchema.parse(data);
+}
+
+export async function deleteTask(taskId) {
+  const response = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete task: ${response.status}`);
+  }
 }

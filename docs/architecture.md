@@ -604,8 +604,14 @@ GET    /api/tasks
 POST   /api/tasks
 GET    /api/tasks/:id
 PATCH  /api/tasks/:id
+PATCH  /api/tasks/:id/status
 DELETE /api/tasks/:id
 ```
+
+Task metadata edits use `PATCH /api/tasks/:id`. Checkbox state changes use
+`PATCH /api/tasks/:id/status` so parent/child completion rules can stay explicit in
+the Go service. Deletes are soft deletes; deleting a parent task also deletes its
+child todos, while deleting a child todo recalculates the parent status.
 
 ### Note API
 
