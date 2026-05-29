@@ -13,6 +13,7 @@ import {
   InputGroup,
   Label,
   Popover,
+  ScrollShadow,
   Table,
   TextArea,
   TextField,
@@ -225,7 +226,6 @@ export function TaskPanel({ currentWorkspace }) {
   const [childTaskTitle, setChildTaskTitle] = useState('');
   const [isCreatingChild, setIsCreatingChild] = useState(false);
   const [expandedTaskIds, setExpandedTaskIds] = useState(() => new Set());
-  const [hasTaskScrollOffset, setHasTaskScrollOffset] = useState(false);
   const taskTitleInputRef = useRef(null);
 
   const workspaceProjects = useMemo(() => {
@@ -523,15 +523,6 @@ export function TaskPanel({ currentWorkspace }) {
     });
   }
 
-  function handleTaskListScroll(event) {
-    const nextHasTaskScrollOffset = event.currentTarget.scrollTop > 0;
-    setHasTaskScrollOffset((currentHasTaskScrollOffset) =>
-      currentHasTaskScrollOffset === nextHasTaskScrollOffset
-        ? currentHasTaskScrollOffset
-        : nextHasTaskScrollOffset,
-    );
-  }
-
   return (
     <section id="tasks" className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <form
@@ -687,16 +678,8 @@ export function TaskPanel({ currentWorkspace }) {
         </div>
       </form>
 
-      <div className="relative min-h-0 flex-1">
-        <div
-          data-testid="task-scroll-shadow"
-          className={cn(
-            'pointer-events-none absolute inset-x-0 top-0 z-10 h-5 bg-linear-to-b from-background to-transparent transition-opacity duration-150 ease-out',
-            hasTaskScrollOffset ? 'opacity-100' : 'opacity-0',
-          )}
-        />
-
-        <div className="h-full min-h-0 overflow-y-auto" onScroll={handleTaskListScroll}>
+      <div className="min-h-0 flex-1">
+        <ScrollShadow className="h-full min-h-0" orientation="vertical" size={20}>
           {status === 'loading' && (
             <p className="px-8 text-sm text-muted-foreground">Loading tasks...</p>
           )}
@@ -1004,7 +987,7 @@ export function TaskPanel({ currentWorkspace }) {
               </Table>
             </div>
           )}
-        </div>
+        </ScrollShadow>
       </div>
     </section>
   );

@@ -107,17 +107,20 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).not.toContain('onCheckedChange');
   });
 
-  it('uses a fading overlay instead of ScrollShadow or a hard quick add divider', () => {
+  it('uses HeroUI ScrollShadow for the task list overflow affordance', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
-    expect(source).toContain('data-testid="task-scroll-shadow"');
-    expect(source).toContain('opacity-100');
-    expect(source).toContain('opacity-0');
-    expect(source).toContain('transition-opacity duration-150 ease-out');
-    expect(source).not.toContain('ScrollShadow');
+    expect(source).toContain('ScrollShadow');
+    expect(source).toContain('<ScrollShadow');
+    expect(source).toContain('orientation="vertical"');
+    expect(source).toContain('size={20}');
+    expect(source).not.toContain('data-testid="task-scroll-shadow"');
+    expect(source).not.toContain('hasTaskScrollOffset');
+    expect(source).not.toContain('handleTaskListScroll');
+    expect(source).not.toContain('transition-opacity duration-150 ease-out');
     expect(source).not.toContain('className="flex shrink-0 flex-col gap-3 px-8 py-4 border-b"');
     expect(source).toContain('className="flex shrink-0 flex-col gap-3 px-8 py-4"');
-    expect(source).toContain('className="h-full min-h-0 overflow-y-auto"');
+    expect(source).toContain('className="h-full min-h-0"');
   });
 
   it('keeps task details inside the parent task row instead of adding sibling table rows', () => {
