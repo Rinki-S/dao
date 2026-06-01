@@ -15,6 +15,7 @@ export function createProjectTab(project) {
     surfaceId: 'project-contents',
     resourceType: 'project',
     resourceId: project.id,
+    workspaceId: project.workspaceId,
   };
 }
 
@@ -25,6 +26,7 @@ export function createNoteTab(note) {
     surfaceId: 'note-editor',
     resourceType: 'note',
     resourceId: note.id,
+    workspaceId: note.workspaceId,
   };
 }
 

@@ -1,12 +1,17 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getNote, updateNote, updateNoteContent } from '../api.js';
+import { listWorkspaces } from '@/features/workspaces/api.js';
 import { NoteEditorPanel } from './NoteEditorPanel.jsx';
 
 vi.mock('../api.js', () => ({
   getNote: vi.fn(),
   updateNote: vi.fn(),
   updateNoteContent: vi.fn(),
+}));
+
+vi.mock('@/features/workspaces/api.js', () => ({
+  listWorkspaces: vi.fn(),
 }));
 
 vi.mock('@/features/activities/events.js', () => ({
@@ -37,6 +42,17 @@ describe('NoteEditorPanel', () => {
     getNote.mockResolvedValue(makeNote());
     updateNote.mockResolvedValue(makeNote({ title: 'Updated title', version: 2 }));
     updateNoteContent.mockResolvedValue(makeNote({ content: 'Updated content', version: 2 }));
+    listWorkspaces.mockResolvedValue([
+      {
+        id: 'workspace-1',
+        name: 'Test Workspace',
+        createdAt: '2026-05-26T00:00:00Z',
+        updatedAt: '2026-05-26T00:00:00Z',
+        deletedAt: null,
+        version: 1,
+        syncStatus: 'local',
+      },
+    ]);
   });
 
   afterEach(() => {

@@ -226,6 +226,38 @@ function App() {
     }
   }
 
+  function handleSelectWorkspace(workspaceId) {
+    setCurrentWorkspaceId(workspaceId);
+
+    // Close tabs that don't belong to the new workspace
+    setOpenTabs((currentTabs) => {
+      const nextTabs = currentTabs.filter((tab) => {
+        // Surface tabs (tasks, settings) don't have workspaceId, keep them
+        if (!tab.workspaceId) return true;
+        // Resource tabs (project, note) should match the new workspace
+        return tab.workspaceId === workspaceId;
+      });
+
+      // If active tab was closed, update activeTabId and apply the new tab
+      if (nextTabs.length < currentTabs.length) {
+        const activeTabStillExists = nextTabs.some((tab) => tab.id === activeTabId);
+        if (!activeTabStillExists) {
+          const nextActiveTab = nextTabs[0];
+          setActiveTabId(nextActiveTab?.id ?? '');
+          if (nextActiveTab) {
+            applyTab(nextActiveTab);
+          } else {
+            setActiveSurfaceId('');
+            setSelectedProjectId('');
+            setSelectedNoteId('');
+          }
+        }
+      }
+
+      return nextTabs;
+    });
+  }
+
   function handleSelectSurface(surfaceId) {
     const surface = surfaces.find((nextSurface) => nextSurface.id === surfaceId);
 
@@ -363,7 +395,7 @@ function App() {
             onSelectSurface={handleSelectSurface}
             onSelectProject={handleSelectProject}
             onSelectNote={handleSelectNote}
-            onSelectWorkspace={setCurrentWorkspaceId}
+            onSelectWorkspace={handleSelectWorkspace}
             onWorkspaceMenuOpenChange={setIsWorkspaceMenuOpen}
             onCreateWorkspaceDialogOpenChange={setIsCreateWorkspaceDialogOpen}
             onCreateWorkspace={handleCreateWorkspace}
@@ -413,7 +445,7 @@ function App() {
                   />
                 </div>
               ) : activeSurfaceId === 'note-editor' ? (
-                <NoteEditorPanel currentWorkspace={currentWorkspace} noteId={selectedNoteId} />
+                <NoteEditorPanel noteId={selectedNoteId} />
               ) : activeSurfaceId === 'tasks' && activeSurface ? (
                 getSurfaceComponent(activeSurface.id, {
                   currentWorkspace,

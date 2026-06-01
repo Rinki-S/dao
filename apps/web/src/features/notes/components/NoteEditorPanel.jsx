@@ -5,6 +5,7 @@ import FileEmpty01Icon from '@hugeicons/core-free-icons/FileEmpty01Icon';
 
 import { notifyActivityChanged } from '@/features/activities/events.js';
 import { listProjects } from '@/features/projects/api.js';
+import { listWorkspaces } from '@/features/workspaces/api.js';
 import { getNote, updateNote, updateNoteContent } from '../api.js';
 
 const AUTOSAVE_DELAY_MS = 800;
@@ -50,8 +51,9 @@ function NoteEditorState({ title, description, tone = 'muted' }) {
   );
 }
 
-export function NoteEditorPanel({ currentWorkspace, noteId }) {
+export function NoteEditorPanel({ noteId }) {
   const [_note, setNote] = useState(null);
+  const [workspaceName, setWorkspaceName] = useState('');
   const [projectName, setProjectName] = useState('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -128,6 +130,12 @@ export function NoteEditorPanel({ currentWorkspace, noteId }) {
         latestContentRef.current = nextNote.content;
         setLoadStatus('ready');
         setSaveStatus('saved');
+
+        const workspaces = await listWorkspaces();
+        if (!cancelled) {
+          const workspace = workspaces.find((w) => w.id === nextNote.workspaceId);
+          setWorkspaceName(workspace?.name ?? '');
+        }
 
         if (nextNote.projectId) {
           const projects = await listProjects();
@@ -265,9 +273,9 @@ export function NoteEditorPanel({ currentWorkspace, noteId }) {
         <div className="min-w-0 flex-1">
           <nav aria-label="Note location" className="text-xs">
             <ol className="flex items-center gap-1.5">
-              {currentWorkspace && (
+              {workspaceName && (
                 <>
-                  <li className="pointer-events-none text-muted">{currentWorkspace.name}</li>
+                  <li className="pointer-events-none text-muted">{workspaceName}</li>
                   <li aria-hidden="true" className="text-muted">
                     /
                   </li>
