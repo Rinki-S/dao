@@ -277,7 +277,16 @@ export function ProjectTree({
     event.preventDefault();
     event.stopPropagation();
     setTreeActionError('');
-    setTreeContextMenu({ x: event.clientX, y: event.clientY, type, item });
+
+    const treeRoot = event.currentTarget.closest('[data-slot="project-tree"]');
+    const treeRect = treeRoot?.getBoundingClientRect();
+
+    setTreeContextMenu({
+      x: treeRect ? event.clientX - treeRect.left : event.clientX,
+      y: treeRect ? event.clientY - treeRect.top : event.clientY,
+      type,
+      item,
+    });
   }
 
   function closeTreeContextMenu() {
@@ -381,7 +390,7 @@ export function ProjectTree({
   }
 
   return (
-    <section className="relative flex w-full min-w-0 flex-col p-2">
+    <section data-slot="project-tree" className="relative flex w-full min-w-0 flex-col p-2">
       <div
         className={`flex h-8 items-center justify-between gap-2 px-2 text-xs font-medium text-sidebar-foreground/70 transition-[margin,opacity] duration-200 ease-linear ${!isSidebarOpen ? '-mt-8 opacity-0' : ''}`}
       >
@@ -526,7 +535,7 @@ export function ProjectTree({
       >
         <Button
           aria-label="File tree context menu"
-          className="fixed z-50 size-px opacity-0"
+          className="absolute z-50 size-px opacity-0"
           isIconOnly
           style={{
             left: treeContextMenu?.x ?? 0,
