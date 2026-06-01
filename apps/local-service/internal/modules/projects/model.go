@@ -21,3 +21,12 @@ type CreateProjectRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
+
+type UpdateProjectRequest struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+}
+
+type DeleteProjectRequest struct {
+	DeleteNotes bool `json:"deleteNotes"`
+}
