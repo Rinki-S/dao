@@ -119,6 +119,28 @@ body {
   transition: none !important;
 }
 
+.app-tabbar-scroll {
+  scrollbar-color: var(--scrollbar) transparent;
+  scrollbar-width: thin;
+}
+
+.app-tabbar-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.app-tabbar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-tabbar-scroll::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border-radius: 999px;
+}
+
+.app-tabbar-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
 @layer base {
   body {
     @apply font-sans bg-background text-foreground;
