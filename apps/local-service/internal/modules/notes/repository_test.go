@@ -232,6 +232,95 @@ func TestRepositoryUpdateChangesMetadataAndReplacesIndex(t *testing.T) {
 	}
 }
 
+func TestRepositoryDeleteSoftDeletesNoteAndRemovesSearchIndex(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	indexer := &captureIndexer{}
+	repo := NewRepository(db, indexer, activities.NewRepository(db))
+
+	createdNote, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		ProjectID:   nil,
+		Title:       "Delete Me",
+		Content:     "Temporary content",
+		ContentType: "markdown",
+		NoteType:    "general",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	if err := repo.Delete(createdNote.ID); err != nil {
+		t.Fatalf("delete note: %v", err)
+	}
+
+	if _, err := repo.Get(createdNote.ID); err != sql.ErrNoRows {
+		t.Fatalf("Get deleted note error = %v, want sql.ErrNoRows", err)
+	}
+
+	notes, err := repo.List()
+	if err != nil {
+		t.Fatalf("list notes: %v", err)
+	}
+	if len(notes) != 0 {
+		t.Fatalf("len(notes) = %d, want 0", len(notes))
+	}
+
+	var deletedAt *string
+	if err := db.QueryRow(`SELECT deleted_at FROM notes WHERE id = ?`, createdNote.ID).Scan(&deletedAt); err != nil {
+		t.Fatalf("query deleted_at: %v", err)
+	}
+	if deletedAt == nil || *deletedAt == "" {
+		t.Fatal("deleted_at was not set")
+	}
+
+	if len(indexer.deletedEntries) != 1 {
+		t.Fatalf("len(indexer.deletedEntries) = %d, want 1", len(indexer.deletedEntries))
+	}
+	if indexer.deletedEntries[0].entityType != "note" || indexer.deletedEntries[0].entityID != createdNote.ID {
+		t.Fatalf("deleted search entry = %#v", indexer.deletedEntries[0])
+	}
+}
+
+func TestHandlerDeleteNote(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+	createdNote, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		ProjectID:   nil,
+		Title:       "Handler Delete",
+		Content:     "Delete via handler",
+		ContentType: "markdown",
+		NoteType:    "general",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	NewHandler(repo).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/notes/"+createdNote.ID, nil)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusNoContent, rec.Body.String())
+	}
+
+	if _, err := repo.Get(createdNote.ID); err != sql.ErrNoRows {
+		t.Fatalf("Get deleted note error = %v, want sql.ErrNoRows", err)
+	}
+}
+
 func TestHandlerGetNote(t *testing.T) {
 	db := openNotesTestDB(t)
 	workspaceRoot := t.TempDir()
@@ -453,9 +542,15 @@ func TestHandlerGetNoteNotFound(t *testing.T) {
 	}
 }
 
+type deletedSearchEntry struct {
+	entityType string
+	entityID   string
+}
+
 type captureIndexer struct {
 	entries         []search.IndexEntry
 	replacedEntries []search.IndexEntry
+	deletedEntries  []deletedSearchEntry
 }
 
 func (i *captureIndexer) IndexTx(_ *sql.Tx, entry search.IndexEntry) error {
@@ -468,7 +563,11 @@ func (i *captureIndexer) ReplaceTx(_ *sql.Tx, entry search.IndexEntry) error {
 	return nil
 }
 
-func (i *captureIndexer) DeleteTx(_ *sql.Tx, _ string, _ string) error {
+func (i *captureIndexer) DeleteTx(_ *sql.Tx, entityType string, entityID string) error {
+	i.deletedEntries = append(i.deletedEntries, deletedSearchEntry{
+		entityType: entityType,
+		entityID:   entityID,
+	})
 	return nil
 }
 

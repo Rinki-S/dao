@@ -85,3 +85,13 @@ export async function updateNote(id, input) {
   const data = await response.json();
   return NoteSchema.parse(data);
 }
+
+export async function deleteNote(id) {
+  const response = await apiFetch(`/api/notes/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete note: ${response.status}`);
+  }
+}
