@@ -688,7 +688,7 @@ export function ProjectTree({
           <Modal.Container size="sm">
             <Modal.Dialog aria-label="Create project">
               <Modal.CloseTrigger />
-              <Modal.Header>
+              <Modal.Header className="gap-0.5 pb-5">
                 <Modal.Heading>Create project</Modal.Heading>
                 <p className="text-sm text-muted-foreground">
                   Add a project to the current workspace.
@@ -745,7 +745,7 @@ export function ProjectTree({
           <Modal.Container size="sm">
             <Modal.Dialog aria-label="Create content">
               <Modal.CloseTrigger />
-              <Modal.Header>
+              <Modal.Header className="gap-0.5 pb-5">
                 <Modal.Heading>Create content</Modal.Heading>
                 <p className="text-sm text-muted-foreground">
                   Add a note now, with room for integrations later.
