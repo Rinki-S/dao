@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Chip } from '@heroui/react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import FileEmpty01Icon from '@hugeicons/core-free-icons/FileEmpty01Icon';
 
 import { notifyActivityChanged } from '@/features/activities/events.js';
+import { listProjects } from '@/features/projects/api.js';
 import { getNote, updateNote, updateNoteContent } from '../api.js';
 
 const AUTOSAVE_DELAY_MS = 800;
@@ -18,8 +22,37 @@ function getSaveStatusLabel(status) {
   }
 }
 
-export function NoteEditorPanel({ noteId }) {
-  const [note, setNote] = useState(null);
+function getSaveStatusVariant(status) {
+  return status === 'failed' ? 'danger' : 'soft';
+}
+
+function NoteEditorState({ title, description, tone = 'muted' }) {
+  return (
+    <section className="flex min-h-0 flex-1 items-center justify-center px-8 py-7 text-center">
+      <div className="flex max-w-sm flex-col items-center">
+        <HugeiconsIcon
+          icon={FileEmpty01Icon}
+          aria-hidden="true"
+          className={tone === 'danger' ? 'mb-4 size-8 text-danger' : 'mb-4 size-8 text-muted'}
+        />
+        <h1
+          className={
+            tone === 'danger'
+              ? 'font-heading text-lg font-semibold text-danger'
+              : 'font-heading text-lg font-semibold text-muted-foreground'
+          }
+        >
+          {title}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground text-pretty">{description}</p>
+      </div>
+    </section>
+  );
+}
+
+export function NoteEditorPanel({ currentWorkspace, noteId }) {
+  const [_note, setNote] = useState(null);
+  const [projectName, setProjectName] = useState('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [loadStatus, setLoadStatus] = useState('idle');
@@ -95,6 +128,16 @@ export function NoteEditorPanel({ noteId }) {
         latestContentRef.current = nextNote.content;
         setLoadStatus('ready');
         setSaveStatus('saved');
+
+        if (nextNote.projectId) {
+          const projects = await listProjects();
+          if (!cancelled) {
+            const project = projects.find((p) => p.id === nextNote.projectId);
+            setProjectName(project?.name ?? '');
+          }
+        } else {
+          setProjectName('');
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load note');
@@ -199,37 +242,52 @@ export function NoteEditorPanel({ noteId }) {
 
   if (!noteId) {
     return (
-      <section className="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">
-        Select a note from the file tree.
-      </section>
+      <NoteEditorState
+        title="No note selected"
+        description="Select a note from the file tree to start editing."
+      />
     );
   }
 
   if (loadStatus === 'loading') {
-    return (
-      <section className="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">
-        Loading note...
-      </section>
-    );
+    return <NoteEditorState title="Loading note" description="Preparing the selected note." />;
   }
 
   if (loadStatus === 'error') {
-    return (
-      <section className="flex min-h-0 flex-1 items-center justify-center text-sm text-destructive">
-        {error}
-      </section>
-    );
+    return <NoteEditorState title="Unable to load note" description={error} tone="danger" />;
   }
 
+  const saveStatusLabel = getSaveStatusLabel(saveStatus);
+
   return (
-    <section className="flex min-h-0 flex-1 flex-col gap-5">
-      <div className="flex shrink-0 items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="truncate text-xs text-muted-foreground">{note?.filePath}</p>
+    <section className="flex min-h-0 flex-1 flex-col gap-6">
+      <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border pb-5">
+        <div className="min-w-0 flex-1">
+          <nav aria-label="Note location" className="text-xs">
+            <ol className="flex items-center gap-1.5">
+              {currentWorkspace && (
+                <>
+                  <li className="pointer-events-none text-muted">{currentWorkspace.name}</li>
+                  <li aria-hidden="true" className="text-muted">
+                    /
+                  </li>
+                </>
+              )}
+              {projectName && (
+                <>
+                  <li className="pointer-events-none text-muted">{projectName}</li>
+                  <li aria-hidden="true" className="text-muted">
+                    /
+                  </li>
+                </>
+              )}
+              <li className="pointer-events-none text-foreground">{title || 'Untitled'}</li>
+            </ol>
+          </nav>
           <input
             type="text"
             aria-label="Note title"
-            className="mt-1 w-full border-0 bg-transparent p-0 font-heading text-xl font-semibold text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
+            className="w-full border-0 bg-transparent p-0 font-heading text-xl font-semibold text-foreground outline-none placeholder:text-muted"
             value={title}
             onChange={(event) => {
               latestTitleRef.current = event.target.value;
@@ -238,16 +296,23 @@ export function NoteEditorPanel({ noteId }) {
             placeholder="Untitled"
           />
         </div>
-        <div className="shrink-0 text-xs text-muted-foreground">
-          {getSaveStatusLabel(saveStatus)}
-        </div>
+        {saveStatusLabel && (
+          <Chip
+            className="shrink-0"
+            size="sm"
+            variant={getSaveStatusVariant(saveStatus)}
+            aria-live="polite"
+          >
+            {saveStatusLabel}
+          </Chip>
+        )}
       </div>
 
-      {error && saveStatus === 'failed' && <p className="text-sm text-destructive">{error}</p>}
+      {error && saveStatus === 'failed' && <p className="text-sm text-danger">{error}</p>}
 
       <textarea
         aria-label="Markdown note content"
-        className="min-h-0 w-full flex-1 resize-none border-0 bg-transparent p-0 font-mono text-sm leading-6 text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
+        className="min-h-0 w-full flex-1 resize-none border-0 bg-transparent p-0 font-mono text-sm leading-6 text-foreground outline-none placeholder:text-muted"
         value={content}
         onChange={(event) => {
           latestContentRef.current = event.target.value;

@@ -413,7 +413,7 @@ function App() {
                   />
                 </div>
               ) : activeSurfaceId === 'note-editor' ? (
-                <NoteEditorPanel noteId={selectedNoteId} />
+                <NoteEditorPanel currentWorkspace={currentWorkspace} noteId={selectedNoteId} />
               ) : activeSurfaceId === 'tasks' && activeSurface ? (
                 getSurfaceComponent(activeSurface.id, {
                   currentWorkspace,
