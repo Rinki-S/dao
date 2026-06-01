@@ -8,6 +8,7 @@ import {
   Label,
   Modal,
   Separator,
+  Skeleton,
   TextField,
   Tooltip,
 } from '@heroui/react';
@@ -101,12 +102,12 @@ export function WorkspaceSwitcher({
                   {currentWorkspace?.name ?? 'No workspace'}
                 </span>
                 <span className="truncate text-xs font-normal text-sidebar-foreground/70">
-                  {isLoading ? 'Loading...' : 'Workspace'}
+                  {isLoading ? <Skeleton className="h-3 w-16 rounded" /> : 'Workspace'}
                 </span>
               </span>
               <HugeiconsIcon
                 icon={ArrowDown01Icon}
-                className={`size-[18px] shrink-0 translate-y-px transition-transform ${(isPressed || menuOpen) ? 'rotate-180' : ''} ${!isSidebarOpen ? 'hidden' : ''}`}
+                className={`size-[18px] shrink-0 translate-y-px transition-transform ${isPressed || menuOpen ? 'rotate-180' : ''} ${!isSidebarOpen ? 'hidden' : ''}`}
               />
             </>
           )}

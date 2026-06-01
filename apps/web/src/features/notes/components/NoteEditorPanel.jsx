@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Chip } from '@heroui/react';
+import { Chip, Skeleton } from '@heroui/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import FileEmpty01Icon from '@hugeicons/core-free-icons/FileEmpty01Icon';
 
@@ -258,7 +258,25 @@ export function NoteEditorPanel({ noteId }) {
   }
 
   if (loadStatus === 'loading') {
-    return <NoteEditorState title="Loading note" description="Preparing the selected note." />;
+    return (
+      <section className="flex min-h-0 flex-1 flex-col gap-6">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border pb-5">
+          <div className="min-w-0 flex-1 space-y-3">
+            <Skeleton className="h-3 w-48 rounded" />
+            <Skeleton className="h-6 w-64 rounded" />
+          </div>
+          <Skeleton className="h-6 w-16 rounded-full" />
+        </div>
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-4 w-full rounded" />
+          <Skeleton className="h-4 w-5/6 rounded" />
+          <Skeleton className="h-4 w-4/5 rounded" />
+          <Skeleton className="h-4 w-full rounded" />
+          <Skeleton className="h-4 w-3/4 rounded" />
+          <Skeleton className="h-4 w-5/6 rounded" />
+        </div>
+      </section>
+    );
   }
 
   if (loadStatus === 'error') {

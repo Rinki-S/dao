@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Chip, Label, SearchField } from '@heroui/react';
+import { Chip, Label, SearchField, Skeleton } from '@heroui/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
 import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
@@ -26,7 +26,18 @@ export function AppSearchBar() {
 
   const panelContent = useMemo(() => {
     if (displayStatus === 'loading' || displayStatus === 'pending') {
-      return <p className="px-3 py-2 text-sm text-muted">Searching...</p>;
+      return (
+        <div className="space-y-2 p-2" data-testid="search-loading-skeleton">
+          <div className="space-y-1 rounded-lg px-2 py-2">
+            <Skeleton className="h-4 w-3/4 rounded" />
+            <Skeleton className="h-3 w-1/2 rounded" />
+          </div>
+          <div className="space-y-1 rounded-lg px-2 py-2">
+            <Skeleton className="h-4 w-2/3 rounded" />
+            <Skeleton className="h-3 w-2/5 rounded" />
+          </div>
+        </div>
+      );
     }
 
     if (displayStatus === 'error') {

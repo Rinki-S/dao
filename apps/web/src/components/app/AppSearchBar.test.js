@@ -52,7 +52,7 @@ describe('AppSearchBar HeroUI migration boundary', () => {
 
     await user.type(screen.getByPlaceholderText('Search'), 'dao');
 
-    expect(screen.getByText('Searching...')).toBeInTheDocument();
+    expect(screen.getByTestId('search-loading-skeleton')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(searchAll).toHaveBeenCalledWith({ query: 'dao' });

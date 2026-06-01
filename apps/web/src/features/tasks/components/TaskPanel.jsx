@@ -18,6 +18,7 @@ import {
   Modal,
   Popover,
   ScrollShadow,
+  Skeleton,
   Table,
   TextArea,
   TextField,
@@ -847,7 +848,35 @@ export function TaskPanel({ currentWorkspace }) {
       <div className="min-h-0 flex-1">
         <ScrollShadow className="h-full min-h-0" orientation="vertical" size={20}>
           {status === 'loading' && (
-            <p className="px-8 text-sm text-muted-foreground">Loading tasks...</p>
+            <div className="flex flex-col gap-4 px-8 py-6">
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-5 rounded" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4 rounded" />
+                  <Skeleton className="h-3 w-1/2 rounded" />
+                </div>
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <Skeleton className="size-7 rounded" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-5 rounded" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-2/3 rounded" />
+                  <Skeleton className="h-3 w-2/5 rounded" />
+                </div>
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <Skeleton className="size-7 rounded" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-5 rounded" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-4/5 rounded" />
+                  <Skeleton className="h-3 w-1/3 rounded" />
+                </div>
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <Skeleton className="size-7 rounded" />
+              </div>
+            </div>
           )}
 
           {status === 'error' && (
@@ -1074,7 +1103,9 @@ export function TaskPanel({ currentWorkspace }) {
                                               Cancel
                                             </Button>
                                           </div>
-                                          <TaskApiErrorMessage>{childTaskError}</TaskApiErrorMessage>
+                                          <TaskApiErrorMessage>
+                                            {childTaskError}
+                                          </TaskApiErrorMessage>
                                         </Form>
                                       </GsapDisclosure>
                                     )}
@@ -1295,11 +1326,7 @@ export function TaskPanel({ currentWorkspace }) {
                 </Modal.Body>
 
                 <Modal.Footer>
-                  <Button
-                    isDisabled={isSavingTaskEdit}
-                    isPending={isSavingTaskEdit}
-                    type="submit"
-                  >
+                  <Button isDisabled={isSavingTaskEdit} isPending={isSavingTaskEdit} type="submit">
                     {isSavingTaskEdit ? 'Saving...' : 'Save'}
                   </Button>
                 </Modal.Footer>

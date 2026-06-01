@@ -10,6 +10,7 @@ import {
   ListBox,
   Modal,
   Select,
+  Skeleton,
   TextArea,
   TextField,
   Tooltip,
@@ -437,7 +438,20 @@ export function ProjectTree({
         <ul className="flex w-full min-w-0 flex-col gap-0">
           {status === 'loading' && (
             <li className="relative">
-              <span className="block px-2 py-1 text-xs text-muted-foreground">Loading...</span>
+              <div className="flex flex-col gap-2 px-2 py-1">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="size-[18px] rounded" />
+                  <Skeleton className="h-4 w-32 rounded" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="size-[18px] rounded" />
+                  <Skeleton className="h-4 w-28 rounded" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="size-[18px] rounded" />
+                  <Skeleton className="h-4 w-36 rounded" />
+                </div>
+              </div>
             </li>
           )}
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Folder01Icon from '@hugeicons/core-free-icons/Folder01Icon';
-import { Chip, Surface, Table } from '@heroui/react';
+import { Chip, Skeleton, Surface, Table } from '@heroui/react';
 import { getContentFormatIcon } from '@/extensions/registry.js';
 import { subscribeToActivityChanged } from '@/features/activities/events.js';
 import { listNotes } from '@/features/notes/api.js';
@@ -122,7 +122,36 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
   }
 
   if (status === 'loading') {
-    return <p className="text-sm text-muted-foreground">Loading project contents...</p>;
+    return (
+      <div className="space-y-4 p-6">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-48 rounded" />
+          <Skeleton className="h-3 w-32 rounded" />
+        </div>
+        <div className="space-y-3">
+          <div className="flex gap-4 border-b border-border pb-2">
+            <Skeleton className="h-4 w-32 rounded" />
+            <Skeleton className="h-4 w-24 rounded" />
+            <Skeleton className="h-4 w-40 rounded" />
+          </div>
+          <div className="flex gap-4">
+            <Skeleton className="h-4 w-36 rounded" />
+            <Skeleton className="h-4 w-20 rounded" />
+            <Skeleton className="h-4 w-44 rounded" />
+          </div>
+          <div className="flex gap-4">
+            <Skeleton className="h-4 w-28 rounded" />
+            <Skeleton className="h-4 w-28 rounded" />
+            <Skeleton className="h-4 w-36 rounded" />
+          </div>
+          <div className="flex gap-4">
+            <Skeleton className="h-4 w-40 rounded" />
+            <Skeleton className="h-4 w-16 rounded" />
+            <Skeleton className="h-4 w-48 rounded" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (status === 'error') {
