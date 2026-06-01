@@ -2,18 +2,27 @@ import { createElement } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createNote, listNotes } from '@/features/notes/api.js';
-import { createProject, listProjects } from '@/features/projects/api.js';
+import { createNote, deleteNote, listNotes, updateNote } from '@/features/notes/api.js';
+import {
+  createProject,
+  deleteProject,
+  listProjects,
+  updateProject,
+} from '@/features/projects/api.js';
 import { ProjectTree } from './ProjectTree.jsx';
 
 vi.mock('@/features/projects/api.js', () => ({
   createProject: vi.fn(),
+  deleteProject: vi.fn(),
   listProjects: vi.fn(),
+  updateProject: vi.fn(),
 }));
 
 vi.mock('@/features/notes/api.js', () => ({
   createNote: vi.fn(),
+  deleteNote: vi.fn(),
   listNotes: vi.fn(),
+  updateNote: vi.fn(),
 }));
 
 vi.mock('@/features/activities/events.js', () => ({
@@ -90,7 +99,11 @@ describe('ProjectTree interactions', () => {
     listProjects.mockResolvedValue([projectFixture()]);
     listNotes.mockResolvedValue([noteFixture()]);
     createProject.mockResolvedValue(projectFixture({ id: 'project-2', name: 'New Project' }));
+    updateProject.mockResolvedValue(projectFixture({ name: 'Renamed Project' }));
+    deleteProject.mockResolvedValue(undefined);
     createNote.mockResolvedValue(noteFixture({ id: 'note-2', title: 'New Note' }));
+    updateNote.mockResolvedValue(noteFixture({ title: 'Renamed Note' }));
+    deleteNote.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -122,6 +135,51 @@ describe('ProjectTree interactions', () => {
     expect(within(container).getByText('Root note')).toBeInTheDocument();
     expect(listProjects).toHaveBeenCalledTimes(1);
     expect(listNotes).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens a project context menu and renames the project', async () => {
+    const user = userEvent.setup();
+
+    renderProjectTree();
+
+    const projectButton = await screen.findByRole('button', { name: 'Dao Project' });
+    await user.pointer({ target: projectButton, keys: '[MouseRight]' });
+
+    expect(await screen.findByRole('menuitem', { name: 'Open' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'New note' })).toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Rename project' });
+    const input = within(dialog).getByLabelText('Name');
+    await user.clear(input);
+    await user.type(input, 'Renamed Project');
+    await user.click(within(dialog).getByRole('button', { name: 'Rename' }));
+
+    await waitFor(() => {
+      expect(updateProject).toHaveBeenCalledWith('project-1', { name: 'Renamed Project' });
+    });
+  });
+
+  it('opens a note context menu and deletes the note', async () => {
+    const user = userEvent.setup();
+    listNotes.mockResolvedValue([noteFixture({ projectId: 'project-1', title: 'Project note' })]);
+
+    renderProjectTree();
+
+    const projectButton = await screen.findByRole('button', { name: 'Dao Project' });
+    await user.click(projectButton);
+    const noteButton = await screen.findByRole('button', { name: 'Project note' });
+    await user.pointer({ target: noteButton, keys: '[MouseRight]' });
+
+    expect(await screen.findByRole('menuitem', { name: 'Open' })).toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete note' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(deleteNote).toHaveBeenCalledWith('note-1');
+    });
   });
 
   it('keeps the project tree mounted when note creation fails', async () => {
