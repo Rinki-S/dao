@@ -468,7 +468,7 @@ Notes:
 
 ## Active Foundation Migration: HeroUI and hugeicons
 
-Status: in progress
+Status: complete
 
 Branch:
 
@@ -492,28 +492,36 @@ Direction:
 - replace `@nine-thirty-five/material-symbols-react` with `@hugeicons/react` and `@hugeicons/core-free-icons`
 - remove shadcn, Radix, class-variance-authority, and tailwind-merge only after no current component imports depend on them
 
-Completed so far:
+Completed scope:
 
 - install HeroUI and hugeicons dependencies
 - import HeroUI styles after Tailwind CSS
 - define Dao's HeroUI theme variables in `apps/web/src/index.css`
 - set the current app font to Funnel Sans Variable
-- migrate the titlebar, sidebar, workspace switcher, project tree, project contents, task panel, settings panel, onboarding, and command palette shell toward HeroUI
+- migrate the titlebar, sidebar, workspace switcher, project tree, project contents, task panel, settings panel, onboarding, command palette shell, and note editor shell toward HeroUI
 - replace Material Symbols usage with direct hugeicons imports
 - keep extension-owned content format icons in the extension registry, including the built-in `markdown` content format
 - keep the command palette on `cmdk` while styling it with HeroUI surface, field, focus, muted, danger, separator, and accent-soft tokens
 - center the command palette and keep its global overlay above the app titlebar
+- remove unused shadcn-era local UI compatibility files and old dependencies after import checks
+- unify page and inline loading states with HeroUI `Skeleton`
+- preserve filesystem-backed markdown notes and debounced autosave while leaving rich editor internals for the CodeMirror milestone
 
-Remaining migration work:
+Validation:
 
-- migrate `NoteEditorPanel` away from old local `Input` and `Textarea` wrappers
-- remove unused shadcn-era files under `apps/web/src/components/ui/*` after import checks prove they are dead
-- remove Radix, shadcn, class-variance-authority, and tailwind-merge dependencies only after no current code needs them
-- run visual QA for the migrated shell, dialogs, tables, command palette, onboarding, and task interactions
+- web focused interaction tests passed
+- web production build passed
+- Go service tests passed
+- Go vet passed
+
+Notes:
+
+- The text editing area remains intentionally lightweight at the end of this milestone because the next milestone replaces the markdown textarea with CodeMirror 6.
+- Remaining visual QA should happen as part of normal feature work rather than blocking the HeroUI foundation migration.
 
 ## Milestone 9: Product Shell
 
-Status: in progress
+Status: complete
 
 Branch:
 
@@ -527,59 +535,57 @@ Goal:
 Dao starts moving from functional test panels to a real product workspace experience.
 ```
 
-Planned scope:
+Completed scope:
 
 - replace the stacked all-surfaces page with route-like active surface navigation
-- make the sidebar communicate the current workspace structure and active surface
-- keep Tasks as the primary MVP surface for now
-- keep command palette as the global action entry point
-- preserve existing API contracts and MVP create/list behavior while reorganizing the UI
-- avoid AI features until the product shell can carry existing local context clearly
-
-Completed so far:
-
 - add a fixed app titlebar with sidebar toggle and global search
-- add a resizable/collapsible sidebar
+- add a resizable sidebar that can be hidden with a GSAP-assisted reveal/collapse animation
 - keep the main sidebar navigation focused on Tasks and Settings
 - render projects as folders in the sidebar file tree
 - render project notes under their project folder and unassigned notes at the workspace root
+- add file-tree context menus for opening, creating, renaming, and deleting projects and notes
 - open project folders into a project contents surface
 - open notes from the file tree into the note editor surface
+- add runtime-only global workspace tabs for tasks, settings, projects, and notes
+- keep workspace switches from showing resource tabs that belong to another workspace
 - keep page title/header areas fixed while scrollable content stays inside the active surface
 - add a settings surface with iOS-style sections for storage and debug actions
 - add full-window onboarding for first working directory selection and first workspace creation
 - add replay onboarding from Settings
 - add a development-only Go service restart action through the desktop preload bridge
+- preserve existing API contracts and MVP create/list behavior while reorganizing the UI
+- avoid AI features until the product shell can carry existing local context clearly
 
-Product shell work still deferred:
+Keep deferred:
 
 - a real Dashboard/home surface
 - richer project detail editing
-- finished note editor experience
 - route capability support in the extension registry
 - browser-level visual QA across desktop and narrow viewports
+- persisted tabs or route restoration
+- AI features
 
-## Next Milestone: Note Editor and Remaining HeroUI Migration
+## Next Milestone: CodeMirror 6 Markdown Editor
 
 Recommended branch:
 
 ```txt
-feat/note-editor-heroui
+feat/codemirror-editor
 ```
 
 Goal:
 
 ```txt
-Dao finishes the notes surface and removes the remaining shadcn-era UI dependencies.
+Dao replaces the temporary markdown textarea with a CodeMirror 6 editor that can become the long-term note editing surface.
 ```
 
 Planned scope:
 
-- migrate `NoteEditorPanel` to HeroUI fields or a proper markdown editor surface
-- keep markdown content filesystem-backed through the Go service
-- preserve debounced autosave and visible save state
-- decide the next markdown editor implementation path before reintroducing a rich editor
-- remove dead compatibility wrappers and dependencies after import checks
+- preserve the existing note shell, breadcrumbs, title editing, save status chip, loading skeleton, and error state
+- replace only the markdown body editor internals first, keeping the Go file-backed note content API unchanged
+- keep debounced autosave and failed-save behavior intact so unsaved editor state is not lost
+- add Markdown syntax highlighting, line wrapping, keyboard-friendly editing, and Dao theme integration
+- add a formal editor MVP with toolbar, preview or split-view direction, shortcuts, and status affordances only after the CodeMirror base is stable
 - keep AI features deferred
 
 ## Later Milestone: AI Summary Loop
