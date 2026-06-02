@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, Surface } from '@heroui/react';
 
 export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
   const [restartStatus, setRestartStatus] = useState('idle');
@@ -36,7 +36,7 @@ export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
           Storage
         </h2>
 
-        <div className="overflow-hidden rounded-xl border border-border bg-background">
+        <Surface className="overflow-hidden rounded-xl border border-border" variant="default">
           <div className="grid min-h-16 grid-cols-[minmax(0,1fr)_minmax(12rem,45%)] items-center gap-4 px-4 py-3">
             <div className="min-w-0">
               <h3 className="text-sm font-medium text-foreground">Working Directory</h3>
@@ -49,7 +49,7 @@ export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
             </p>
           </div>
 
-          <div className="ml-4 border-t border-border" />
+          <div className="mx-4 border-t border-border" />
 
           <div className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
             <div className="min-w-0">
@@ -58,11 +58,11 @@ export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
                 Reselect the working directory and review workspace setup.
               </p>
             </div>
-            <Button type="button" variant="outline" onClick={onReplayOnboarding}>
+            <Button type="button" variant="outline" onPress={onReplayOnboarding}>
               Open
             </Button>
           </div>
-        </div>
+        </Surface>
       </section>
 
       <section className="flex flex-col gap-2">
@@ -70,7 +70,7 @@ export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
           Debug
         </h2>
 
-        <div className="overflow-hidden rounded-xl border border-border bg-background">
+        <Surface className="overflow-hidden rounded-xl border border-border" variant="default">
           <div className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
             <div className="min-w-0">
               <h3 className="text-sm font-medium text-foreground">Restart Go Service</h3>
@@ -86,14 +86,14 @@ export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
             </div>
             <Button
               type="button"
-              variant="destructive"
-              disabled={restartStatus === 'restarting'}
-              onClick={handleRestartLocalService}
+              variant="danger"
+              isDisabled={restartStatus === 'restarting'}
+              onPress={handleRestartLocalService}
             >
               {restartStatus === 'restarting' ? 'Restarting...' : 'Restart'}
             </Button>
           </div>
-        </div>
+        </Surface>
       </section>
     </section>
   );

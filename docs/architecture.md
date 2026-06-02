@@ -604,8 +604,14 @@ GET    /api/tasks
 POST   /api/tasks
 GET    /api/tasks/:id
 PATCH  /api/tasks/:id
+PATCH  /api/tasks/:id/status
 DELETE /api/tasks/:id
 ```
+
+Task metadata edits use `PATCH /api/tasks/:id`. Checkbox state changes use
+`PATCH /api/tasks/:id/status` so parent/child completion rules can stay explicit in
+the Go service. Deletes are soft deletes; deleting a parent task also deletes its
+child todos, while deleting a child todo recalculates the parent status.
 
 ### Note API
 
@@ -793,6 +799,46 @@ Route capabilities are deferred until Dao introduces a real route layer.
 Command capabilities should initially stay lightweight and UI-oriented. They may navigate to an existing surface and focus a target input, but should not bypass page-level validation, form state, or existing create flows by calling API functions directly.
 
 Future executable capabilities should be routed through dedicated layers such as an import pipeline, content transform pipeline, browser bridge, backend service, or AI Harness instead of becoming arbitrary registry handlers.
+
+## 12.1 Frontend UI Foundation
+
+Dao's current React UI foundation is HeroUI + Tailwind CSS v4 + Dao design tokens.
+
+Rules:
+
+- use HeroUI as the maintained accessible primitive layer for buttons, inputs, overlays, tables, menus, keyboard hints, and related controls
+- import HeroUI components directly in migrated or new UI code
+- do not create shadcn-compatible wrapper abstractions for newly migrated components
+- keep Dao-specific product composition in app and feature components
+- use HeroUI theme tokens from `apps/web/src/index.css` for surface, field, focus, separator, muted, danger, accent, and soft accent colors
+- do not use shadcn-era color tokens such as `bg-popover`, `border-input`, `ring-ring`, `bg-muted`, `text-destructive`, or `text-muted-foreground` in newly migrated HeroUI surfaces
+- use hugeicons through direct imports where icons are used
+- do not add a centralized icon gateway or icon map for ordinary component icons
+
+Compatibility note:
+
+Some old files under `apps/web/src/components/ui/*` may remain temporarily while the migration is unfinished. They should be treated as compatibility debt, not as the target component API. Remove them after import checks prove they are unused.
+
+### Command palette UI
+
+The command palette is intentionally hybrid:
+
+- `cmdk` owns command input behavior, search interaction, selection, and keyboard navigation
+- HeroUI owns the modal shell, overlay, keyboard hint styling, semantic colors, and visual integration with the product shell
+
+The palette should be centered in the viewport and its backdrop must sit above the app titlebar. Command palette colors should use HeroUI tokens such as `surface`, `field`, `focus`, `muted`, `danger`, `separator`, and `accent-soft`.
+
+### Product shell layout
+
+The current product shell uses:
+
+- a fixed app titlebar
+- a resizable/collapsible sidebar
+- a project/note file tree inside the sidebar
+- fixed active-surface headers
+- scrollable content inside each active surface
+
+The sidebar intentionally shows Tasks and Settings as primary navigation while projects and notes are represented as a file tree. Dashboard, route capabilities, and standalone Notes browsing remain deferred.
 
 ### Go module interface
 

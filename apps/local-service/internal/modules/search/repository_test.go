@@ -128,6 +128,46 @@ func TestRepositoryReplaceTx(t *testing.T) {
 	}
 }
 
+func TestRepositoryDeleteTx(t *testing.T) {
+	db := openSearchTestDB(t)
+	repo := NewRepository(db)
+
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+
+	if err := repo.IndexTx(tx, IndexEntry{
+		EntityType:  "task",
+		EntityID:    "task-1",
+		WorkspaceID: "workspace-1",
+		ProjectID:   nil,
+		Title:       "Deleted task",
+		Body:        "body",
+		CreatedAt:   "2026-05-26T00:00:00Z",
+		UpdatedAt:   "2026-05-26T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("index tx: %v", err)
+	}
+
+	if err := repo.DeleteTx(tx, "task", "task-1"); err != nil {
+		t.Fatalf("delete tx: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit tx: %v", err)
+	}
+
+	results, err := repo.Search("Deleted")
+	if err != nil {
+		t.Fatalf("search deleted: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Fatalf("len(results) = %d, want 0", len(results))
+	}
+}
+
 func openSearchTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 

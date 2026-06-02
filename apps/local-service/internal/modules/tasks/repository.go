@@ -19,6 +19,200 @@ type Repository struct {
 
 var ErrInvalidParentTask = errors.New("invalid parent task")
 
+func (r *Repository) Update(id string, req UpdateTaskRequest) (Task, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return Task{}, err
+	}
+	defer tx.Rollback()
+
+	task, err := scanTaskRow(tx.QueryRow(`
+		SELECT
+			id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
+			created_at, updated_at, deleted_at, version, sync_status
+		FROM tasks
+		WHERE id = ? AND deleted_at IS NULL
+	`, id))
+	if err != nil {
+		return Task{}, err
+	}
+
+	if req.ProjectIDSet {
+		task.ProjectID = req.ProjectID
+	}
+	if req.Title != nil {
+		task.Title = *req.Title
+	}
+	if req.Description != nil {
+		task.Description = *req.Description
+	}
+	if req.Priority != nil {
+		task.Priority = *req.Priority
+	}
+	if req.DueDateSet {
+		task.DueDate = req.DueDate
+	}
+
+	result, err := tx.Exec(`
+		UPDATE tasks
+		SET project_id = ?, title = ?, description = ?, priority = ?, due_date = ?,
+			updated_at = ?, version = version + 1, sync_status = 'local'
+		WHERE id = ? AND deleted_at IS NULL
+	`, task.ProjectID, task.Title, task.Description, task.Priority, task.DueDate, now, id)
+	if err != nil {
+		return Task{}, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return Task{}, err
+	}
+	if rowsAffected == 0 {
+		return Task{}, sql.ErrNoRows
+	}
+
+	task.UpdatedAt = now
+	task.Version += 1
+	task.SyncStatus = "local"
+
+	if err := r.indexer.ReplaceTx(tx, search.IndexEntry{
+		EntityType:  "task",
+		EntityID:    task.ID,
+		WorkspaceID: task.WorkspaceID,
+		ProjectID:   task.ProjectID,
+		Title:       task.Title,
+		Body:        task.Description,
+		CreatedAt:   task.CreatedAt,
+		UpdatedAt:   task.UpdatedAt,
+	}); err != nil {
+		return Task{}, err
+	}
+
+	metadata, err := json.Marshal(map[string]string{
+		"title":    task.Title,
+		"priority": task.Priority,
+	})
+	if err != nil {
+		return Task{}, err
+	}
+
+	if _, err := r.activity.CreateTx(tx, activities.CreateActivityRequest{
+		WorkspaceID:  task.WorkspaceID,
+		ProjectID:    task.ProjectID,
+		EntityType:   "task",
+		EntityID:     task.ID,
+		Action:       "updated",
+		MetadataJSON: string(metadata),
+	}); err != nil {
+		return Task{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return Task{}, err
+	}
+
+	return task, nil
+}
+
+func (r *Repository) Delete(id string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	task, err := scanTaskRow(tx.QueryRow(`
+		SELECT
+			id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
+			created_at, updated_at, deleted_at, version, sync_status
+		FROM tasks
+		WHERE id = ? AND deleted_at IS NULL
+	`, id))
+	if err != nil {
+		return err
+	}
+
+	idsToDelete := []string{task.ID}
+	if task.ParentID == nil {
+		childRows, err := tx.Query(`
+			SELECT id
+			FROM tasks
+			WHERE parent_id = ? AND deleted_at IS NULL
+		`, task.ID)
+		if err != nil {
+			return err
+		}
+
+		for childRows.Next() {
+			var childID string
+			if err := childRows.Scan(&childID); err != nil {
+				childRows.Close()
+				return err
+			}
+			idsToDelete = append(idsToDelete, childID)
+		}
+		if err := childRows.Close(); err != nil {
+			return err
+		}
+		if err := childRows.Err(); err != nil {
+			return err
+		}
+	}
+
+	for _, taskID := range idsToDelete {
+		result, err := tx.Exec(`
+			UPDATE tasks
+			SET deleted_at = ?, updated_at = ?, version = version + 1, sync_status = 'local'
+			WHERE id = ? AND deleted_at IS NULL
+		`, now, now, taskID)
+		if err != nil {
+			return err
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rowsAffected == 0 {
+			return sql.ErrNoRows
+		}
+
+		if err := r.indexer.DeleteTx(tx, "task", taskID); err != nil {
+			return err
+		}
+	}
+
+	metadata, err := json.Marshal(map[string]string{
+		"title": task.Title,
+	})
+	if err != nil {
+		return err
+	}
+
+	if _, err := r.activity.CreateTx(tx, activities.CreateActivityRequest{
+		WorkspaceID:  task.WorkspaceID,
+		ProjectID:    task.ProjectID,
+		EntityType:   "task",
+		EntityID:     task.ID,
+		Action:       "deleted",
+		MetadataJSON: string(metadata),
+	}); err != nil {
+		return err
+	}
+
+	if task.ParentID != nil {
+		if err := r.recalculateParentStatusTx(tx, *task.ParentID, now); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (r *Repository) UpdateStatus(id string, req UpdateTaskStatusRequest) (Task, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 

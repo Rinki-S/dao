@@ -268,30 +268,32 @@ The typography should communicate:
 
 | Usage | Typeface |
 |---|---|
-| Brand / Headings | Outfit Variable |
-| UI Body | Geist Variable |
+| Brand / Headings | Funnel Sans Variable |
+| UI Body | Funnel Sans Variable |
 | Code / Technical surfaces | System monospace now, JetBrains Mono later |
 
 ## 7.3 Brand Typeface
 
-Use **Outfit Variable** for:
+Use **Funnel Sans Variable** for:
 
 - wordmark
-- landing page headings
-- key product messaging
-- dashboard headings
+- app headings
+- controls
+- tables
+- settings
+- dense workstation surfaces
 
-Why Outfit works:
+Why Funnel Sans works:
 
 - modern
-- geometric
-- warm without becoming decorative
+- compact
+- readable at small sizes
 - restrained
-- distinct enough to carry the short `dao` brand mark
+- friendly without becoming decorative
 
 ## 7.4 UI Body Typeface
 
-Use **Geist Variable** for:
+Use **Funnel Sans Variable** for:
 
 - app UI
 - body text
@@ -300,7 +302,7 @@ Use **Geist Variable** for:
 - forms
 - documentation
 
-Geist provides strong readability, compact rhythm, and a developer-tool tone that works well across dense interfaces.
+Using one strong variable family keeps the current MVP visually coherent while the product shell is still evolving. Revisit a separate brand/display font after the core app surfaces stabilize.
 
 ## 7.5 Code Typeface
 
@@ -433,39 +435,39 @@ Avoid heavy card shadows.
 Dao uses:
 
 ```txt
-shadcn/ui + Tailwind CSS + custom Dao design system
+HeroUI + Tailwind CSS + custom Dao design system
 ```
 
-shadcn/ui provides source-owned, accessible React components that Dao can adapt to its own product needs.
+HeroUI provides accessible React components built on React Aria and Tailwind CSS v4. Dao should use HeroUI as the interactive primitive layer and keep Dao-specific product composition in the application code.
 
-Dao should define its own UI layer on top of shadcn/ui components instead of scattering one-off Tailwind styling across business pages.
+Dao should use HeroUI directly in migrated product code. Do not recreate shadcn-style wrapper APIs, icon gateways, or mapping layers around HeroUI just to hide the library.
 
-Business pages should import stable Dao UI components and composed feature components, not copy registry examples directly.
+Business pages and feature components may import HeroUI components directly. Shared Dao-specific components are appropriate only when they represent real product composition, not when they merely proxy a HeroUI primitive.
 
-When a screen needs a semantic or interactive primitive that is not installed yet, add the appropriate shadcn/ui component and adapt it into Dao's component layer. Do not avoid adding shadcn/ui components when doing so would lead to hand-rolled controls, weaker accessibility, or non-standard interaction behavior.
+When a screen needs a semantic or interactive primitive, prefer the appropriate HeroUI component and adapt it with local composition and styling. Do not hand-roll controls when HeroUI provides a maintained accessible primitive.
 
-The shadcn/ui preset should be treated as the starting component contract and token baseline. Dao should still keep its own visual identity: neutral-first surfaces, restrained jade accent, compact developer-tool density, and calm product voice.
+HeroUI should be treated as the component contract and accessibility baseline. Dao should still keep its own visual identity: neutral-first surfaces, restrained jade accent, compact developer-tool density, and calm product voice.
 
-## 9.1 Recommended Component Package
+During the migration from the previous shadcn-style component layer, old local components may remain temporarily only as compatibility wrappers. New UI work should move toward HeroUI-backed primitives.
+
+Current migration status:
+
+- the app shell, titlebar, sidebar, workspace switcher, project tree, project contents surface, task panel, settings panel, onboarding, and command palette shell are moving through HeroUI
+- the command palette keeps `cmdk` for mature command interaction while using HeroUI modal, keyboard hint, overlay, and color styling
+- the note editor and some old local `components/ui/*` files still need migration cleanup
+- new migrated surfaces should use HeroUI semantic tokens such as `surface`, `field`, `focus`, `separator`, `muted`, `danger`, and `accent-soft`
+- avoid old shadcn-era token names in new work, including `popover`, `input`, `ring`, `destructive`, and `muted-foreground`
+
+## 9.1 Component Extraction Rule
 
 ```txt
-apps/web/src/components/ui/
-  Button.jsx
-  Input.jsx
-  Textarea.jsx
-  Dialog.jsx
-  Dropdown.jsx
-  Tabs.jsx
-  Tooltip.jsx
-  Command.jsx
-  Badge.jsx
-  Sidebar.jsx
-  Panel.jsx
+apps/web/src/components/app/
+apps/web/src/features/*/components/
 ```
 
-If the component layer later proves reusable outside the app, it may be extracted into `packages/ui`.
+Keep product composition close to the app or feature that owns it. Extract a shared component only after at least two real product surfaces need the same behavior or structure.
 
-Do not extract a shared package before the components have been validated inside Dao.
+If the component layer later proves reusable outside the app, it may be extracted into `packages/ui`. Do not extract a shared package before the components have been validated inside Dao.
 
 ## 9.2 Component Design Rules
 
@@ -537,10 +539,13 @@ Command palette should support:
 
 Visual rules:
 
+- the palette should be centered in the viewport
+- the backdrop should cover the full app, including the titlebar
 - dark mode should feel premium
 - selected item uses subtle jade highlight
 - metadata uses muted text
-- keyboard hints use JetBrains Mono
+- keyboard hints use HeroUI `Kbd`
+- command behavior uses `cmdk`; do not replace it with hand-rolled keyboard selection logic unless there is a clear product reason
 
 ## 10. Motion
 
@@ -591,7 +596,7 @@ Icon style should be:
 Recommended icon library:
 
 ```txt
-Phosphor Icons
+hugeicons
 ```
 
 Icon style:
@@ -693,8 +698,9 @@ Social preview should include:
 - use brush stroke clichés
 - use red-and-gold festival colors
 - make everything green
-- copy default shadcn/ui style
-- bypass Dao's component layer with one-off shadcn example code
+- copy default component-library style
+- copy default HeroUI examples without adapting them to Dao's product density and tone
+- create wrapper or mapping layers that merely hide HeroUI or hugeicons without adding product behavior
 - build a generic SaaS dashboard
 - use heavy gradients
 - overuse shadows
@@ -738,12 +744,12 @@ Dao’s design is successful when:
 Dao should use:
 
 ```txt
-shadcn/ui + Tailwind CSS
+HeroUI + Tailwind CSS
 Custom Dao UI layer
 Jade Green #00A86B as primary accent
 Neutral-first interface
-Outfit Variable headings + Geist Variable body
-Phosphor Icons
+Funnel Sans Variable for the current app UI
+hugeicons
 Geometric English and Chinese logo system
 ```
 

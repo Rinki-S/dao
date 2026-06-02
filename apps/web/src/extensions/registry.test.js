@@ -30,12 +30,8 @@ describe('extension registry', () => {
     expect(commands.map((command) => command.id)).toEqual([
       'create-workspace',
       'switch-workspace',
-      'create-project',
-      'open-projects',
       'create-task',
       'open-tasks',
-      'create-note',
-      'open-notes',
       'open-search',
       'open-settings',
     ]);
@@ -51,13 +47,7 @@ describe('extension registry', () => {
   it('registers surfaces by order', () => {
     const surfaces = getRegisteredSurfaces();
 
-    expect(surfaces.map((surface) => surface.id)).toEqual([
-      'dashboard',
-      'projects',
-      'tasks',
-      'notes',
-      'settings',
-    ]);
+    expect(surfaces.map((surface) => surface.id)).toEqual(['tasks', 'settings']);
   });
 
   it('registers content formats', () => {

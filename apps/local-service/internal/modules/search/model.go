@@ -25,4 +25,5 @@ type IndexEntry struct {
 type Indexer interface {
 	IndexTx(tx *sql.Tx, entry IndexEntry) error
 	ReplaceTx(tx *sql.Tx, entry IndexEntry) error
+	DeleteTx(tx *sql.Tx, entityType string, entityID string) error
 }

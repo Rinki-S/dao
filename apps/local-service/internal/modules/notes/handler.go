@@ -35,6 +35,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/notes/{id}", h.get)
 	mux.HandleFunc("PATCH /api/notes/{id}", h.update)
 	mux.HandleFunc("PUT /api/notes/{id}/content", h.updateContent)
+	mux.HandleFunc("DELETE /api/notes/{id}", h.delete)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -190,6 +191,26 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.JSON(w, http.StatusOK, note)
+}
+
+func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		httpx.Error(w, http.StatusBadRequest, "note id is required")
+		return
+	}
+
+	if err := h.repo.Delete(id); err != nil {
+		if err == sql.ErrNoRows {
+			httpx.Error(w, http.StatusNotFound, "note not found")
+			return
+		}
+
+		httpx.Error(w, http.StatusInternalServerError, "failed to delete note")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func trimOptionalString(value *string) *string {

@@ -54,6 +54,15 @@ func (r *Repository) ReplaceTx(tx *sql.Tx, entry IndexEntry) error {
 	return r.IndexTx(tx, entry)
 }
 
+func (r *Repository) DeleteTx(tx *sql.Tx, entityType string, entityID string) error {
+	_, err := tx.Exec(`
+		DELETE FROM search_index
+		WHERE entity_type = ? AND entity_id = ?
+	`, entityType, entityID)
+
+	return err
+}
+
 func (r *Repository) Search(query string) ([]Result, error) {
 	matchQuery := buildMatchQuery(query)
 	if matchQuery == "" {

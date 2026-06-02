@@ -1,15 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
 import {
-  Command,
-  CommandDialog,
-  CommandEmpty,
-  CommandFooter,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import { Kbd, KbdGroup } from '@/components/ui/kbd';
+  Kbd,
+  Modal,
+  Separator,
+} from '@heroui/react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
+import { Command as CommandPrimitive } from 'cmdk';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getRegisteredCommands } from '../../../extensions/registry.js';
 import {
   filterCommands,
@@ -82,10 +79,25 @@ export function CommandPalette({ onSelectSurface, onRunAction }) {
   const [query, setQuery] = useState('');
   const [selectedCommandValue, setSelectedCommandValue] = useState('');
   const [feedback, setFeedback] = useState('');
+  const searchInputRef = useRef(null);
 
   const commands = useMemo(() => getRegisteredCommands(), []);
   const visibleCommands = useMemo(() => filterCommands(commands, query), [commands, query]);
   const commandGroups = useMemo(() => groupCommands(visibleCommands), [visibleCommands]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -159,70 +171,115 @@ export function CommandPalette({ onSelectSurface, onRunAction }) {
   }
 
   return (
-    <CommandDialog
-      open={isOpen}
-      onOpenChange={handleOpenChange}
-      title="Command Palette"
-      description="Search for a command to run."
-    >
-      <Command
-        shouldFilter={false}
-        value={selectedCommandValue}
-        onValueChange={setSelectedCommandValue}
-      >
-        <CommandInput
-          value={query}
-          onValueChange={handleQueryChange}
-          placeholder="Type a command"
-        />
+    <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
+      <Modal.Backdrop className="z-[200]!">
+        <Modal.Container placement="center" size="sm">
+          <Modal.Dialog aria-label="Command Palette" className="overflow-hidden p-0">
+            <Modal.Header className="sr-only">
+              <Modal.Heading>Command Palette</Modal.Heading>
+              <p>Search for a command to run.</p>
+            </Modal.Header>
 
-        <CommandList>
-          <CommandEmpty>No commands found.</CommandEmpty>
+            <CommandPrimitive
+              label="Command Palette"
+              shouldFilter={false}
+              value={selectedCommandValue}
+              onValueChange={setSelectedCommandValue}
+              className="flex size-full flex-col overflow-hidden rounded-xl bg-surface p-3 text-surface-foreground"
+            >
+              <div>
+                <div className="flex h-8 items-center gap-2 rounded-field border border-field-border bg-field px-2 shadow-none focus-within:border-focus focus-within:ring-3 focus-within:ring-focus/30">
+                  <HugeiconsIcon
+                    icon={Search01Icon}
+                    aria-hidden="true"
+                    className="size-[18px] shrink-0 translate-y-px text-field-placeholder"
+                  />
+                  <CommandPrimitive.Input
+                    ref={searchInputRef}
+                    value={query}
+                    onValueChange={handleQueryChange}
+                    placeholder="Type a command"
+                    className="h-full min-w-0 flex-1 bg-transparent text-sm text-field-foreground outline-none placeholder:text-field-placeholder disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              </div>
 
-          {commandGroups.map((commandGroup) => (
-            <CommandGroup key={commandGroup.group} heading={commandGroup.group}>
-              {commandGroup.commands.map((command) => (
-                <CommandItem
-                  key={command.id}
-                  value={getCommandValue(command)}
-                  onSelect={() => handleRunCommand(command)}
-                >
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-medium">{command.title}</span>
-                    <span className="truncate text-muted-foreground">{command.description}</span>
+              <CommandPrimitive.List className="no-scrollbar mt-2 max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none">
+                <CommandPrimitive.Empty className="py-6 text-center text-sm text-muted">
+                  No commands found.
+                </CommandPrimitive.Empty>
+
+                {visibleCommands.length > 0 && (
+                  <>
+                    {commandGroups.map((commandGroup) => (
+                      <CommandPrimitive.Group
+                        key={commandGroup.group}
+                        heading={commandGroup.group}
+                        className="overflow-hidden py-1 text-surface-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-muted"
+                      >
+                        {commandGroup.commands.map((command) => (
+                          <CommandPrimitive.Item
+                            key={command.id}
+                            value={getCommandValue(command)}
+                            onSelect={() => handleRunCommand(command)}
+                            className="relative flex cursor-default select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected=true]:bg-accent-soft data-[selected=true]:text-accent-soft-foreground data-[disabled=true]:opacity-50"
+                          >
+                            <span className="flex min-w-0 flex-1 flex-col">
+                              <span className="truncate font-medium">{command.title}</span>
+                              <span className="truncate text-muted group-data-[selected=true]:text-accent-soft-foreground">
+                                {command.description}
+                              </span>
+                            </span>
+                          </CommandPrimitive.Item>
+                        ))}
+                      </CommandPrimitive.Group>
+                    ))}
+                  </>
+                )}
+              </CommandPrimitive.List>
+
+              {feedback && (
+                <p className="border-t border-separator px-4 py-2 text-xs text-danger">
+                  {feedback}
+                </p>
+              )}
+
+              <Separator className="mt-2" />
+              <div className="flex w-full items-center justify-between pt-2 text-[11px] text-muted">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1">
+                    <Kbd>
+                      <Kbd.Abbr keyValue="command" />
+                    </Kbd>
+                    <Kbd>
+                      <Kbd.Abbr keyValue="ctrl" />
+                    </Kbd>
                   </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          ))}
-        </CommandList>
-
-        {feedback && (
-          <p className="border-t border-border px-4 py-2 text-xs text-destructive">{feedback}</p>
-        )}
-
-        <CommandFooter>
-          <div className="flex w-full items-center justify-between px-1 pt-1 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <KbdGroup>
-                <Kbd>⌘</Kbd>
-                <Kbd>Ctrl</Kbd>
-              </KbdGroup>
-              <span>+</span>
-              <Kbd>⇧</Kbd>
-              <span>+</span>
-              <Kbd>P</Kbd>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Kbd>Enter</Kbd>
-              <span>to run</span>
-              <span>/</span>
-              <Kbd>Esc</Kbd>
-              <span>to close</span>
-            </span>
-          </div>
-        </CommandFooter>
-      </Command>
-    </CommandDialog>
+                  <span>+</span>
+                  <Kbd>
+                    <Kbd.Abbr keyValue="shift" />
+                  </Kbd>
+                  <span>+</span>
+                  <Kbd>
+                    <Kbd.Content>P</Kbd.Content>
+                  </Kbd>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Kbd>
+                    <Kbd.Abbr keyValue="enter" />
+                  </Kbd>
+                  <span>to run</span>
+                  <span>/</span>
+                  <Kbd>
+                    <Kbd.Abbr keyValue="escape" />
+                  </Kbd>
+                  <span>to close</span>
+                </span>
+              </div>
+            </CommandPrimitive>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
   );
 }

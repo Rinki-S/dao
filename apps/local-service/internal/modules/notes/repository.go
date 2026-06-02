@@ -347,6 +347,39 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 	return note, nil
 }
 
+func (r *Repository) Delete(id string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.Exec(`
+		UPDATE notes
+		SET deleted_at = ?, updated_at = ?, version = version + 1, sync_status = 'local'
+		WHERE id = ? AND deleted_at IS NULL
+	`, now, now, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	if err := r.indexer.DeleteTx(tx, "note", id); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func (r *Repository) noteParentDir(workspaceID string, projectID *string) (string, error) {
 	if projectID != nil {
 		var folderPath string

@@ -1,4 +1,6 @@
-import { UnknownDocument } from '@nine-thirty-five/material-symbols-react/rounded';
+import { createElement } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import FileUnknownIcon from '@hugeicons/core-free-icons/FileUnknownIcon';
 import { dashboardExtension } from './dashboard.js';
 import { notesExtension } from './notes.js';
 import { projectsExtension } from './projects.js';
@@ -19,6 +21,13 @@ export const builtInExtensions = [
 ];
 
 export const registeredExtensions = ExtensionListSchema.parse(builtInExtensions);
+
+function UnknownDocumentIcon(props) {
+  return createElement(HugeiconsIcon, {
+    icon: FileUnknownIcon,
+    ...props,
+  });
+}
 
 export function getRegisteredCommands(extensions = registeredExtensions) {
   return extensions.flatMap((extension) => extension.capabilities?.commands ?? []);
@@ -43,6 +52,6 @@ export function getRegisteredContentFormats(extensions = registeredExtensions) {
 export function getContentFormatIcon(format, extensions = registeredExtensions) {
   return (
     getRegisteredContentFormats(extensions).find((contentFormat) => contentFormat.format === format)
-      ?.icon ?? UnknownDocument
+      ?.icon ?? UnknownDocumentIcon
   );
 }

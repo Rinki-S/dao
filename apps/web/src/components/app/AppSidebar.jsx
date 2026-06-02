@@ -1,18 +1,29 @@
-import { Extension } from '@nine-thirty-five/material-symbols-react/rounded';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from '@/components/ui/sidebar';
+import { useRef, useState } from 'react';
+import { Button, Tooltip } from '@heroui/react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { gsap } from 'gsap';
+import { useGSAP } from '@gsap/react';
+import Layers01Icon from '@hugeicons/core-free-icons/Layers01Icon';
 import { ProjectTree } from './ProjectTree.jsx';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx';
+
+gsap.registerPlugin(useGSAP);
+
+function ExtensionIcon(props) {
+  return <HugeiconsIcon icon={Layers01Icon} {...props} />;
+}
+
+const sidebarSurfaceButtonBase =
+  'app-no-drag flex h-8 w-full transform-gpu items-center justify-start gap-2 overflow-hidden rounded-md p-2 text-left text-sm font-normal ring-sidebar-ring outline-hidden transition-[background-color,color,width,height,padding,scale] duration-[250ms] ease-[var(--ease-smooth)] data-[focus-visible=true]:ring-2 active:scale-[0.96] data-[pressed=true]:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100';
+
+const sidebarIconButtonBase =
+  'app-no-drag size-8 min-w-0 transform-gpu p-0 transition-[background-color,color,scale] duration-[250ms] ease-[var(--ease-smooth)] data-[focus-visible=true]:ring-2 active:scale-[0.96] data-[pressed=true]:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100';
+
+const activeSurfaceButtonClass =
+  'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground data-[pressed=true]:bg-accent-soft-hover data-[pressed=true]:text-accent-soft-foreground';
+
+const inactiveSurfaceButtonClass =
+  'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[pressed=true]:bg-sidebar-accent data-[pressed=true]:text-sidebar-accent-foreground';
 
 export function AppSidebar({
   activeSurfaceId,
@@ -39,6 +50,144 @@ export function AppSidebar({
   resizeMaxWidth,
   resizeCollapseThreshold,
 }) {
+  const sidebarRef = useRef(null);
+  const hasMountedRef = useRef(false);
+  const isResizingRef = useRef(false);
+  const hasAnimatedResizeRevealRef = useRef(false);
+  const [isSidebarVisuallyOpen, setIsSidebarVisuallyOpen] = useState(isSidebarOpen);
+
+  useGSAP(
+    () => {
+      const sidebar = sidebarRef.current;
+      if (!sidebar) return;
+
+      const targetWidth = isSidebarOpen ? 'var(--sidebar-width)' : '0px';
+
+      if (!hasMountedRef.current) {
+        hasMountedRef.current = true;
+        gsap.set(sidebar, { width: targetWidth });
+        return;
+      }
+
+      if (isResizingRef.current) {
+        if (isSidebarOpen && !isSidebarVisuallyOpen) {
+          setIsSidebarVisuallyOpen(true);
+          return;
+        }
+
+        if (!isSidebarOpen && isSidebarVisuallyOpen) {
+          hasAnimatedResizeRevealRef.current = false;
+          gsap.set(sidebar, { width: '0px' });
+          setIsSidebarVisuallyOpen(false);
+          return;
+        }
+
+        gsap.set(sidebar, isSidebarOpen ? { clearProps: 'width' } : { width: '0px' });
+
+        if (isSidebarOpen && !hasAnimatedResizeRevealRef.current) {
+          hasAnimatedResizeRevealRef.current = true;
+          const resizeContentElements = sidebar.querySelectorAll('[data-sidebar-content]');
+
+          gsap.fromTo(
+            resizeContentElements,
+            { autoAlpha: 0, x: -8 },
+            {
+              autoAlpha: 1,
+              x: 0,
+              duration: 0.2,
+              stagger: 0.04,
+              ease: 'power2.out',
+              overwrite: 'auto',
+            },
+          );
+        }
+
+        return;
+      }
+
+      if (isSidebarOpen && !isSidebarVisuallyOpen) {
+        setIsSidebarVisuallyOpen(true);
+        return;
+      }
+
+      if (!isSidebarOpen && !isSidebarVisuallyOpen) {
+        gsap.set(sidebar, { width: targetWidth });
+        return;
+      }
+
+      if (process.env.NODE_ENV === 'test') {
+        gsap.set(sidebar, { width: targetWidth });
+        if (!isSidebarOpen) {
+          setIsSidebarVisuallyOpen(false);
+        }
+        return;
+      }
+
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (prefersReducedMotion) {
+        gsap.set(sidebar, { width: targetWidth });
+        if (!isSidebarOpen) {
+          setIsSidebarVisuallyOpen(false);
+        }
+        return;
+      }
+
+      const contentElements = sidebar.querySelectorAll('[data-sidebar-content]');
+      const currentWidth = `${sidebar.getBoundingClientRect().width}px`;
+
+      if (isSidebarOpen) {
+        const tl = gsap.timeline();
+
+        tl.fromTo(
+          sidebar,
+          { width: currentWidth },
+          {
+            width: 'var(--sidebar-width)',
+            duration: 0.3,
+            ease: 'power2.out',
+          },
+          0,
+        ).from(
+          contentElements,
+          {
+            autoAlpha: 0,
+            x: -10,
+            duration: 0.2,
+            stagger: 0.05,
+            ease: 'power2.out',
+          },
+          '-=0.15',
+        );
+      } else {
+        const tl = gsap.timeline({
+          onComplete: () => setIsSidebarVisuallyOpen(false),
+        });
+
+        tl.to(contentElements, {
+          autoAlpha: 0,
+          x: -10,
+          duration: 0.15,
+          stagger: 0.03,
+          ease: 'power2.in',
+        }).fromTo(
+          sidebar,
+          { width: currentWidth },
+          {
+            width: '0px',
+            duration: 0.25,
+            ease: 'power2.in',
+          },
+          '-=0.09',
+        );
+      }
+    },
+    {
+      dependencies: [isSidebarOpen, isSidebarVisuallyOpen],
+      scope: sidebarRef,
+      revertOnUpdate: true,
+    },
+  );
+
   function handleResizePointerDown(event) {
     if (event.button !== 0) {
       return;
@@ -55,9 +204,11 @@ export function AppSidebar({
     let latestClientX = event.clientX;
     let isCollapsedDuringResize = !isSidebarOpen;
 
+    isResizingRef.current = true;
     sidebarWrapper.classList.add('app-sidebar-resizing');
 
     function stopResize() {
+      isResizingRef.current = false;
       sidebarWrapper.classList.remove('app-sidebar-resizing');
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
@@ -99,106 +250,115 @@ export function AppSidebar({
   }
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className="top-12 h-[calc(100dvh-3rem)] [&_[data-sidebar=sidebar]]:bg-background"
+    <aside
+      ref={sidebarRef}
+      className={`relative hidden h-[calc(100dvh-3rem)] shrink-0 flex-col overflow-hidden border-r border-border bg-surface text-sidebar-foreground md:flex ${isSidebarVisuallyOpen ? 'w-(--sidebar-width)' : 'w-0'}`}
+      data-collapsible={isSidebarVisuallyOpen ? '' : 'hidden'}
+      data-sidebar-state={isSidebarVisuallyOpen ? 'expanded' : 'collapsed'}
+      data-slot="app-sidebar"
     >
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
+      <div data-sidebar-content className="flex flex-col gap-2 p-2">
+        <ul className="flex min-w-0 flex-col gap-0">
+          <li className="relative">
             <WorkspaceSwitcher
               workspaces={workspaces}
               currentWorkspace={currentWorkspace}
               isLoading={isWorkspaceLoading}
               error={workspaceError}
               menuOpen={workspaceMenuOpen}
+              isSidebarOpen={isSidebarVisuallyOpen}
               onMenuOpenChange={onWorkspaceMenuOpenChange}
               createDialogOpen={createWorkspaceDialogOpen}
               onCreateDialogOpenChange={onCreateWorkspaceDialogOpenChange}
               onSelectWorkspace={onSelectWorkspace}
               onCreateWorkspace={onCreateWorkspace}
             />
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
+          </li>
+        </ul>
+      </div>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
+      <div
+        data-sidebar-content
+        className="no-scrollbar flex min-h-0 flex-1 flex-col gap-0 overflow-auto data-[collapsed=true]:overflow-hidden"
+      >
+        <section className="relative flex w-full min-w-0 flex-col p-2">
+          <div
+            className={`flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ${!isSidebarVisuallyOpen ? '-mt-8 opacity-0' : ''}`}
+          >
+            Workspace
+          </div>
+
+          <div className="w-full text-sm">
+            <ul className="flex w-full min-w-0 flex-col gap-0">
               {sidebarItems.map((item) => {
                 const surfaceId = item.href.replace(/^#/, '');
-                const Icon = item.icon ?? Extension;
+                const Icon = item.icon ?? ExtensionIcon;
+                const isActive = surfaceId === activeSurfaceId;
+                const surfaceButton = (
+                  <Button
+                    className={`${sidebarSurfaceButtonBase} justify-start ${isActive ? `font-medium ${activeSurfaceButtonClass}` : inactiveSurfaceButtonClass}`}
+                    type="button"
+                    variant="ghost"
+                    onPress={() => onSelectSurface(surfaceId)}
+                  >
+                    <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+                    <span className="truncate">{item.label}</span>
+                  </Button>
+                );
 
                 return (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={surfaceId === activeSurfaceId}
-                      tooltip={item.label}
-                    >
-                      <a
-                        className="app-no-drag"
-                        href={item.href}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          onSelectSurface(surfaceId);
-                        }}
-                      >
-                        <Icon aria-hidden="true" className="size-4 shrink-0" />
-                        <span>{item.label}</span>
-                      </a>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <li key={item.id} className="relative">
+                    {surfaceButton}
+                  </li>
                 );
               })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+            </ul>
+          </div>
+        </section>
 
         <ProjectTree
           currentWorkspace={currentWorkspace}
           selectedProjectId={selectedProjectId}
           selectedNoteId={selectedNoteId}
+          isSidebarOpen={isSidebarVisuallyOpen}
           onSelectProject={onSelectProject}
           onSelectNote={onSelectNote}
         />
-      </SidebarContent>
+      </div>
 
       {footerSidebarItems.length > 0 && (
-        <SidebarFooter>
-          <SidebarMenu>
+        <div data-sidebar-content className="flex flex-col gap-2 p-2">
+          <ul className="flex min-w-0 flex-col gap-0">
             {footerSidebarItems.map((item) => {
               const surfaceId = item.href.replace(/^#/, '');
-              const Icon = item.icon ?? Extension;
+              const Icon = item.icon ?? ExtensionIcon;
+              const isActive = surfaceId === activeSurfaceId;
+              const surfaceButton = (
+                <Button
+                  aria-label={item.label}
+                  className={`${sidebarIconButtonBase} ${isActive ? activeSurfaceButtonClass : inactiveSurfaceButtonClass}`}
+                  isIconOnly
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onPress={() => onSelectSurface(surfaceId)}
+                >
+                  <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+                  <span className="sr-only">{item.label}</span>
+                </Button>
+              );
 
               return (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={surfaceId === activeSurfaceId}
-                    className="w-8 justify-center"
-                    tooltip={item.label}
-                  >
-                    <a
-                      className="app-no-drag"
-                      href={item.href}
-                      aria-label={item.label}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        onSelectSurface(surfaceId);
-                      }}
-                    >
-                      <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
-                      <span className="sr-only">{item.label}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <li key={item.id} className="relative">
+                  <Tooltip delay={0}>
+                    {surfaceButton}
+                    <Tooltip.Content placement="right">{item.label}</Tooltip.Content>
+                  </Tooltip>
+                </li>
               );
             })}
-          </SidebarMenu>
-        </SidebarFooter>
+          </ul>
+        </div>
       )}
 
       <div
@@ -208,6 +368,6 @@ export function AppSidebar({
         tabIndex={0}
         onPointerDown={handleResizePointerDown}
       />
-    </Sidebar>
+    </aside>
   );
 }

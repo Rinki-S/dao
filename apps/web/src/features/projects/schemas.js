@@ -23,3 +23,12 @@ export const CreateProjectInputSchema = z.object({
   name: z.string().trim().min(1, { error: 'Project name is required' }),
   description: z.string().trim(),
 });
+
+export const UpdateProjectInputSchema = z.object({
+  name: z.string().trim().min(1, { error: 'Project name is required' }).optional(),
+  description: z.string().trim().optional(),
+});
+
+export const DeleteProjectInputSchema = z.object({
+  deleteNotes: z.boolean().default(false),
+});

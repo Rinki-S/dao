@@ -1,15 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Folder } from '@nine-thirty-five/material-symbols-react/rounded';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Folder01Icon from '@hugeicons/core-free-icons/Folder01Icon';
+import { Chip, Skeleton, Surface, Table } from '@heroui/react';
 import { getContentFormatIcon } from '@/extensions/registry.js';
 import { subscribeToActivityChanged } from '@/features/activities/events.js';
 import { listNotes } from '@/features/notes/api.js';
@@ -27,6 +19,15 @@ function formatUpdatedAt(value) {
     day: 'numeric',
     year: 'numeric',
   }).format(date);
+}
+
+function ProjectContentsNotice({ title, description }) {
+  return (
+    <Surface className="max-w-3xl rounded-xl border border-border p-6" variant="default">
+      <h2 className="font-heading text-lg font-semibold text-foreground text-balance">{title}</h2>
+      <p className="mt-1 text-sm text-muted-foreground text-pretty">{description}</p>
+    </Surface>
+  );
 }
 
 export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
@@ -113,19 +114,44 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
 
   if (!currentWorkspace) {
     return (
-      <Card className="max-w-3xl">
-        <CardHeader>
-          <CardTitle>No workspace selected</CardTitle>
-          <CardDescription>
-            Create or select a workspace before browsing project content.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <ProjectContentsNotice
+        title="No workspace selected"
+        description="Create or select a workspace before browsing project content."
+      />
     );
   }
 
   if (status === 'loading') {
-    return <p className="text-sm text-muted-foreground">Loading project contents...</p>;
+    return (
+      <div className="space-y-4 p-6">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-48 rounded" />
+          <Skeleton className="h-3 w-32 rounded" />
+        </div>
+        <div className="space-y-3">
+          <div className="flex gap-4 border-b border-border pb-2">
+            <Skeleton className="h-4 w-32 rounded" />
+            <Skeleton className="h-4 w-24 rounded" />
+            <Skeleton className="h-4 w-40 rounded" />
+          </div>
+          <div className="flex gap-4">
+            <Skeleton className="h-4 w-36 rounded" />
+            <Skeleton className="h-4 w-20 rounded" />
+            <Skeleton className="h-4 w-44 rounded" />
+          </div>
+          <div className="flex gap-4">
+            <Skeleton className="h-4 w-28 rounded" />
+            <Skeleton className="h-4 w-28 rounded" />
+            <Skeleton className="h-4 w-36 rounded" />
+          </div>
+          <div className="flex gap-4">
+            <Skeleton className="h-4 w-40 rounded" />
+            <Skeleton className="h-4 w-16 rounded" />
+            <Skeleton className="h-4 w-48 rounded" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (status === 'error') {
@@ -134,20 +160,22 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
 
   if (!selectedProject) {
     return (
-      <Card className="max-w-3xl">
-        <CardHeader>
-          <CardTitle>Project not found</CardTitle>
-          <CardDescription>Select another project from the sidebar.</CardDescription>
-        </CardHeader>
-      </Card>
+      <ProjectContentsNotice
+        title="Project not found"
+        description="Select another project from the sidebar."
+      />
     );
   }
 
   return (
     <section className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 pl-2">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Folder aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
+          <HugeiconsIcon
+            icon={Folder01Icon}
+            aria-hidden="true"
+            className="size-[18px] shrink-0 translate-y-px"
+          />
           <span>{currentWorkspace.name}</span>
         </div>
         <div className="min-w-0">
@@ -160,55 +188,62 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
         </div>
       </div>
 
-      <div className="-mx-8">
-        <Table className={'border-b'}>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="pl-8">Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead className="pr-8">Format</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {contentRows.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 px-8 text-center text-muted-foreground">
-                  Add project content from the sidebar to start building this workspace.
-                </TableCell>
-              </TableRow>
-            )}
+      <div>
+        <Table>
+          <Table.ScrollContainer className="w-full overflow-x-auto">
+            <Table.Content aria-label="Project contents" className="w-full min-w-full">
+              <Table.Header>
+                <Table.Column isRowHeader>Name</Table.Column>
+                <Table.Column>Type</Table.Column>
+                <Table.Column>Source</Table.Column>
+                <Table.Column>Updated</Table.Column>
+                <Table.Column>Format</Table.Column>
+              </Table.Header>
+              <Table.Body>
+                {contentRows.length === 0 && (
+                  <Table.Row id="empty-project-contents">
+                    <Table.Cell colSpan={5} className="h-24 px-8 text-center text-muted-foreground">
+                      Add project content from the sidebar to start building this workspace.
+                    </Table.Cell>
+                  </Table.Row>
+                )}
 
-            {contentRows.map((row) => {
-              const ContentIcon = getContentFormatIcon(row.format);
+                {contentRows.map((row) => {
+                  const ContentIcon = getContentFormatIcon(row.format);
 
-              return (
-                <TableRow key={row.id}>
-                  <TableCell className="max-w-sm pl-8">
-                    <div className="flex min-w-0 items-center gap-4">
-                      <ContentIcon
-                        aria-hidden="true"
-                        className="size-[18px] shrink-0 translate-y-px"
-                      />
-                      <div className="min-w-0">
-                        <div className="truncate font-medium text-foreground">{row.name}</div>
-                        <div className="truncate text-xs text-muted-foreground">{row.summary}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{row.type}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{row.source}</Badge>
-                  </TableCell>
-                  <TableCell>{formatUpdatedAt(row.updatedAt)}</TableCell>
-                  <TableCell className="pr-8">
-                    <Badge variant="outline">{row.format}</Badge>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
+                  return (
+                    <Table.Row id={row.id} key={row.id}>
+                      <Table.Cell className="max-w-sm">
+                        <div className="flex min-w-0 items-center gap-4">
+                          <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
+                          <div className="min-w-0">
+                            <div className="truncate font-medium text-foreground">{row.name}</div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {row.summary}
+                            </div>
+                          </div>
+                        </div>
+                      </Table.Cell>
+                      <Table.Cell>{row.type}</Table.Cell>
+                      <Table.Cell>
+                        <Chip size="sm" variant="soft">
+                          {row.source}
+                        </Chip>
+                      </Table.Cell>
+                      <Table.Cell className="tabular-nums">
+                        {formatUpdatedAt(row.updatedAt)}
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Chip size="sm" variant="secondary">
+                          {row.format}
+                        </Chip>
+                      </Table.Cell>
+                    </Table.Row>
+                  );
+                })}
+              </Table.Body>
+            </Table.Content>
+          </Table.ScrollContainer>
         </Table>
       </div>
     </section>
