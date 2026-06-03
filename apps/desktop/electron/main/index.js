@@ -11,6 +11,7 @@ import {
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const appIconPath = path.join(__dirname, '../assets/dao-iOS-Default-1024x1024@1x.png')
 
 let localService = null
 let serviceConfig = null
@@ -24,6 +25,7 @@ function createWindow() {
         height: 800,
         minWidth: 900,
         minHeight: 600,
+        icon: appIconPath,
         backgroundColor: '#0B1220',
         titleBarStyle: 'hiddenInset',
         trafficLightPosition: { x: 16, y: 16 },
@@ -80,6 +82,10 @@ ipcMain.handle('dao:restart-local-service', async () => {
 })
 
 app.whenReady().then(async () => {
+    if (process.platform === 'darwin') {
+        app.dock.setIcon(appIconPath)
+    }
+
     serviceConfig = createServiceConfig()
     localService = startLocalService(serviceConfig)
 

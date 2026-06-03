@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./apps/desktop/electron/assets/dao-iOS-Default-1024x1024@1x.png" alt="Dao app icon" width="128" height="128">
+</p>
+
 # Dao
 
 **Dao is an AI-native, local-first workspace for developer growth.**
