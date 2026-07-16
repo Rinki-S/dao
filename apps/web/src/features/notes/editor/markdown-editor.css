@@ -1,0 +1,347 @@
+.dao-markdown-editor {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.dao-markdown-toolbar {
+  min-height: 2.5rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-bottom: 1px solid color-mix(in oklab, var(--separator) 72%, transparent);
+  background: var(--surface);
+}
+
+.dao-markdown-toolbar__inner {
+  display: flex;
+  min-height: 2.5rem;
+  width: 100%;
+  max-width: var(--dao-note-column-width, 54rem);
+  align-items: center;
+  gap: 0.25rem;
+  overflow-x: auto;
+  margin-inline: auto;
+  padding: 0.25rem var(--dao-note-gutter, clamp(1.125rem, 6cqi, 4rem));
+  scrollbar-color: var(--scrollbar) transparent;
+  scrollbar-width: thin;
+}
+
+.dao-markdown-toolbar__group {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.dao-markdown-toolbar__button {
+  width: 1.875rem;
+  min-width: 1.875rem;
+  height: 1.875rem;
+  flex: 0 0 1.875rem;
+  color: var(--muted);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.dao-markdown-toolbar__button:hover {
+  color: var(--foreground);
+}
+
+.dao-markdown-toolbar__button[aria-pressed='true'] {
+  color: var(--accent);
+}
+
+.dao-markdown-toolbar__divider {
+  width: 1px;
+  height: 1.125rem;
+  flex: 0 0 1px;
+  margin-inline: 0.125rem;
+  background: color-mix(in oklab, var(--separator) 82%, transparent);
+}
+
+.dao-markdown-link-popover {
+  width: min(18rem, calc(100vw - 2rem));
+  min-width: 0;
+}
+
+.dao-markdown-link-popover__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dao-markdown-link-popover__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.375rem;
+}
+
+.dao-markdown-editor__content {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  scrollbar-color: var(--scrollbar) transparent;
+  scrollbar-width: thin;
+}
+
+.dao-markdown-editor__prose {
+  min-height: 100%;
+  width: 100%;
+  max-width: var(--dao-note-column-width, 54rem);
+  margin-inline: auto;
+  padding: 1.65rem var(--dao-note-gutter, clamp(1.125rem, 6cqi, 4rem)) 6rem;
+  color: var(--foreground);
+  caret-color: var(--accent);
+  outline: none;
+  font-size: 1rem;
+  line-height: 1.72;
+}
+
+.dao-markdown-editor__prose:focus-visible {
+  box-shadow: inset 2px 0 0 color-mix(in oklab, var(--focus) 24%, transparent);
+}
+
+.dao-markdown-editor__prose > :first-child {
+  margin-top: 0;
+}
+
+.dao-markdown-editor__prose > :last-child {
+  margin-bottom: 0;
+}
+
+.dao-markdown-editor__prose :where(h1, h2, h3, h4, h5, h6) {
+  margin: 1.7em 0 0.55em;
+  font-family: var(--font-sans);
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.018em;
+}
+
+.dao-markdown-editor__prose h1 {
+  font-size: 1.7rem;
+}
+
+.dao-markdown-editor__prose h2 {
+  font-size: 1.35rem;
+}
+
+.dao-markdown-editor__prose h3 {
+  font-size: 1.14rem;
+}
+
+.dao-markdown-editor__prose :where(p, ul, ol, blockquote, pre, table) {
+  margin: 0 0 0.95rem;
+}
+
+.dao-markdown-editor__prose :where(ul, ol) {
+  padding-left: 1.45rem;
+}
+
+.dao-markdown-editor__prose ul {
+  list-style: disc;
+}
+
+.dao-markdown-editor__prose ol {
+  list-style: decimal;
+}
+
+.dao-markdown-editor__prose li + li {
+  margin-top: 0.22rem;
+}
+
+.dao-markdown-editor__prose li > :where(p) {
+  margin: 0;
+}
+
+.dao-markdown-editor__prose ul[data-type='taskList'] {
+  padding-left: 0;
+  list-style: none;
+}
+
+.dao-markdown-editor__prose ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.dao-markdown-editor__prose ul[data-type='taskList'] label {
+  padding-top: 0.25rem;
+  user-select: none;
+}
+
+.dao-markdown-editor__prose ul[data-type='taskList'] input {
+  accent-color: var(--accent);
+}
+
+.dao-markdown-editor__prose blockquote {
+  padding: 0.1rem 0 0.1rem 0.95rem;
+  border-left: 2px solid color-mix(in oklab, var(--accent) 58%, var(--separator));
+  color: var(--muted);
+}
+
+.dao-markdown-editor__prose :not(pre) > code {
+  padding: 0.1rem 0.32rem;
+  border: 1px solid var(--separator);
+  border-radius: 4px;
+  background: var(--surface-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88em;
+}
+
+.dao-markdown-editor__prose pre {
+  overflow-x: auto;
+  padding: 1rem;
+  border: 1px solid var(--separator);
+  border-radius: 6px;
+  background: var(--surface-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.dao-markdown-editor__prose pre code {
+  background: transparent;
+}
+
+.dao-markdown-editor__prose a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--accent) 62%, transparent);
+  text-underline-offset: 0.16em;
+}
+
+.dao-markdown-editor__prose hr {
+  margin: 1.75rem 0;
+  border: 0;
+  border-top: 1px solid var(--separator);
+}
+
+.dao-markdown-editor__prose .tableWrapper {
+  overflow-x: auto;
+}
+
+.dao-markdown-editor__prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.925rem;
+}
+
+.dao-markdown-editor__prose :where(th, td) {
+  min-width: 7rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--separator);
+  vertical-align: top;
+  text-align: left;
+}
+
+.dao-markdown-editor__prose th {
+  background: var(--surface-secondary);
+  font-weight: 600;
+}
+
+.dao-markdown-editor__prose .selectedCell {
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+}
+
+.dao-markdown-editor__prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.dao-markdown-editor__prose p.is-editor-empty:first-child::before {
+  float: left;
+  height: 0;
+  color: var(--field-placeholder);
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+
+.dao-markdown-editor--source {
+  background: var(--surface);
+}
+
+.dao-markdown-source-header {
+  min-height: 2.75rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--separator) 72%, transparent);
+  background: var(--surface);
+}
+
+.dao-markdown-source-header__message {
+  display: flex;
+  min-height: 2.75rem;
+  width: 100%;
+  max-width: var(--dao-note-column-width, 54rem);
+  align-items: center;
+  gap: 0.55rem;
+  margin-inline: auto;
+  padding: 0.45rem var(--dao-note-gutter, clamp(1.125rem, 6cqi, 4rem));
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.dao-markdown-source-header__copy {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.45rem;
+}
+
+.dao-markdown-source-header__title {
+  flex: 0 0 auto;
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.dao-markdown-source-textarea {
+  min-height: 0;
+  width: 100%;
+  max-width: var(--dao-note-column-width, 54rem);
+  flex: 1;
+  resize: none;
+  margin-inline: auto;
+  border: 0;
+  background: transparent;
+  padding: 1.4rem var(--dao-note-gutter, clamp(1.125rem, 6cqi, 4rem)) 6rem;
+  color: var(--foreground);
+  caret-color: var(--accent);
+  outline: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  scrollbar-color: var(--scrollbar) transparent;
+  scrollbar-width: thin;
+  tab-size: 2;
+}
+
+.dao-markdown-source-textarea:focus-visible {
+  box-shadow: inset 2px 0 0 color-mix(in oklab, var(--focus) 24%, transparent);
+}
+
+@container dao-note-editor (max-width: 34rem) {
+  .dao-markdown-editor__prose {
+    padding-top: 1.25rem;
+  }
+
+  .dao-markdown-source-header__message {
+    align-items: flex-start;
+    padding-block: 0.6rem;
+  }
+
+  .dao-markdown-source-textarea {
+    padding-top: 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dao-markdown-toolbar__button {
+    transition: none;
+  }
+}

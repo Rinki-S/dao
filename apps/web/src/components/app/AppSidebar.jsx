@@ -115,7 +115,7 @@ export function AppSidebar({
         return;
       }
 
-      if (process.env.NODE_ENV === 'test') {
+      if (import.meta.env.MODE === 'test') {
         gsap.set(sidebar, { width: targetWidth });
         if (!isSidebarOpen) {
           setIsSidebarVisuallyOpen(false);

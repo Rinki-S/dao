@@ -505,7 +505,7 @@ Completed scope:
 - center the command palette and keep its global overlay above the app titlebar
 - remove unused shadcn-era local UI compatibility files and old dependencies after import checks
 - unify page and inline loading states with HeroUI `Skeleton`
-- preserve filesystem-backed markdown notes and debounced autosave while leaving rich editor internals for the CodeMirror milestone
+- preserve filesystem-backed markdown notes and debounced autosave while leaving rich editor internals for the dedicated editor milestone
 
 Validation:
 
@@ -516,7 +516,7 @@ Validation:
 
 Notes:
 
-- The text editing area remains intentionally lightweight at the end of this milestone because the next milestone replaces the markdown textarea with CodeMirror 6.
+- The text editing area remained intentionally lightweight at the end of this milestone. Dao later selected Tiptap for the dedicated rich Markdown editor milestone.
 - Remaining visual QA should happen as part of normal feature work rather than blocking the HeroUI foundation migration.
 
 ## Milestone 9: Product Shell
@@ -565,28 +565,40 @@ Keep deferred:
 - persisted tabs or route restoration
 - AI features
 
-## Next Milestone: CodeMirror 6 Markdown Editor
+## Current Milestone: Tiptap Markdown Rich Editor
 
 Recommended branch:
 
 ```txt
-feat/codemirror-editor
+feat/tiptap-editor
 ```
 
 Goal:
 
 ```txt
-Dao replaces the temporary markdown textarea with a CodeMirror 6 editor that can become the long-term note editing surface.
+Dao replaces the temporary markdown textarea with a Tiptap rich-text editor while keeping Markdown files as the only durable note body format.
 ```
 
 Planned scope:
 
 - preserve the existing note shell, breadcrumbs, title editing, save status chip, loading skeleton, and error state
-- replace only the markdown body editor internals first, keeping the Go file-backed note content API unchanged
-- keep debounced autosave and failed-save behavior intact so unsaved editor state is not lost
-- add Markdown syntax highlighting, line wrapping, keyboard-friendly editing, and Dao theme integration
-- add a formal editor MVP with toolbar, preview or split-view direction, shortcuts, and status affordances only after the CodeMirror base is stable
+- keep the Go file-backed note content API unchanged: React receives Markdown and sends Markdown back
+- parse Markdown into Tiptap's document model only in renderer memory; never persist Tiptap, ProseMirror, JSON, or HTML as the note body
+- isolate Tiptap behind a Dao-owned Markdown editor component so note loading and persistence remain editor-agnostic
+- lazy-load Tiptap in the note body so the title and note shell render without adding ProseMirror to the main application chunk
+- serialize title and content autosaves per note, flush the latest draft on switch or close, and drain pending saves before restarting the Go service
+- keep failed-save behavior intact so unsaved editor state is not lost
+- add a focused formatting toolbar, keyboard-friendly editing, and Dao theme integration
+- support the initial Markdown subset with explicit round-trip tests, including headings, emphasis, links, lists, task lists, blockquotes, code, tables, dividers, and images
+- require real Tiptap-to-Markdown autosave coverage and a second-round-trip idempotence check before merge
+- treat Tiptap Markdown support as a compatibility boundary because `@tiptap/markdown` is currently beta and semantic round trips may normalize source formatting
+- fall back to a safe Markdown source editor when frontmatter, raw HTML, HTML comments, reference definitions, or footnote definitions would otherwise risk silent loss
+- keep CodeMirror or another dedicated source editor available as a later enhancement if the fallback experience needs richer source editing
 - keep AI features deferred
+
+Architecture decision:
+
+- [`docs/adr/0001-tiptap-markdown-editor.md`](./adr/0001-tiptap-markdown-editor.md)
 
 ## Later Milestone: AI Summary Loop
 

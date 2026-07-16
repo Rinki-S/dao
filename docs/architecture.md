@@ -632,6 +632,9 @@ Note API responsibilities:
 - `PATCH /api/notes/:id` updates metadata such as title, project association, or note type.
 - `PUT /api/notes/:id/content` writes the markdown file body and updates derived search index content.
 - Autosave should call the content endpoint with debounce from the renderer. Failed saves must surface an error and preserve unsaved editor state.
+- Renderer saves for the same note must run through one serial queue so an older title or content request cannot finish after and overwrite newer state. Different notes may save in parallel.
+- Reopening a note must wait for that note's pending save queue before reading its Markdown file.
+- Restarting the local Go service from the renderer must wait for all pending note saves and must not restart when draining the queue reports a save failure.
 
 ### Search API
 

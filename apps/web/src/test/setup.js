@@ -13,6 +13,27 @@ class ResizeObserverMock {
 
 globalThis.ResizeObserver = ResizeObserverMock;
 
+Object.defineProperty(Document.prototype, 'elementFromPoint', {
+  configurable: true,
+  value() {
+    return this.querySelector('.ProseMirror') ?? this.body;
+  },
+});
+
+Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+  configurable: true,
+  value() {
+    return new DOMRect(0, 0, 0, 0);
+  },
+});
+
+Object.defineProperty(Range.prototype, 'getClientRects', {
+  configurable: true,
+  value() {
+    return [this.getBoundingClientRect()];
+  },
+});
+
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: vi.fn().mockImplementation((query) => ({

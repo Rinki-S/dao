@@ -112,17 +112,18 @@ export function AppSearchBar() {
     }
   }, [selectedIndex]);
 
-  useEffect(() => {
-    if (isPanelVisible) {
-      setShouldRender(true);
-    }
-  }, [isPanelVisible]);
-
   useLayoutEffect(() => {
     const panel = panelRef.current;
     if (!panel) return;
 
     gsap.killTweensOf(panel);
+
+    function finishClosingPanel() {
+      setShouldRender(false);
+      setResults([]);
+      setError('');
+      setStatus('idle');
+    }
 
     if (isPanelVisible) {
       if (prefersReducedMotion()) {
@@ -143,8 +144,12 @@ export function AppSearchBar() {
       }
     } else {
       if (prefersReducedMotion()) {
-        gsap.set(panel, { autoAlpha: 0 });
-        setShouldRender(false);
+        gsap.to(panel, {
+          autoAlpha: 0,
+          duration: 0,
+          overwrite: 'auto',
+          onComplete: finishClosingPanel,
+        });
       } else {
         gsap.to(panel, {
           autoAlpha: 0,
@@ -153,12 +158,7 @@ export function AppSearchBar() {
           duration: 0.15,
           ease: 'power2.in',
           overwrite: 'auto',
-          onComplete: () => {
-            setShouldRender(false);
-            setResults([]);
-            setError('');
-            setStatus('idle');
-          },
+          onComplete: finishClosingPanel,
         });
       }
     }
@@ -202,6 +202,10 @@ export function AppSearchBar() {
   }, [trimmedQuery]);
 
   function handleQueryChange(nextQuery) {
+    if (nextQuery.trim() !== '') {
+      setShouldRender(true);
+    }
+
     setQuery(nextQuery);
     setSelectedIndex(-1);
   }

@@ -16,6 +16,7 @@ const appSearchBarPath = path.resolve(import.meta.dirname, 'AppSearchBar.jsx');
 
 describe('AppSearchBar HeroUI migration boundary', () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
@@ -61,5 +62,34 @@ describe('AppSearchBar HeroUI migration boundary', () => {
     expect(await screen.findByText('Dao note')).toBeInTheDocument();
     expect(screen.getByText('partial match result')).toBeInTheDocument();
     expect(screen.getByText('note')).toBeInTheDocument();
+  });
+
+  it('closes and cleans up the result panel without animation when motion is reduced', async () => {
+    const user = userEvent.setup();
+
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    searchAll.mockResolvedValue([]);
+
+    render(createElement(AppSearchBar));
+
+    const input = screen.getByPlaceholderText('Search');
+    await user.type(input, 'dao');
+
+    expect(screen.getByTestId('search-loading-skeleton')).toBeInTheDocument();
+
+    await user.clear(input);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('search-loading-skeleton')).not.toBeInTheDocument();
+    });
   });
 });

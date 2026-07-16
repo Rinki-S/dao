@@ -417,7 +417,9 @@ function App() {
               className={
                 activeSurfaceId === 'tasks'
                   ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-                  : 'flex min-h-0 flex-1 flex-col overflow-hidden px-8 py-7'
+                  : activeSurfaceId === 'note-editor'
+                    ? 'flex min-h-0 flex-1 flex-col overflow-hidden bg-surface'
+                    : 'flex min-h-0 flex-1 flex-col overflow-hidden px-8 py-7'
               }
             >
               {!activeTab ? (

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetNoteSaveQueueForTests, waitForNoteSaves } from '@/features/notes/note-save-queue.js';
 import App from './App.jsx';
 
 function renderApp() {
@@ -104,7 +105,8 @@ describe('App', () => {
     );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await resetNoteSaveQueueForTests();
     window.history.replaceState(null, '', '/');
     vi.unstubAllGlobals();
   });
@@ -201,6 +203,61 @@ describe('App', () => {
 
     expect(screen.getAllByRole('tab', { name: /Dao Project/ })).toHaveLength(1);
     expect(screen.getAllByRole('tab', { name: /README/ })).toHaveLength(1);
+  });
+
+  it('flushes a real Tiptap edit when the active note tab closes', async () => {
+    const user = userEvent.setup();
+    const defaultFetch = fetch.getMockImplementation();
+    let diskContent = '# README';
+
+    fetch.mockImplementation(async (path, options = {}) => {
+      const pathname = new URL(path, window.location.origin).pathname;
+
+      if (pathname === '/api/notes/note-1/content' && options.method === 'PUT') {
+        diskContent = JSON.parse(options.body).content;
+        return Response.json({
+          id: 'note-1',
+          workspaceId: 'workspace-1',
+          projectId: 'project-1',
+          title: 'README',
+          content: diskContent,
+          noteType: 'project',
+          contentType: 'markdown',
+          filePath: '/tmp/dao-test/personal-workspace-1/dao-project/README.md',
+          createdAt: '2026-05-25T00:00:00Z',
+          updatedAt: '2026-05-25T00:00:01Z',
+          deletedAt: null,
+          version: 2,
+          syncStatus: 'local',
+        });
+      }
+
+      return defaultFetch(path, options);
+    });
+
+    renderApp();
+
+    await user.click(await screen.findByRole('button', { name: 'Dao Project' }));
+    await user.click(await screen.findByRole('button', { name: 'README' }));
+    const editor = await screen.findByRole('textbox', { name: 'Markdown note content' });
+    const headingText = editor.querySelector('h1')?.firstChild;
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.setStart(headingText, headingText.textContent.length);
+    range.collapse(true);
+    editor.focus();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.dispatchEvent(new Event('selectionchange'));
+
+    await user.type(editor, ' saved on close', { skipClick: true });
+    expect(diskContent).toBe('# README');
+    await user.click(screen.getByRole('button', { name: 'Close README tab' }));
+
+    await waitForNoteSaves('note-1');
+
+    expect(screen.queryByRole('tab', { name: /README/ })).not.toBeInTheDocument();
+    expect(diskContent).toBe('# README saved on close\n\n');
   });
 
   it('does not depend on the legacy shadcn sidebar provider in the app shell', async () => {

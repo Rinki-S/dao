@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button, Surface } from '@heroui/react';
+import { waitForAllPendingNoteSaves } from '@/features/notes/note-save-queue.js';
 
 export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
   const [restartStatus, setRestartStatus] = useState('idle');
@@ -15,6 +16,8 @@ export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
     try {
       setRestartStatus('restarting');
       setRestartError('');
+
+      await waitForAllPendingNoteSaves();
 
       const result = await window.dao.restartLocalService();
 

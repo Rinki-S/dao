@@ -32,4 +32,11 @@ describe('AppSidebar HeroUI migration boundary', () => {
     expect(source).toContain('bg-accent-soft-hover');
     expect(source).toContain('text-accent-soft-foreground');
   });
+
+  it('uses the Vite mode when selecting deterministic test animation behavior', () => {
+    const source = fs.readFileSync(appSidebarPath, 'utf8');
+
+    expect(source).toContain("import.meta.env.MODE === 'test'");
+    expect(source).not.toContain('process.env.NODE_ENV');
+  });
 });

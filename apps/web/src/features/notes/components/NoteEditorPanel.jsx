@@ -1,14 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Chip, Skeleton } from '@heroui/react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Skeleton } from '@heroui/react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import FileEmpty01Icon from '@hugeicons/core-free-icons/FileEmpty01Icon';
 
 import { notifyActivityChanged } from '@/features/activities/events.js';
+import {
+  clearPendingNoteDraft,
+  enqueueNoteSave,
+  getPendingNoteDraft,
+  markPendingNoteDraftFailed,
+  markPendingNoteDraftSaved,
+  setPendingNoteDraft,
+  waitForNoteSaves,
+} from '@/features/notes/note-save-queue.js';
 import { listProjects } from '@/features/projects/api.js';
 import { listWorkspaces } from '@/features/workspaces/api.js';
 import { getNote, updateNote, updateNoteContent } from '../api.js';
+import './note-editor-panel.css';
 
 const AUTOSAVE_DELAY_MS = 800;
+const MarkdownRichEditor = lazy(() =>
+  import('@/features/notes/editor/MarkdownRichEditor.jsx').then((module) => ({
+    default: module.MarkdownRichEditor,
+  })),
+);
 
 function getSaveStatusLabel(status) {
   switch (status) {
@@ -23,13 +38,9 @@ function getSaveStatusLabel(status) {
   }
 }
 
-function getSaveStatusVariant(status) {
-  return status === 'failed' ? 'danger' : 'soft';
-}
-
 function NoteEditorState({ title, description, tone = 'muted' }) {
   return (
-    <section className="flex min-h-0 flex-1 items-center justify-center px-8 py-7 text-center">
+    <section aria-label={title} className="dao-note-editor-state">
       <div className="flex max-w-sm flex-col items-center">
         <HugeiconsIcon
           icon={FileEmpty01Icon}
@@ -40,24 +51,47 @@ function NoteEditorState({ title, description, tone = 'muted' }) {
           className={
             tone === 'danger'
               ? 'font-heading text-lg font-semibold text-danger'
-              : 'font-heading text-lg font-semibold text-muted-foreground'
+              : 'font-heading text-lg font-semibold text-muted'
           }
         >
           {title}
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground text-pretty">{description}</p>
+        <p className="mt-2 text-sm text-muted text-pretty">{description}</p>
       </div>
     </section>
   );
 }
 
+function MarkdownEditorLoadingState() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Loading Markdown editor"
+      className="dao-note-editor-loading"
+      role="status"
+    >
+      <div className="dao-note-editor-loading__toolbar">
+        <Skeleton className="h-7 w-72 max-w-full rounded-md" />
+      </div>
+      <div className="dao-note-editor-loading__body space-y-3">
+        <Skeleton className="h-4 w-full rounded" />
+        <Skeleton className="h-4 w-5/6 rounded" />
+        <Skeleton className="h-4 w-3/4 rounded" />
+        <Skeleton className="mt-7 h-5 w-2/5 rounded" />
+        <Skeleton className="h-4 w-full rounded" />
+        <Skeleton className="h-4 w-4/5 rounded" />
+      </div>
+    </div>
+  );
+}
+
 export function NoteEditorPanel({ noteId }) {
-  const [_note, setNote] = useState(null);
   const [workspaceName, setWorkspaceName] = useState('');
   const [projectName, setProjectName] = useState('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [loadStatus, setLoadStatus] = useState('idle');
+  const [loadedNoteId, setLoadedNoteId] = useState(null);
   const [saveStatus, setSaveStatus] = useState('idle');
   const [error, setError] = useState('');
   const savedTitleRef = useRef('');
@@ -65,6 +99,20 @@ export function NoteEditorPanel({ noteId }) {
   const savedContentRef = useRef('');
   const latestContentRef = useRef('');
   const latestNoteIdRef = useRef(noteId);
+  const loadedNoteIdRef = useRef(null);
+  const noteGenerationRef = useRef(0);
+  const saveRevisionRef = useRef({ content: 0, title: 0 });
+  const saveErrorsRef = useRef({ content: null, title: null });
+  const pendingFieldSaveCountsRef = useRef(new Map());
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     latestNoteIdRef.current = noteId;
@@ -78,36 +126,230 @@ export function NoteEditorPanel({ noteId }) {
     latestTitleRef.current = title;
   }, [title]);
 
-  const flushPendingSave = useCallback((noteIdToSave) => {
-    const contentToSave = latestContentRef.current;
-
-    if (!noteIdToSave || contentToSave === savedContentRef.current) {
-      return;
-    }
-
-    void updateNoteContent(noteIdToSave, { content: contentToSave }).catch(() => {});
+  const isActiveNoteGeneration = useCallback((noteIdToSave, noteGeneration) => {
+    return (
+      mountedRef.current &&
+      latestNoteIdRef.current === noteIdToSave &&
+      noteGenerationRef.current === noteGeneration
+    );
   }, []);
 
-  const flushPendingMetadataSave = useCallback((noteIdToSave) => {
-    const titleToSave = latestTitleRef.current.trim();
-
-    if (!noteIdToSave || titleToSave === '' || titleToSave === savedTitleRef.current) {
-      return;
-    }
-
-    void updateNote(noteIdToSave, { title: titleToSave })
-      .then(() => {
-        notifyActivityChanged();
-      })
-      .catch(() => {});
+  const hasPendingFieldSave = useCallback((noteIdToCheck, field) => {
+    return (pendingFieldSaveCountsRef.current.get(`${noteIdToCheck}:${field}`) ?? 0) > 0;
   }, []);
+
+  const updateSavePresentation = useCallback(
+    (noteIdToSave, noteGeneration) => {
+      if (!isActiveNoteGeneration(noteIdToSave, noteGeneration)) {
+        return;
+      }
+
+      const saveError = saveErrorsRef.current.content ?? saveErrorsRef.current.title;
+
+      if (saveError) {
+        setError(saveError instanceof Error ? saveError.message : 'Failed to save note');
+        setSaveStatus('failed');
+        return;
+      }
+
+      const latestTrimmedTitle = latestTitleRef.current.trim();
+      const hasUnsavedTitle =
+        (latestTrimmedTitle !== '' && latestTrimmedTitle !== savedTitleRef.current) ||
+        hasPendingFieldSave(noteIdToSave, 'title');
+      const hasUnsavedContent =
+        latestContentRef.current !== savedContentRef.current ||
+        hasPendingFieldSave(noteIdToSave, 'content');
+
+      setError('');
+      setSaveStatus(hasUnsavedTitle || hasUnsavedContent ? 'saving' : 'saved');
+    },
+    [hasPendingFieldSave, isActiveNoteGeneration],
+  );
+
+  const enqueueContentSave = useCallback(
+    (noteIdToSave, contentToSave, noteGeneration) => {
+      const saveRevision = ++saveRevisionRef.current.content;
+      const pendingSaveKey = `${noteIdToSave}:content`;
+      setPendingNoteDraft(noteIdToSave, 'content', contentToSave);
+
+      pendingFieldSaveCountsRef.current.set(
+        pendingSaveKey,
+        (pendingFieldSaveCountsRef.current.get(pendingSaveKey) ?? 0) + 1,
+      );
+
+      if (isActiveNoteGeneration(noteIdToSave, noteGeneration)) {
+        saveErrorsRef.current.content = null;
+        updateSavePresentation(noteIdToSave, noteGeneration);
+      }
+
+      const savePromise = enqueueNoteSave(noteIdToSave, () =>
+        updateNoteContent(noteIdToSave, { content: contentToSave }),
+      );
+
+      void savePromise.then(
+        () => {
+          markPendingNoteDraftSaved(noteIdToSave, 'content', contentToSave);
+
+          if (!isActiveNoteGeneration(noteIdToSave, noteGeneration)) {
+            return;
+          }
+
+          savedContentRef.current = contentToSave;
+
+          if (
+            saveRevision === saveRevisionRef.current.content &&
+            latestContentRef.current === contentToSave
+          ) {
+            saveErrorsRef.current.content = null;
+          }
+
+          updateSavePresentation(noteIdToSave, noteGeneration);
+        },
+        (err) => {
+          markPendingNoteDraftFailed(noteIdToSave, 'content', contentToSave, err);
+
+          if (
+            isActiveNoteGeneration(noteIdToSave, noteGeneration) &&
+            saveRevision === saveRevisionRef.current.content &&
+            latestContentRef.current === contentToSave
+          ) {
+            saveErrorsRef.current.content = err;
+            updateSavePresentation(noteIdToSave, noteGeneration);
+          }
+        },
+      );
+      const finishTrackingSave = () => {
+        const remainingSaves = (pendingFieldSaveCountsRef.current.get(pendingSaveKey) ?? 1) - 1;
+
+        if (remainingSaves > 0) {
+          pendingFieldSaveCountsRef.current.set(pendingSaveKey, remainingSaves);
+        } else {
+          pendingFieldSaveCountsRef.current.delete(pendingSaveKey);
+        }
+
+        updateSavePresentation(noteIdToSave, noteGeneration);
+      };
+      void savePromise.then(finishTrackingSave, finishTrackingSave);
+
+      return savePromise;
+    },
+    [isActiveNoteGeneration, updateSavePresentation],
+  );
+
+  const enqueueMetadataSave = useCallback(
+    (noteIdToSave, titleToSave, noteGeneration) => {
+      const saveRevision = ++saveRevisionRef.current.title;
+      const pendingSaveKey = `${noteIdToSave}:title`;
+      setPendingNoteDraft(noteIdToSave, 'title', titleToSave);
+
+      pendingFieldSaveCountsRef.current.set(
+        pendingSaveKey,
+        (pendingFieldSaveCountsRef.current.get(pendingSaveKey) ?? 0) + 1,
+      );
+
+      if (isActiveNoteGeneration(noteIdToSave, noteGeneration)) {
+        saveErrorsRef.current.title = null;
+        updateSavePresentation(noteIdToSave, noteGeneration);
+      }
+
+      const savePromise = enqueueNoteSave(noteIdToSave, () =>
+        updateNote(noteIdToSave, { title: titleToSave }),
+      );
+
+      void savePromise.then(
+        () => {
+          markPendingNoteDraftSaved(noteIdToSave, 'title', titleToSave);
+          notifyActivityChanged();
+
+          if (!isActiveNoteGeneration(noteIdToSave, noteGeneration)) {
+            return;
+          }
+
+          savedTitleRef.current = titleToSave;
+
+          if (
+            saveRevision === saveRevisionRef.current.title &&
+            latestTitleRef.current.trim() === titleToSave
+          ) {
+            saveErrorsRef.current.title = null;
+          }
+
+          updateSavePresentation(noteIdToSave, noteGeneration);
+        },
+        (err) => {
+          markPendingNoteDraftFailed(noteIdToSave, 'title', titleToSave, err);
+
+          if (
+            isActiveNoteGeneration(noteIdToSave, noteGeneration) &&
+            saveRevision === saveRevisionRef.current.title &&
+            latestTitleRef.current.trim() === titleToSave
+          ) {
+            saveErrorsRef.current.title = err;
+            updateSavePresentation(noteIdToSave, noteGeneration);
+          }
+        },
+      );
+      const finishTrackingSave = () => {
+        const remainingSaves = (pendingFieldSaveCountsRef.current.get(pendingSaveKey) ?? 1) - 1;
+
+        if (remainingSaves > 0) {
+          pendingFieldSaveCountsRef.current.set(pendingSaveKey, remainingSaves);
+        } else {
+          pendingFieldSaveCountsRef.current.delete(pendingSaveKey);
+        }
+
+        updateSavePresentation(noteIdToSave, noteGeneration);
+      };
+      void savePromise.then(finishTrackingSave, finishTrackingSave);
+
+      return savePromise;
+    },
+    [isActiveNoteGeneration, updateSavePresentation],
+  );
+
+  const flushPendingSave = useCallback(
+    (noteIdToSave, noteGeneration) => {
+      const contentToSave = latestContentRef.current;
+
+      if (
+        !noteIdToSave ||
+        loadedNoteIdRef.current !== noteIdToSave ||
+        (contentToSave === savedContentRef.current && !hasPendingFieldSave(noteIdToSave, 'content'))
+      ) {
+        return;
+      }
+
+      void enqueueContentSave(noteIdToSave, contentToSave, noteGeneration);
+    },
+    [enqueueContentSave, hasPendingFieldSave],
+  );
+
+  const flushPendingMetadataSave = useCallback(
+    (noteIdToSave, noteGeneration) => {
+      const titleToSave = latestTitleRef.current.trim();
+
+      if (
+        !noteIdToSave ||
+        loadedNoteIdRef.current !== noteIdToSave ||
+        titleToSave === '' ||
+        (titleToSave === savedTitleRef.current && !hasPendingFieldSave(noteIdToSave, 'title'))
+      ) {
+        return;
+      }
+
+      void enqueueMetadataSave(noteIdToSave, titleToSave, noteGeneration);
+    },
+    [enqueueMetadataSave, hasPendingFieldSave],
+  );
 
   useEffect(() => {
     if (!noteId) {
       return;
     }
 
+    const noteGeneration = ++noteGenerationRef.current;
     let cancelled = false;
+    loadedNoteIdRef.current = null;
 
     async function load() {
       try {
@@ -115,21 +357,60 @@ export function NoteEditorPanel({ noteId }) {
         setSaveStatus('idle');
         setError('');
 
-        const nextNote = await getNote(noteId);
+        await waitForNoteSaves(noteId);
 
-        if (cancelled) {
+        if (cancelled || noteGenerationRef.current !== noteGeneration) {
           return;
         }
 
-        setNote(nextNote);
-        setTitle(nextNote.title);
-        setContent(nextNote.content);
+        const nextNote = await getNote(noteId);
+
+        if (cancelled || noteGenerationRef.current !== noteGeneration) {
+          return;
+        }
+
+        const pendingDraft = getPendingNoteDraft(noteId);
+        const pendingTitle =
+          pendingDraft?.title?.value === nextNote.title ? null : (pendingDraft?.title ?? null);
+        const pendingContent =
+          pendingDraft?.content?.value === nextNote.content
+            ? null
+            : (pendingDraft?.content ?? null);
+
+        if (pendingDraft?.title && !pendingTitle) {
+          clearPendingNoteDraft(noteId, 'title');
+        }
+
+        if (pendingDraft?.content && !pendingContent) {
+          clearPendingNoteDraft(noteId, 'content');
+        }
+
+        const hasPendingDraft = Boolean(pendingTitle || pendingContent);
+        const nextTitle = pendingTitle?.value ?? nextNote.title;
+        const nextContent = pendingContent?.value ?? nextNote.content;
+        const pendingSaveError = pendingContent?.error ?? pendingTitle?.error ?? null;
+
+        loadedNoteIdRef.current = noteId;
+        setLoadedNoteId(noteId);
+        setTitle(nextTitle);
+        setContent(nextContent);
         savedTitleRef.current = nextNote.title;
-        latestTitleRef.current = nextNote.title;
+        latestTitleRef.current = nextTitle;
         savedContentRef.current = nextNote.content;
-        latestContentRef.current = nextNote.content;
+        latestContentRef.current = nextContent;
+        saveErrorsRef.current = {
+          content: pendingContent?.error ?? null,
+          title: pendingTitle?.error ?? null,
+        };
         setLoadStatus('ready');
-        setSaveStatus('saved');
+        setSaveStatus(hasPendingDraft ? (pendingSaveError ? 'failed' : 'saving') : 'saved');
+        setError(
+          pendingSaveError instanceof Error
+            ? pendingSaveError.message
+            : pendingSaveError
+              ? 'Failed to save note'
+              : '',
+        );
 
         const workspaces = await listWorkspaces();
         if (!cancelled) {
@@ -143,7 +424,7 @@ export function NoteEditorPanel({ noteId }) {
             const project = projects.find((p) => p.id === nextNote.projectId);
             setProjectName(project?.name ?? '');
           }
-        } else {
+        } else if (!cancelled) {
           setProjectName('');
         }
       } catch (err) {
@@ -158,8 +439,8 @@ export function NoteEditorPanel({ noteId }) {
     load();
 
     return () => {
-      flushPendingMetadataSave(noteId);
-      flushPendingSave(noteId);
+      flushPendingMetadataSave(noteId, noteGeneration);
+      flushPendingSave(noteId, noteGeneration);
       cancelled = true;
     };
   }, [flushPendingMetadataSave, flushPendingSave, noteId]);
@@ -170,83 +451,46 @@ export function NoteEditorPanel({ noteId }) {
     if (
       loadStatus !== 'ready' ||
       !noteId ||
+      loadedNoteIdRef.current !== noteId ||
       trimmedTitle === '' ||
-      trimmedTitle === savedTitleRef.current
+      (trimmedTitle === savedTitleRef.current && !hasPendingFieldSave(noteId, 'title'))
     ) {
       return;
     }
 
-    let cancelled = false;
     const titleToSave = trimmedTitle;
+    const noteGeneration = noteGenerationRef.current;
 
-    setSaveStatus('saving');
-    setError('');
-
-    const timeoutId = window.setTimeout(async () => {
-      try {
-        const updatedNote = await updateNote(noteId, { title: titleToSave });
-
-        if (cancelled || latestNoteIdRef.current !== noteId) {
-          return;
-        }
-
-        savedTitleRef.current = titleToSave;
-        setNote({
-          ...updatedNote,
-          title: latestTitleRef.current,
-          content: latestContentRef.current,
-        });
-        setSaveStatus(latestTitleRef.current.trim() === titleToSave ? 'saved' : 'saving');
-        notifyActivityChanged();
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to save note');
-          setSaveStatus('failed');
-        }
-      }
+    const timeoutId = window.setTimeout(() => {
+      void enqueueMetadataSave(noteId, titleToSave, noteGeneration);
     }, AUTOSAVE_DELAY_MS);
 
     return () => {
-      cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [loadStatus, noteId, title]);
+  }, [enqueueMetadataSave, hasPendingFieldSave, loadStatus, noteId, title]);
 
   useEffect(() => {
-    if (loadStatus !== 'ready' || !noteId || content === savedContentRef.current) {
+    if (
+      loadStatus !== 'ready' ||
+      !noteId ||
+      loadedNoteIdRef.current !== noteId ||
+      (content === savedContentRef.current && !hasPendingFieldSave(noteId, 'content'))
+    ) {
       return;
     }
 
-    let cancelled = false;
     const contentToSave = content;
+    const noteGeneration = noteGenerationRef.current;
 
-    setSaveStatus('saving');
-    setError('');
-
-    const timeoutId = window.setTimeout(async () => {
-      try {
-        const updatedNote = await updateNoteContent(noteId, { content: contentToSave });
-
-        if (cancelled || latestNoteIdRef.current !== noteId) {
-          return;
-        }
-
-        savedContentRef.current = contentToSave;
-        setNote({ ...updatedNote, content: latestContentRef.current });
-        setSaveStatus(latestContentRef.current === contentToSave ? 'saved' : 'saving');
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to save note');
-          setSaveStatus('failed');
-        }
-      }
+    const timeoutId = window.setTimeout(() => {
+      void enqueueContentSave(noteId, contentToSave, noteGeneration);
     }, AUTOSAVE_DELAY_MS);
 
     return () => {
-      cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [content, loadStatus, noteId]);
+  }, [content, enqueueContentSave, hasPendingFieldSave, loadStatus, noteId]);
 
   if (!noteId) {
     return (
@@ -257,23 +501,26 @@ export function NoteEditorPanel({ noteId }) {
     );
   }
 
-  if (loadStatus === 'loading') {
+  if (loadStatus === 'loading' || (loadStatus !== 'error' && loadedNoteId !== noteId)) {
     return (
-      <section className="flex min-h-0 flex-1 flex-col gap-6">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border pb-5">
-          <div className="min-w-0 flex-1 space-y-3">
+      <section aria-busy="true" aria-label="Loading note" className="dao-note-editor" role="status">
+        <div className="dao-note-document-header">
+          <div className="dao-note-document-meta">
             <Skeleton className="h-3 w-48 rounded" />
-            <Skeleton className="h-6 w-64 rounded" />
+            <Skeleton className="h-3 w-14 rounded" />
           </div>
-          <Skeleton className="h-6 w-16 rounded-full" />
+          <Skeleton className="mt-3 h-10 w-80 max-w-full rounded-md" />
         </div>
-        <div className="flex-1 space-y-2">
+        <div className="dao-note-editor-loading__toolbar">
+          <Skeleton className="h-7 w-72 max-w-full rounded-md" />
+        </div>
+        <div className="dao-note-loading-body space-y-3">
           <Skeleton className="h-4 w-full rounded" />
           <Skeleton className="h-4 w-5/6 rounded" />
           <Skeleton className="h-4 w-4/5 rounded" />
+          <Skeleton className="mt-7 h-5 w-2/5 rounded" />
           <Skeleton className="h-4 w-full rounded" />
           <Skeleton className="h-4 w-3/4 rounded" />
-          <Skeleton className="h-4 w-5/6 rounded" />
         </div>
       </section>
     );
@@ -286,67 +533,109 @@ export function NoteEditorPanel({ noteId }) {
   const saveStatusLabel = getSaveStatusLabel(saveStatus);
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col gap-6">
-      <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border pb-5">
-        <div className="min-w-0 flex-1">
-          <nav aria-label="Note location" className="text-xs">
-            <ol className="flex items-center gap-1.5">
-              {workspaceName && (
-                <>
-                  <li className="pointer-events-none text-muted">{workspaceName}</li>
-                  <li aria-hidden="true" className="text-muted">
+    <section aria-label="Note editor" className="dao-note-editor">
+      <header className="dao-note-document-header">
+        <div className="dao-note-document-header__layout">
+          <div className="dao-note-document-copy">
+            <nav aria-label="Note location" className="dao-note-location">
+              <ol>
+                {workspaceName ? (
+                  <li className="dao-note-location__item">{workspaceName}</li>
+                ) : (
+                  <li className="dao-note-location__item">Notes</li>
+                )}
+                {workspaceName && projectName && (
+                  <li aria-hidden="true" className="dao-note-location__separator">
                     /
                   </li>
-                </>
-              )}
-              {projectName && (
-                <>
-                  <li className="pointer-events-none text-muted">{projectName}</li>
-                  <li aria-hidden="true" className="text-muted">
-                    /
-                  </li>
-                </>
-              )}
-              <li className="pointer-events-none text-foreground">{title || 'Untitled'}</li>
-            </ol>
-          </nav>
-          <input
-            type="text"
-            aria-label="Note title"
-            className="w-full border-0 bg-transparent p-0 font-heading text-xl font-semibold text-foreground outline-none placeholder:text-muted"
-            value={title}
-            onChange={(event) => {
-              latestTitleRef.current = event.target.value;
-              setTitle(event.target.value);
-            }}
-            placeholder="Untitled"
-          />
+                )}
+                {projectName && <li className="dao-note-location__item">{projectName}</li>}
+              </ol>
+            </nav>
+            <input
+              type="text"
+              aria-label="Note title"
+              className="dao-note-document-title"
+              value={title}
+              onChange={(event) => {
+                const nextTitle = event.target.value;
+                const normalizedTitle = nextTitle.trim();
+                latestTitleRef.current = nextTitle;
+
+                if (loadStatus === 'ready' && noteId && loadedNoteIdRef.current === noteId) {
+                  if (
+                    normalizedTitle === savedTitleRef.current &&
+                    !hasPendingFieldSave(noteId, 'title')
+                  ) {
+                    clearPendingNoteDraft(noteId, 'title');
+                    saveErrorsRef.current.title = null;
+                  } else {
+                    setPendingNoteDraft(noteId, 'title', normalizedTitle);
+
+                    if (normalizedTitle === '') {
+                      const validationError = new Error('Note title cannot be empty');
+                      markPendingNoteDraftFailed(noteId, 'title', normalizedTitle, validationError);
+                      saveErrorsRef.current.title = validationError;
+                    } else {
+                      saveErrorsRef.current.title = null;
+                    }
+                  }
+
+                  updateSavePresentation(noteId, noteGenerationRef.current);
+                }
+
+                setTitle(nextTitle);
+              }}
+              placeholder="Untitled"
+            />
+          </div>
+          {saveStatusLabel && (
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              className={`dao-note-save-status dao-note-save-status--${saveStatus}`}
+              role="status"
+            >
+              <span aria-hidden="true" className="dao-note-save-status__dot" />
+              {saveStatusLabel}
+            </span>
+          )}
         </div>
-        {saveStatusLabel && (
-          <Chip
-            className="shrink-0"
-            size="sm"
-            variant={getSaveStatusVariant(saveStatus)}
-            aria-live="polite"
-          >
-            {saveStatusLabel}
-          </Chip>
-        )}
-      </div>
+      </header>
 
-      {error && saveStatus === 'failed' && <p className="text-sm text-danger">{error}</p>}
+      {error && saveStatus === 'failed' && (
+        <p className="dao-note-save-error" role="alert">
+          {error}
+        </p>
+      )}
 
-      <textarea
-        aria-label="Markdown note content"
-        className="min-h-0 w-full flex-1 resize-none border-0 bg-transparent p-0 font-mono text-sm leading-6 text-foreground outline-none placeholder:text-muted"
-        value={content}
-        onChange={(event) => {
-          latestContentRef.current = event.target.value;
-          setContent(event.target.value);
-        }}
-        placeholder="Write markdown..."
-        spellCheck={false}
-      />
+      <Suspense fallback={<MarkdownEditorLoadingState />}>
+        <MarkdownRichEditor
+          key={noteId}
+          ariaLabel="Markdown note content"
+          initialMarkdown={content}
+          onMarkdownChange={(nextMarkdown) => {
+            if (loadedNoteIdRef.current !== noteId) {
+              return;
+            }
+
+            latestContentRef.current = nextMarkdown;
+
+            if (
+              nextMarkdown === savedContentRef.current &&
+              !hasPendingFieldSave(noteId, 'content')
+            ) {
+              clearPendingNoteDraft(noteId, 'content');
+            } else {
+              setPendingNoteDraft(noteId, 'content', nextMarkdown);
+            }
+
+            saveErrorsRef.current.content = null;
+            updateSavePresentation(noteId, noteGenerationRef.current);
+            setContent(nextMarkdown);
+          }}
+        />
+      </Suspense>
     </section>
   );
 }

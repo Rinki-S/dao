@@ -49,6 +49,7 @@ Dao brings these fragments into one calm, local-first workspace.
 - SQLite
 - HeroUI
 - hugeicons
+- Tiptap
 - Tailwind CSS
 - Zod
 - JSDoc
@@ -86,10 +87,11 @@ React runs a product-shell style layout with titlebar, sidebar, file tree, activ
 React is migrating the remaining shadcn-era UI pieces to HeroUI
 Workspaces and projects are backed by folders in a user-selected working directory
 Markdown note bodies are stored as files on disk while SQLite stores note metadata
+Tiptap provides rich note editing while Markdown remains the only durable note body format
 SQLite persists local metadata, search indexes, tasks, projects, workspaces, settings, and activities
 ```
 
-The current renderer UI has moved from stacked MVP panels toward a real product shell. Tasks, settings, onboarding, project tree, project contents, and the command palette now use the HeroUI direction. The note editor and some old local UI compatibility files remain to be migrated.
+The current renderer UI has moved from stacked MVP panels toward a real product shell. Tasks, settings, onboarding, project tree, project contents, the command palette, and the note shell use the HeroUI direction. The current note-editor milestone adds Tiptap rich editing behind a Markdown-only persistence boundary. Notes containing frontmatter, raw HTML, HTML comments, reference definitions, or footnote definitions use a safe source fallback instead of risking silent content loss.
 
 ## MVP Scope
 
@@ -203,6 +205,7 @@ For details, see [`DESIGN.md`](./DESIGN.md).
 - [`docs/ai-harness.md`](./docs/ai-harness.md) — future AI execution layer, context, tools, permissions, validation, traces, and confirmation rules.
 - [`docs/open-source-strategy.md`](./docs/open-source-strategy.md) — when and how to extract companion packages from real Dao needs.
 - [`docs/development-log.md`](./docs/development-log.md) — completed milestones, current milestone context, and near-term development direction.
+- [`docs/adr/0001-tiptap-markdown-editor.md`](./docs/adr/0001-tiptap-markdown-editor.md) — rich-editor choice, Markdown persistence boundary, and compatibility fallback.
 
 ## Development
 
