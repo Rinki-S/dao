@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   FOOTNOTE_DEFINITION_FIXTURES,
   REFERENCE_DEFINITION_FIXTURES,
+  UNSAFE_QUOTED_TITLE_FIXTURES,
 } from './markdown-compatibility.fixtures.js';
 import { MarkdownRichEditor } from './MarkdownRichEditor.jsx';
 import { MarkdownEditorToolbar } from './MarkdownEditorToolbar.jsx';
@@ -109,6 +110,25 @@ describe('MarkdownRichEditor', () => {
 
       fireEvent.change(editor, { target: { value: `${markdown}\nUpdated` } });
       expect(onMarkdownChange).toHaveBeenLastCalledWith(`${markdown}\nUpdated`);
+    },
+  );
+
+  it.each(UNSAFE_QUOTED_TITLE_FIXTURES)(
+    'keeps $name in source mode instead of rewriting its delimiter',
+    ({ markdown }) => {
+      const onMarkdownChange = vi.fn();
+
+      render(<MarkdownRichEditor initialMarkdown={markdown} onMarkdownChange={onMarkdownChange} />);
+
+      const editor = screen.getByRole('textbox', { name: 'Markdown note content' });
+      const descriptionId = editor.getAttribute('aria-describedby');
+      expect(editor).toHaveValue(markdown);
+      expect(screen.getByText('Source mode')).toBeInTheDocument();
+      expect(descriptionId).toBeTruthy();
+      expect(document.getElementById(descriptionId)).toHaveTextContent(
+        'link or image titles with double quotes',
+      );
+      expect(onMarkdownChange).not.toHaveBeenCalled();
     },
   );
 });

@@ -55,6 +55,52 @@
   color: var(--accent);
 }
 
+.dao-markdown-toolbar__block-type,
+.dao-markdown-toolbar__insert {
+  min-width: 3.75rem;
+  height: 1.875rem;
+  flex: 0 0 auto;
+  justify-content: space-between;
+  gap: 0.2rem;
+  padding-inline: 0.5rem;
+  color: var(--muted);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.dao-markdown-toolbar__block-type:hover,
+.dao-markdown-toolbar__block-type[data-open],
+.dao-markdown-toolbar__insert:hover,
+.dao-markdown-toolbar__insert[data-open] {
+  color: var(--foreground);
+}
+
+.dao-markdown-toolbar__insert {
+  min-width: 4.25rem;
+}
+
+.dao-markdown-toolbar__block-type-label {
+  min-width: 1.75rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-align: left;
+}
+
+.dao-markdown-block-option__label {
+  min-width: 0;
+  flex: 1;
+}
+
+.dao-markdown-block-option__shortcut {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
 .dao-markdown-toolbar__divider {
   width: 1px;
   height: 1.125rem;
@@ -63,6 +109,7 @@
   background: color-mix(in oklab, var(--separator) 82%, transparent);
 }
 
+.dao-markdown-link-popover__content,
 .dao-markdown-link-popover {
   width: min(18rem, calc(100vw - 2rem));
   min-width: 0;
@@ -131,6 +178,20 @@
 
 .dao-markdown-editor__prose h3 {
   font-size: 1.14rem;
+}
+
+.dao-markdown-editor__prose h4 {
+  font-size: 1.03rem;
+}
+
+.dao-markdown-editor__prose h5 {
+  font-size: 0.95rem;
+}
+
+.dao-markdown-editor__prose h6 {
+  color: var(--muted);
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
 }
 
 .dao-markdown-editor__prose :where(p, ul, ol, blockquote, pre, table) {
@@ -341,7 +402,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dao-markdown-toolbar__button {
+  .dao-markdown-toolbar__button,
+  .dao-markdown-toolbar__block-type,
+  .dao-markdown-toolbar__insert {
     transition: none;
   }
 }

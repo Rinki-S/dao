@@ -10,6 +10,7 @@ function getUnsupportedSyntax(markdown) {
     hasHtmlComment: false,
     hasRawHtml: false,
     hasReferenceDefinition: false,
+    hasUnsafeQuotedTitle: false,
   };
 
   walkTokens(Lexer.lex(markdown), (token) => {
@@ -27,6 +28,13 @@ function getUnsupportedSyntax(markdown) {
 
     if (token.type === 'text' && FOOTNOTE_DEFINITION_PATTERN.test(token.raw)) {
       syntax.hasFootnoteDefinition = true;
+    }
+
+    if (
+      (token.type === 'link' || token.type === 'image') &&
+      token.title?.includes('"')
+    ) {
+      syntax.hasUnsafeQuotedTitle = true;
     }
   });
 
@@ -63,6 +71,10 @@ export function getMarkdownCompatibility(markdown) {
 
   if (unsupportedSyntax.hasFootnoteDefinition) {
     reasons.push('footnote definitions');
+  }
+
+  if (unsupportedSyntax.hasUnsafeQuotedTitle) {
+    reasons.push('link or image titles with double quotes');
   }
 
   return {

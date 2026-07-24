@@ -589,6 +589,8 @@ Planned scope:
 - serialize title and content autosaves per note, flush the latest draft on switch or close, and drain pending saves before restarting the Go service
 - keep failed-save behavior intact so unsaved editor state is not lost
 - add a focused formatting toolbar, keyboard-friendly editing, and Dao theme integration
+- expose Paragraph and H1-H6 through one block-type selector; keep low-frequency dividers, remote image references, and GFM tables in a compact Insert menu
+- keep local image attachments deferred until the Go file layer owns asset copying and note-relative path resolution
 - support the initial Markdown subset with explicit round-trip tests, including headings, emphasis, links, lists, task lists, blockquotes, code, tables, dividers, and images
 - require real Tiptap-to-Markdown autosave coverage and a second-round-trip idempotence check before merge
 - treat Tiptap Markdown support as a compatibility boundary because `@tiptap/markdown` is currently beta and semantic round trips may normalize source formatting

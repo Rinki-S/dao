@@ -6,6 +6,7 @@ import {
   FOOTNOTE_DEFINITION_FIXTURES,
   HTML_LITERAL_FIXTURES,
   REFERENCE_DEFINITION_FIXTURES,
+  UNSAFE_QUOTED_TITLE_FIXTURES,
 } from './markdown-compatibility.fixtures.js';
 
 describe('getMarkdownCompatibility', () => {
@@ -49,6 +50,16 @@ describe('getMarkdownCompatibility', () => {
       reasons: ['footnote definitions'],
     });
   });
+
+  it.each(UNSAFE_QUOTED_TITLE_FIXTURES)(
+    'requires source mode for $name',
+    ({ markdown }) => {
+      expect(getMarkdownCompatibility(markdown)).toEqual({
+        isRichTextSafe: false,
+        reasons: ['link or image titles with double quotes'],
+      });
+    },
+  );
 
   it.each(CODE_BLOCK_REFERENCE_LIKE_FIXTURES)(
     'does not mistake definition-like text in a $name for a definition',

@@ -51,6 +51,21 @@ export const FOOTNOTE_DEFINITION_FIXTURES = [
   },
 ];
 
+export const UNSAFE_QUOTED_TITLE_FIXTURES = [
+  {
+    name: 'single-quoted link title containing double quotes',
+    markdown: `[Dao](https://example.com 'The "Dao" docs')`,
+  },
+  {
+    name: 'parenthesized image title containing double quotes',
+    markdown: `![Dao](https://example.com/dao.png (The "Dao" icon))`,
+  },
+  {
+    name: 'quoted title nested in a blockquote',
+    markdown: `> [Dao](https://example.com 'The "Dao" docs')`,
+  },
+];
+
 export const HTML_LITERAL_FIXTURES = [
   {
     name: 'lowercase doctype in a fenced code block',
