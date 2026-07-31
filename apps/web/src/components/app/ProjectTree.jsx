@@ -54,11 +54,6 @@ export function ProjectTree({
   const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set());
   const [status, setStatus] = useState('idle');
   const [treeError, setTreeError] = useState('');
-  const [projectCreateError, setProjectCreateError] = useState('');
-  const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
-  const [projectName, setProjectName] = useState('');
-  const [projectNameError, setProjectNameError] = useState('');
-  const [projectDescription, setProjectDescription] = useState('');
   const [renameTarget, setRenameTarget] = useState(null);
   const [inlineCreate, setInlineCreate] = useState(null);
   const [inlineCreateValue, setInlineCreateValue] = useState('');
@@ -70,7 +65,6 @@ export function ProjectTree({
   const [deleteProjectNotes, setDeleteProjectNotes] = useState(false);
   const [treeActionError, setTreeActionError] = useState('');
   const [isTreeActionPending, setIsTreeActionPending] = useState(false);
-  const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   const workspaceProjects = useMemo(() => {
     if (!currentWorkspace) {
@@ -157,14 +151,6 @@ export function ProjectTree({
     };
   }, [currentWorkspace, loadTreeData]);
 
-  function openProjectDialog() {
-    setProjectName('');
-    setProjectNameError('');
-    setProjectDescription('');
-    setProjectCreateError('');
-    setIsProjectDialogOpen(true);
-  }
-
   function startInlineNoteCreate(projectId = selectedProjectId) {
     const targetProjectId = projectId || null;
 
@@ -179,6 +165,12 @@ export function ProjectTree({
         return nextProjectIds;
       });
     }
+  }
+
+  function startInlineProjectCreate() {
+    setInlineCreate({ type: 'project' });
+    setInlineCreateValue('');
+    setInlineCreateError('');
   }
 
   function cancelInlineCreate() {
@@ -207,33 +199,35 @@ export function ProjectTree({
     });
   }
 
-  async function handleCreateProject(event) {
-    event.preventDefault();
-
-    if (!currentWorkspace) {
-      setProjectCreateError('Create a workspace before adding projects');
+  async function commitInlineProjectCreate() {
+    if (!inlineCreate || inlineCreate.type !== 'project') {
       return;
     }
 
-    if (!projectName.trim()) {
-      setProjectNameError('Project name is required');
+    const name = inlineCreateValue.trim();
+
+    if (!name) {
+      cancelInlineCreate();
+      return;
+    }
+
+    if (!currentWorkspace) {
+      setInlineCreateError('Create a workspace before adding projects');
       return;
     }
 
     try {
-      setIsCreatingProject(true);
-      setProjectCreateError('');
+      setIsInlineCreating(true);
+      setInlineCreateError('');
 
       const createdProject = await createProject({
         workspaceId: currentWorkspace.id,
-        name: projectName,
-        description: projectDescription,
+        name,
+        description: '',
       });
 
-      setProjectName('');
-      setProjectNameError('');
-      setProjectDescription('');
-      setIsProjectDialogOpen(false);
+      setInlineCreate(null);
+      setInlineCreateValue('');
       onSelectProject(createdProject);
       setExpandedProjectIds((currentProjectIds) => {
         const nextProjectIds = new Set(currentProjectIds);
@@ -244,9 +238,9 @@ export function ProjectTree({
       await loadTreeData();
       notifyActivityChanged();
     } catch (err) {
-      setProjectCreateError(err instanceof Error ? err.message : 'Failed to create project');
+      setInlineCreateError(err instanceof Error ? err.message : 'Failed to create project');
     } finally {
-      setIsCreatingProject(false);
+      setIsInlineCreating(false);
     }
   }
 
@@ -413,7 +407,7 @@ export function ProjectTree({
               size="icon"
               type="button"
               variant="ghost"
-              onClick={openProjectDialog}
+              onClick={startInlineProjectCreate}
             >
               <IconPlus
                 aria-hidden="true"
@@ -470,7 +464,8 @@ export function ProjectTree({
 
             {status === 'ready' &&
               workspaceProjects.length === 0 &&
-              unassignedNotes.length === 0 && (
+              unassignedNotes.length === 0 &&
+              inlineCreate?.type !== 'project' && (
                 <li className="relative">
                   <span className="block px-2 py-1 text-xs text-muted-foreground">No projects</span>
                 </li>
@@ -553,6 +548,20 @@ export function ProjectTree({
                 </li>
               );
             })}
+
+            {status === 'ready' && inlineCreate?.type === 'project' && (
+              <InlineCreateRow
+                className="h-8"
+                error={inlineCreateError}
+                icon={IconFolder}
+                isCreating={isInlineCreating}
+                placeholder="Project name"
+                value={inlineCreateValue}
+                onCancel={cancelInlineCreate}
+                onChange={setInlineCreateValue}
+                onSubmit={commitInlineProjectCreate}
+              />
+            )}
 
             {status === 'ready' &&
               unassignedNotes.map((note) => {
@@ -698,68 +707,6 @@ export function ProjectTree({
             </form>
           </DialogContent>
         </Dialog>
-
-        <Dialog
-          open={isProjectDialogOpen}
-          onOpenChange={(open) => {
-            if (!isCreatingProject) {
-              setIsProjectDialogOpen(open);
-            }
-          }}
-        >
-          <DialogContent aria-label="Create project">
-            <DialogHeader>
-              <DialogTitle>Create project</DialogTitle>
-              <DialogDescription>Add a project to the current workspace.</DialogDescription>
-            </DialogHeader>
-
-            <form className="flex flex-col gap-4" onSubmit={handleCreateProject}>
-              <FieldGroup>
-                <Field data-invalid={Boolean(projectNameError)}>
-                  <FieldLabel htmlFor="sidebar-project-name">Project name</FieldLabel>
-                  <Input
-                    id="sidebar-project-name"
-                    aria-describedby={projectNameError ? 'sidebar-project-name-error' : undefined}
-                    aria-invalid={Boolean(projectNameError)}
-                    disabled={!currentWorkspace || isCreatingProject}
-                    name="sidebar-project-name"
-                    placeholder="Project name"
-                    required
-                    value={projectName}
-                    onChange={(event) => {
-                      setProjectName(event.target.value);
-                      setProjectNameError('');
-                    }}
-                  />
-                  <FieldError id="sidebar-project-name-error">{projectNameError}</FieldError>
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="sidebar-project-description">Description</FieldLabel>
-                  <Input
-                    id="sidebar-project-description"
-                    disabled={!currentWorkspace || isCreatingProject}
-                    name="sidebar-project-description"
-                    placeholder="Description"
-                    value={projectDescription}
-                    onChange={(event) => setProjectDescription(event.target.value)}
-                  />
-                </Field>
-              </FieldGroup>
-
-              <AppApiErrorMessage>{projectCreateError}</AppApiErrorMessage>
-
-              <DialogFooter>
-                <Button disabled={!currentWorkspace || isCreatingProject} type="submit">
-                  {isCreatingProject && <Spinner aria-hidden="true" data-icon="inline-start" />}
-                  {isCreatingProject ? 'Creating...' : 'Create project'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-
       </section>
     </TooltipProvider>
   );
@@ -767,6 +714,7 @@ export function ProjectTree({
 
 function InlineCreateRow({
   icon: Icon,
+  className,
   error,
   isCreating,
   onCancel,
@@ -778,7 +726,7 @@ function InlineCreateRow({
   return (
     <li className="relative" data-slot="inline-create-row">
       <form
-        className="flex h-7 w-full items-center gap-2 px-2"
+        className={`flex h-7 w-full items-center gap-2 px-2 ${className ?? ''}`}
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit();

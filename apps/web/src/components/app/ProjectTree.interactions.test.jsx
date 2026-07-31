@@ -125,20 +125,47 @@ describe('ProjectTree interactions', () => {
 
     await user.click(screen.getByRole('button', { name: 'Create project' }));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Create project' });
-    await user.type(within(dialog).getByLabelText('Project name'), 'New Project');
-    await user.click(within(dialog).getByRole('button', { name: 'Create project' }));
+    const input = await screen.findByRole('textbox', { name: 'Project name' });
+    await user.type(input, 'New Project{Enter}');
 
     await waitFor(() => {
       expect(createProject).toHaveBeenCalledTimes(1);
     });
 
-    expect(await within(dialog).findByText('Unable to create project')).toBeInTheDocument();
-    expect(screen.getByRole('dialog', { name: 'Create project' })).toBeInTheDocument();
+    expect(await screen.findByText('Unable to create project')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Project name' })).toBeInTheDocument();
     expect(within(container).getByText('Dao Project')).toBeInTheDocument();
     expect(within(container).getByText('Root note')).toBeInTheDocument();
     expect(listProjects).toHaveBeenCalledTimes(1);
     expect(listNotes).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates a project inline with default metadata', async () => {
+    const user = userEvent.setup();
+    const onSelectProject = vi.fn();
+
+    renderProjectTree({ onSelectProject });
+
+    expect(await screen.findByRole('button', { name: 'Dao Project' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+
+    const input = await screen.findByRole('textbox', { name: 'Project name' });
+    await user.type(input, 'New Project{Enter}');
+
+    await waitFor(() => {
+      expect(createProject).toHaveBeenCalledWith({
+        workspaceId: 'workspace-1',
+        name: 'New Project',
+        description: '',
+      });
+    });
+
+    await waitFor(() => {
+      expect(onSelectProject).toHaveBeenCalledWith(
+        projectFixture({ id: 'project-2', name: 'New Project' }),
+      );
+    });
   });
 
   it('opens a project context menu and renames the project', async () => {

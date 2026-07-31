@@ -34,7 +34,7 @@ describe('ProjectTree shadcn Base UI migration boundary', () => {
 
     expect(source).toContain('<form');
     expect(source).toContain('disabled={isTreeActionPending}');
-    expect(source).toContain('onClick={openProjectDialog}');
+    expect(source).toContain('onClick={startInlineProjectCreate}');
     expect(source).toContain('<Spinner');
     expect(source).not.toContain('isDisabled=');
     expect(source).not.toContain('isPending=');
@@ -46,7 +46,6 @@ describe('ProjectTree shadcn Base UI migration boundary', () => {
 
     expect(source).toContain('FieldError');
     expect(source).toContain('AppApiErrorMessage');
-    expect(source).toContain('<AppApiErrorMessage>{projectCreateError}</AppApiErrorMessage>');
     expect(source).toContain('data-slot="inline-create-row"');
     expect(source).toContain('{treeError}');
     expect(source).not.toContain(
@@ -55,6 +54,8 @@ describe('ProjectTree shadcn Base UI migration boundary', () => {
     expect(source).not.toContain(
       "setStatus('error');\n    } finally {\n      setIsCreatingContent(false);",
     );
+    expect(source).not.toContain('projectCreateError');
+    expect(source).not.toContain('contentCreateError');
   });
 
   it('keeps project tree actions tactile with native active states', () => {
