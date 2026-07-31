@@ -551,7 +551,7 @@ Command palette should support:
 Visual rules:
 
 - the palette should be centered in the viewport
-- the backdrop should cover the full app, including the titlebar
+- the backdrop starts below the titlebar; a full-viewport backdrop filter would break the system material in the titlebar
 - dark mode should feel premium
 - selected item uses subtle jade highlight
 - metadata uses muted text

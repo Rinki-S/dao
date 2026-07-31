@@ -257,7 +257,7 @@ export function AppSidebar({
   return (
     <aside
       ref={sidebarRef}
-      className={`relative hidden h-[calc(100dvh-3rem)] shrink-0 flex-col overflow-hidden border-r border-border text-sidebar-foreground md:flex ${isSidebarVisuallyOpen ? 'w-(--sidebar-width)' : 'w-0'}`}
+      className={`relative hidden h-[calc(100dvh-3rem)] shrink-0 flex-col overflow-hidden border-r border-border bg-background/40 text-sidebar-foreground md:flex ${isSidebarVisuallyOpen ? 'w-(--sidebar-width)' : 'w-0'}`}
       data-collapsible={isSidebarVisuallyOpen ? '' : 'hidden'}
       data-sidebar-state={isSidebarVisuallyOpen ? 'expanded' : 'collapsed'}
       data-slot="app-sidebar"

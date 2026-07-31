@@ -4,9 +4,9 @@ import { AppSearchBar } from './AppSearchBar.jsx';
 
 export function AppTitleBar({ isSidebarOpen, onToggleSidebar }) {
   return (
-    <header className="app-drag-region relative z-100 flex h-12 shrink-0 items-center border-b border-border">
+    <header className="app-drag-region relative z-100 flex h-12 shrink-0 items-center border-b border-border bg-background/40">
       <div className="flex w-20 shrink-0" aria-hidden="true" />
-      <div className="flex min-w-0 flex-1 items-center gap-2 px-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2 pr-2 pl-3">
         <Button
           aria-label={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           className="app-no-drag size-8 translate-y-[0.5px] text-muted-foreground"
