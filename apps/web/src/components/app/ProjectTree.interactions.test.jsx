@@ -197,19 +197,63 @@ describe('ProjectTree interactions', () => {
 
     await user.click(screen.getByRole('button', { name: 'Create content' }));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Create content' });
-    await user.type(within(dialog).getByLabelText('Note title'), 'New Note');
-    await user.click(within(dialog).getByRole('button', { name: 'Create content' }));
+    const input = await screen.findByRole('textbox', { name: 'Note title' });
+    await user.type(input, 'New Note{Enter}');
 
     await waitFor(() => {
       expect(createNote).toHaveBeenCalledTimes(1);
     });
 
-    expect(await within(dialog).findByText('Unable to create note')).toBeInTheDocument();
-    expect(screen.getByRole('dialog', { name: 'Create content' })).toBeInTheDocument();
+    expect(await screen.findByText('Unable to create note')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Note title' })).toBeInTheDocument();
     expect(within(container).getByText('Dao Project')).toBeInTheDocument();
     expect(within(container).getByText('Root note')).toBeInTheDocument();
     expect(listProjects).toHaveBeenCalledTimes(1);
     expect(listNotes).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates a note inline with default metadata', async () => {
+    const user = userEvent.setup();
+    const onSelectNote = vi.fn();
+
+    renderProjectTree({ onSelectNote });
+
+    expect(await screen.findByRole('button', { name: 'Dao Project' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Create content' }));
+
+    const input = await screen.findByRole('textbox', { name: 'Note title' });
+    await user.type(input, 'New Note{Enter}');
+
+    await waitFor(() => {
+      expect(createNote).toHaveBeenCalledWith({
+        workspaceId: 'workspace-1',
+        projectId: null,
+        title: 'New Note',
+        content: '',
+        contentType: 'markdown',
+        noteType: 'general',
+      });
+    });
+
+    await waitFor(() => {
+      expect(onSelectNote).toHaveBeenCalledWith(noteFixture({ id: 'note-2', title: 'New Note' }));
+    });
+  });
+
+  it('cancels inline note creation on Escape', async () => {
+    const user = userEvent.setup();
+
+    renderProjectTree();
+
+    expect(await screen.findByRole('button', { name: 'Dao Project' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Create content' }));
+
+    const input = await screen.findByRole('textbox', { name: 'Note title' });
+    await user.type(input, 'Draft{Escape}');
+
+    expect(screen.queryByRole('textbox', { name: 'Note title' })).not.toBeInTheDocument();
+    expect(createNote).not.toHaveBeenCalled();
   });
 });

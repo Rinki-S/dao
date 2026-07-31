@@ -26,17 +26,8 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
-import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getContentFormatIcon } from '@/extensions/registry.js';
 import { notifyActivityChanged, subscribeToActivityChanged } from '@/features/activities/events.js';
@@ -48,21 +39,6 @@ import {
   updateProject,
 } from '@/features/projects/api.js';
 import { AppApiErrorMessage } from './AppApiErrorMessage.jsx';
-
-const contentTypeOptions = [
-  { label: 'Note', value: 'note' },
-  { label: 'GitHub integration', value: 'github', disabled: true },
-  { label: 'Website', value: 'website', disabled: true },
-  { label: 'LeetCode', value: 'leetcode', disabled: true },
-];
-
-const noteTypeOptions = [
-  { label: 'General', value: 'general' },
-  { label: 'Project', value: 'project' },
-  { label: 'Learning', value: 'learning' },
-  { label: 'Daily', value: 'daily' },
-  { label: 'Interview', value: 'interview' },
-];
 
 export function ProjectTree({
   currentWorkspace,
@@ -79,19 +55,15 @@ export function ProjectTree({
   const [status, setStatus] = useState('idle');
   const [treeError, setTreeError] = useState('');
   const [projectCreateError, setProjectCreateError] = useState('');
-  const [contentCreateError, setContentCreateError] = useState('');
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
-  const [isContentDialogOpen, setIsContentDialogOpen] = useState(false);
   const [projectName, setProjectName] = useState('');
   const [projectNameError, setProjectNameError] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
-  const [contentType, setContentType] = useState('note');
-  const [contentProjectId, setContentProjectId] = useState('none');
-  const [noteTitle, setNoteTitle] = useState('');
-  const [noteTitleError, setNoteTitleError] = useState('');
-  const [noteContent, setNoteContent] = useState('');
-  const [noteType, setNoteType] = useState('general');
   const [renameTarget, setRenameTarget] = useState(null);
+  const [inlineCreate, setInlineCreate] = useState(null);
+  const [inlineCreateValue, setInlineCreateValue] = useState('');
+  const [inlineCreateError, setInlineCreateError] = useState('');
+  const [isInlineCreating, setIsInlineCreating] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [renameFieldError, setRenameFieldError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -99,7 +71,6 @@ export function ProjectTree({
   const [treeActionError, setTreeActionError] = useState('');
   const [isTreeActionPending, setIsTreeActionPending] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
-  const [isCreatingContent, setIsCreatingContent] = useState(false);
 
   const workspaceProjects = useMemo(() => {
     if (!currentWorkspace) {
@@ -136,14 +107,6 @@ export function ProjectTree({
 
     return notes.filter((note) => note.workspaceId === currentWorkspace.id && !note.projectId);
   }, [currentWorkspace, notes]);
-
-  const projectOptions = useMemo(
-    () => [
-      { label: 'No project', value: 'none' },
-      ...workspaceProjects.map((project) => ({ label: project.name, value: project.id })),
-    ],
-    [workspaceProjects],
-  );
 
   const deleteProjectNoteCount =
     deleteTarget?.type === 'project'
@@ -202,15 +165,30 @@ export function ProjectTree({
     setIsProjectDialogOpen(true);
   }
 
-  function openContentDialog(projectId = selectedProjectId) {
-    setContentProjectId(projectId || 'none');
-    setContentType('note');
-    setNoteTitle('');
-    setNoteTitleError('');
-    setNoteContent('');
-    setNoteType('general');
-    setContentCreateError('');
-    setIsContentDialogOpen(true);
+  function startInlineNoteCreate(projectId = selectedProjectId) {
+    const targetProjectId = projectId || null;
+
+    setInlineCreate({ type: 'note', projectId: targetProjectId });
+    setInlineCreateValue('');
+    setInlineCreateError('');
+
+    if (targetProjectId) {
+      setExpandedProjectIds((currentProjectIds) => {
+        const nextProjectIds = new Set(currentProjectIds);
+        nextProjectIds.add(targetProjectId);
+        return nextProjectIds;
+      });
+    }
+  }
+
+  function cancelInlineCreate() {
+    if (isInlineCreating) {
+      return;
+    }
+
+    setInlineCreate(null);
+    setInlineCreateValue('');
+    setInlineCreateError('');
   }
 
   function toggleProject(project) {
@@ -272,59 +250,47 @@ export function ProjectTree({
     }
   }
 
-  async function handleCreateContent(event) {
-    event.preventDefault();
+  async function commitInlineNoteCreate() {
+    if (!inlineCreate || inlineCreate.type !== 'note') {
+      return;
+    }
+
+    const title = inlineCreateValue.trim();
+
+    if (!title) {
+      cancelInlineCreate();
+      return;
+    }
 
     if (!currentWorkspace) {
-      setContentCreateError('Create a workspace before adding content');
-      return;
-    }
-
-    if (contentType !== 'note') {
-      setContentCreateError('Only notes can be created in this milestone');
-      return;
-    }
-
-    if (!noteTitle.trim()) {
-      setNoteTitleError('Note title is required');
+      setInlineCreateError('Create a workspace before adding notes');
       return;
     }
 
     try {
-      setIsCreatingContent(true);
-      setContentCreateError('');
+      setIsInlineCreating(true);
+      setInlineCreateError('');
 
       const createdNote = await createNote({
         workspaceId: currentWorkspace.id,
-        projectId: contentProjectId === 'none' ? null : contentProjectId,
-        title: noteTitle,
-        content: noteContent,
+        projectId: inlineCreate.projectId,
+        title,
+        content: '',
         contentType: 'markdown',
-        noteType,
+        noteType: 'general',
       });
 
-      setNoteTitle('');
-      setNoteTitleError('');
-      setNoteContent('');
-      setNoteType('general');
-      setIsContentDialogOpen(false);
-
-      if (contentProjectId !== 'none') {
-        setExpandedProjectIds((currentProjectIds) => {
-          const nextProjectIds = new Set(currentProjectIds);
-          nextProjectIds.add(contentProjectId);
-          return nextProjectIds;
-        });
-      }
+      setInlineCreate(null);
+      setInlineCreateValue('');
 
       await loadTreeData();
       onSelectNote(createdNote);
       notifyActivityChanged();
       onContentCreated?.();
     } catch (err) {
-      setContentCreateError(err instanceof Error ? err.message : 'Failed to create content');
+      setInlineCreateError(err instanceof Error ? err.message : 'Failed to create note');
     } finally {
-      setIsCreatingContent(false);
+      setIsInlineCreating(false);
     }
   }
 
@@ -410,7 +376,7 @@ export function ProjectTree({
             Open
           </ContextMenuItem>
           {type === 'project' && (
-            <ContextMenuItem label="New note" onClick={() => openContentDialog(item.id)}>
+            <ContextMenuItem label="New note" onClick={() => startInlineNoteCreate(item.id)}>
               <IconFilePlus aria-hidden="true" data-icon="inline-start" />
               New note
             </ContextMenuItem>
@@ -462,7 +428,7 @@ export function ProjectTree({
               size="icon"
               type="button"
               variant="ghost"
-              onClick={() => openContentDialog()}
+              onClick={() => startInlineNoteCreate()}
             >
               <IconFilePlus
                 aria-hidden="true"
@@ -532,13 +498,16 @@ export function ProjectTree({
 
                   {isExpanded && isSidebarOpen && (
                     <ul className="mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5">
-                      {projectNotes.length === 0 && (
-                        <li className="relative">
-                          <span className="block px-2 py-1 text-xs text-muted-foreground">
-                            No notes
-                          </span>
-                        </li>
-                      )}
+                      {projectNotes.length === 0 &&
+                        !(
+                          inlineCreate?.type === 'note' && inlineCreate.projectId === project.id
+                        ) && (
+                          <li className="relative">
+                            <span className="block px-2 py-1 text-xs text-muted-foreground">
+                              No notes
+                            </span>
+                          </li>
+                        )}
 
                       {projectNotes.map((note) => {
                         const ContentIcon = getContentFormatIcon(note.contentType);
@@ -566,6 +535,19 @@ export function ProjectTree({
                           </li>
                         );
                       })}
+
+                      {inlineCreate?.type === 'note' && inlineCreate.projectId === project.id && (
+                        <InlineCreateRow
+                          error={inlineCreateError}
+                          icon={getContentFormatIcon('markdown')}
+                          isCreating={isInlineCreating}
+                          placeholder="Note title"
+                          value={inlineCreateValue}
+                          onCancel={cancelInlineCreate}
+                          onChange={setInlineCreateValue}
+                          onSubmit={commitInlineNoteCreate}
+                        />
+                      )}
                     </ul>
                   )}
                 </li>
@@ -593,6 +575,20 @@ export function ProjectTree({
                   </li>
                 );
               })}
+            {status === 'ready' &&
+              inlineCreate?.type === 'note' &&
+              inlineCreate.projectId === null && (
+                <InlineCreateRow
+                  error={inlineCreateError}
+                  icon={getContentFormatIcon('markdown')}
+                  isCreating={isInlineCreating}
+                  placeholder="Note title"
+                  value={inlineCreateValue}
+                  onCancel={cancelInlineCreate}
+                  onChange={setInlineCreateValue}
+                  onSubmit={commitInlineNoteCreate}
+                />
+              )}
           </ul>
         </div>
 
@@ -763,140 +759,58 @@ export function ProjectTree({
           </DialogContent>
         </Dialog>
 
-        <Dialog
-          open={isContentDialogOpen}
-          onOpenChange={(open) => {
-            if (!isCreatingContent) {
-              setIsContentDialogOpen(open);
-            }
-          }}
-        >
-          <DialogContent aria-label="Create content">
-            <DialogHeader>
-              <DialogTitle>Create content</DialogTitle>
-              <DialogDescription>
-                Add a note now, with room for integrations later.
-              </DialogDescription>
-            </DialogHeader>
 
-            <form className="flex flex-col gap-4" onSubmit={handleCreateContent}>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="sidebar-content-type">Content type</FieldLabel>
-                  <Select
-                    items={contentTypeOptions}
-                    value={contentType}
-                    onValueChange={(value) => setContentType(String(value ?? 'note'))}
-                  >
-                    <SelectTrigger id="sidebar-content-type" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {contentTypeOptions.map((option) => (
-                          <SelectItem
-                            key={option.value}
-                            disabled={option.disabled}
-                            value={option.value}
-                          >
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="sidebar-content-project">Project</FieldLabel>
-                  <Select
-                    items={projectOptions}
-                    value={contentProjectId}
-                    onValueChange={(value) => setContentProjectId(String(value ?? 'none'))}
-                  >
-                    <SelectTrigger id="sidebar-content-project" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {projectOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-
-                <Field data-invalid={Boolean(noteTitleError)}>
-                  <FieldLabel htmlFor="sidebar-note-title">Note title</FieldLabel>
-                  <Input
-                    id="sidebar-note-title"
-                    aria-describedby={noteTitleError ? 'sidebar-note-title-error' : undefined}
-                    aria-invalid={Boolean(noteTitleError)}
-                    disabled={!currentWorkspace || isCreatingContent}
-                    name="sidebar-note-title"
-                    placeholder="Note title"
-                    required
-                    value={noteTitle}
-                    onChange={(event) => {
-                      setNoteTitle(event.target.value);
-                      setNoteTitleError('');
-                    }}
-                  />
-                  <FieldError id="sidebar-note-title-error">{noteTitleError}</FieldError>
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="sidebar-note-type">Note type</FieldLabel>
-                  <Select
-                    items={noteTypeOptions}
-                    value={noteType}
-                    onValueChange={(value) => setNoteType(String(value ?? 'general'))}
-                  >
-                    <SelectTrigger id="sidebar-note-type" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {noteTypeOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="sidebar-note-content">Content</FieldLabel>
-                  <Textarea
-                    id="sidebar-note-content"
-                    className="min-h-28 resize-y"
-                    disabled={!currentWorkspace || isCreatingContent}
-                    name="sidebar-note-content"
-                    placeholder="Write a note..."
-                    value={noteContent}
-                    onChange={(event) => setNoteContent(event.target.value)}
-                  />
-                </Field>
-              </FieldGroup>
-
-              <AppApiErrorMessage>{contentCreateError}</AppApiErrorMessage>
-
-              <DialogFooter>
-                <Button disabled={!currentWorkspace || isCreatingContent} type="submit">
-                  {isCreatingContent && <Spinner aria-hidden="true" data-icon="inline-start" />}
-                  {isCreatingContent ? 'Creating...' : 'Create content'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
       </section>
     </TooltipProvider>
+  );
+}
+
+function InlineCreateRow({
+  icon: Icon,
+  error,
+  isCreating,
+  onCancel,
+  onChange,
+  onSubmit,
+  placeholder,
+  value,
+}) {
+  return (
+    <li className="relative" data-slot="inline-create-row">
+      <form
+        className="flex h-7 w-full items-center gap-2 px-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSubmit();
+        }}
+      >
+        {isCreating ? (
+          <Spinner aria-hidden="true" className="size-[18px] shrink-0" data-icon="inline-start" />
+        ) : (
+          <Icon aria-hidden="true" className="size-[18px] shrink-0" data-icon="inline-start" />
+        )}
+        <Input
+          autoFocus
+          corner="sm"
+          aria-label={placeholder}
+          className="h-6 min-w-0 flex-1 px-1.5 text-sm"
+          disabled={isCreating}
+          placeholder={placeholder}
+          value={value}
+          onBlur={onCancel}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              onCancel();
+            }
+          }}
+        />
+      </form>
+      {error ? (
+        <AppApiErrorMessage className="block px-2 py-1 text-xs">{error}</AppApiErrorMessage>
+      ) : null}
+    </li>
   );
 }
 

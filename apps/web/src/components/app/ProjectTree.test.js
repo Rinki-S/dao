@@ -12,7 +12,6 @@ describe('ProjectTree shadcn Base UI migration boundary', () => {
     expect(source).toContain("from '@/components/ui/button'");
     expect(source).toContain("from '@/components/ui/context-menu'");
     expect(source).toContain("from '@/components/ui/dialog'");
-    expect(source).toContain("from '@/components/ui/select'");
     expect(source).toContain("from '@tabler/icons-react'");
     expect(source).not.toContain('@heroui');
     expect(source).not.toContain('@hugeicons');
@@ -21,16 +20,11 @@ describe('ProjectTree shadcn Base UI migration boundary', () => {
     expect(source).not.toContain('asChild');
   });
 
-  it('uses Base UI composition rules for menus, dialogs, and selects', () => {
+  it('uses Base UI composition rules for menus and dialogs', () => {
     const source = fs.readFileSync(projectTreePath, 'utf8');
 
     expect(source).toContain('<ContextMenuGroup>');
     expect(source).toContain('<DialogTitle>');
-    expect(source).toContain('items={contentTypeOptions}');
-    expect(source).toContain('items={projectOptions}');
-    expect(source).toContain('items={noteTypeOptions}');
-    expect(source).toContain('<SelectGroup>');
-    expect(source).toContain('onValueChange=');
     expect(source).not.toContain('selectedKey=');
     expect(source).not.toContain('onSelectionChange=');
   });
@@ -53,7 +47,7 @@ describe('ProjectTree shadcn Base UI migration boundary', () => {
     expect(source).toContain('FieldError');
     expect(source).toContain('AppApiErrorMessage');
     expect(source).toContain('<AppApiErrorMessage>{projectCreateError}</AppApiErrorMessage>');
-    expect(source).toContain('<AppApiErrorMessage>{contentCreateError}</AppApiErrorMessage>');
+    expect(source).toContain('data-slot="inline-create-row"');
     expect(source).toContain('{treeError}');
     expect(source).not.toContain(
       "setStatus('error');\n    } finally {\n      setIsCreatingProject(false);",
