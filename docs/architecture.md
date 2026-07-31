@@ -693,16 +693,16 @@ Use Zod at system boundaries:
 Example:
 
 ```js
-import { z } from 'zod'
+import { z } from "zod";
 
 export const TaskSchema = z.object({
   id: z.string(),
   title: z.string(),
-  status: z.enum(['todo', 'doing', 'done', 'archived']),
-  priority: z.enum(['low', 'medium', 'high']),
+  status: z.enum(["todo", "doing", "done", "archived"]),
+  priority: z.enum(["low", "medium", "high"]),
   createdAt: z.string(),
   updatedAt: z.string(),
-})
+});
 ```
 
 ## 12. Extension Architecture
@@ -720,7 +720,8 @@ The MVP registry must stay limited to official built-in extensions.
 The current frontend registry validates built-in extensions at the registry boundary with Zod:
 
 ```js
-export const registeredExtensions = ExtensionListSchema.parse(builtInExtensions)
+export const registeredExtensions =
+  ExtensionListSchema.parse(builtInExtensions);
 ```
 
 Consumers should use `registeredExtensions` indirectly through registry helpers.
@@ -739,46 +740,46 @@ Deferred:
 
 ```js
 export const extension = {
-  id: 'tasks',
-  name: 'Tasks',
+  id: "tasks",
+  name: "Tasks",
   capabilities: {
     commands: [
       {
-        id: 'tasks.create',
-        title: 'Create Task',
-        group: 'Tasks',
-        targetId: 'tasks',
+        id: "tasks.create",
+        title: "Create Task",
+        group: "Tasks",
+        targetId: "tasks",
         focusSelector: '[data-command-target="task-title"]',
       },
     ],
 
     sidebarItems: [
       {
-        id: 'tasks',
-        label: 'Tasks',
-        href: '#tasks',
+        id: "tasks",
+        label: "Tasks",
+        href: "#tasks",
         order: 40,
       },
     ],
 
     surfaces: [
       {
-        id: 'tasks',
-        label: 'Tasks',
-        anchorId: 'tasks',
+        id: "tasks",
+        label: "Tasks",
+        anchorId: "tasks",
         order: 40,
       },
     ],
 
     contentFormats: [
       {
-        format: 'markdown',
-        label: 'Markdown',
+        format: "markdown",
+        label: "Markdown",
         icon: EditNote,
       },
     ],
   },
-}
+};
 ```
 
 Business pages should not import extension internals directly.
@@ -786,11 +787,11 @@ Business pages should not import extension internals directly.
 Consumers should read specific capabilities through registry helpers, such as:
 
 ```js
-getRegisteredCommands()
-getRegisteredSidebarItems()
-getRegisteredSurfaces()
-getRegisteredContentFormats()
-getContentFormatIcon(format)
+getRegisteredCommands();
+getRegisteredSidebarItems();
+getRegisteredSurfaces();
+getRegisteredContentFormats();
+getContentFormatIcon(format);
 ```
 
 Surface capabilities describe stable main-content surfaces and their ordering. They are metadata only. React components remain explicitly assembled in the app layer, so extension metadata does not become a React component registry.
@@ -805,31 +806,30 @@ Future executable capabilities should be routed through dedicated layers such as
 
 ## 12.1 Frontend UI Foundation
 
-Dao's current React UI foundation is HeroUI + Tailwind CSS v4 + Dao design tokens.
+Dao's current React UI foundation is shadcn + Base UI + Tailwind CSS v4 + Lisse + Dao design tokens.
 
 Rules:
 
-- use HeroUI as the maintained accessible primitive layer for buttons, inputs, overlays, tables, menus, keyboard hints, and related controls
-- import HeroUI components directly in migrated or new UI code
-- do not create shadcn-compatible wrapper abstractions for newly migrated components
+- generate and maintain shadcn components from preset `b1D0eTD6` with the `base-mira` style
+- use Base UI (`@base-ui/react`) as the maintained accessible primitive layer
+- consume local shadcn components from `apps/web/src/components/ui` in app and feature code
 - keep Dao-specific product composition in app and feature components
-- use HeroUI theme tokens from `apps/web/src/index.css` for surface, field, focus, separator, muted, danger, accent, and soft accent colors
-- do not use shadcn-era color tokens such as `bg-popover`, `border-input`, `ring-ring`, `bg-muted`, `text-destructive`, or `text-muted-foreground` in newly migrated HeroUI surfaces
-- use hugeicons through direct imports where icons are used
-- do not add a centralized icon gateway or icon map for ordinary component icons
-
-Compatibility note:
-
-Some old files under `apps/web/src/components/ui/*` may remain temporarily while the migration is unfinished. They should be treated as compatibility debt, not as the target component API. Remove them after import checks prove they are unused.
+- use shadcn semantic tokens from `apps/web/src/index.css` while preserving Dao's existing jade accent and `accent-soft` selected state
+- keep Funnel Sans Variable for both headings and UI body copy
+- use Tabler Icons through direct imports; extension-owned durable content-format icons remain registry metadata
+- use Lisse (`@lisse/react`) for every visible rounded surface; renderer code must not use `rounded-*`, CSS `border-radius`, or inline `borderRadius`
+- apply Lisse refs to the actual DOM or Base UI primitive node so menus, dialogs, focus management, and portals keep their expected structure
+- use Base UI `render` composition and never Radix-style `asChild`
 
 ### Command palette UI
 
 The command palette is intentionally hybrid:
 
 - `cmdk` owns command input behavior, search interaction, selection, and keyboard navigation
-- HeroUI owns the modal shell, overlay, keyboard hint styling, semantic colors, and visual integration with the product shell
+- shadcn components backed by Base UI own the dialog shell, overlay, keyboard hints, semantic colors, and visual integration with the product shell
+- Lisse owns visible corner geometry
 
-The palette should be centered in the viewport and its backdrop must sit above the app titlebar. Command palette colors should use HeroUI tokens such as `surface`, `field`, `focus`, `muted`, `danger`, `separator`, and `accent-soft`.
+The palette should be centered in the viewport and its backdrop must sit above the app titlebar. Its selected state should retain Dao's restrained jade `accent-soft` treatment.
 
 ### Product shell layout
 

@@ -38,7 +38,7 @@ Important decisions:
 - Use SQLite as the first local database.
 - Use `net/http` first, with a possible future move to `chi` when routing and middleware complexity justify it.
 - Use Tailwind CSS for styling.
-- Use HeroUI for the React component system, with Dao-specific design tokens and composition on top.
+- The initial component-system choice changed over later milestones; the current foundation is shadcn backed by Base UI, with a shared CSS radius token scale and Dao design tokens.
 
 ## Milestone 1: Project Loop
 
@@ -466,7 +466,7 @@ Notes:
 - The next UI phase should turn the renderer from stacked feature panels into a real product workspace.
 - The first product UI branch should focus on the app shell, active surface navigation, dashboard shape, and command palette fit inside the product workflow.
 
-## Active Foundation Migration: HeroUI and hugeicons
+## Historical Foundation Migration: HeroUI and hugeicons
 
 Status: complete
 
@@ -518,6 +518,51 @@ Notes:
 
 - The text editing area remained intentionally lightweight at the end of this milestone. Dao later selected Tiptap for the dedicated rich Markdown editor milestone.
 - Remaining visual QA should happen as part of normal feature work rather than blocking the HeroUI foundation migration.
+- This foundation was later superseded by the shadcn + Base UI migration below.
+
+## Foundation Migration: shadcn Base UI
+
+(Originally scoped with Lisse smooth corners; Lisse was later removed — see the direction note below.)
+Status: in progress
+
+Branch:
+
+```txt
+codex/migrate-heroui-to-shadcn
+```
+
+Goal:
+
+```txt
+Move the renderer from HeroUI to shadcn preset b1D0eTD6 backed by Base UI,
+while preserving Dao's jade accent and Funnel Sans typography.
+```
+
+Direction:
+
+- use `base-mira`, the Base UI variant of preset `b1D0eTD6`
+- use `@base-ui/react` and Base UI `render` composition; do not use Radix or `asChild`
+- keep `cmdk` as the command palette interaction core through the shadcn `Command` component
+- replace hugeicons with Tabler Icons
+- preserve the existing jade accent and Funnel Sans Variable
+- ~~use `@lisse/react` for every visible rounded surface instead of CSS border radii~~ **reversed during this branch**: Lisse clip-path corners cropped element borders and focus rings, so Dao removed `@lisse/react` and standardized on a shared CSS radius token scale (`--radius-*` theme tokens, `rounded-*` utilities, and the `corner` prop API in `apps/web/src/lib/corners.jsx`)
+- keep product composition in app and feature code while maintaining shadcn source locally
+
+Migration scope:
+
+- app titlebar, tab bar, sidebar, search, workspace switcher, onboarding, and project content surface
+- project tree and task panel menus, dialogs, forms, tables, selects, and loading states
+- command palette shell and keyboard hints
+- note editor shell and Markdown toolbar controls
+- extension-owned icons and React-component boundary validation
+- removal of HeroUI, hugeicons, Radix, and unused font dependencies after residual scans
+
+Validation:
+
+- focused component and interaction tests
+- full renderer lint, test, and production build
+- shadcn project info must report `base: "base"` and preset `b1D0eTD6`
+- production source scans must find no HeroUI, hugeicons, Radix, `asChild`, or CSS radius usage
 
 ## Milestone 9: Product Shell
 

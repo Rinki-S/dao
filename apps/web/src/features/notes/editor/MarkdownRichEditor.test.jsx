@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -32,7 +32,7 @@ describe('MarkdownRichEditor', () => {
     expect(screen.queryByText('Link URL')).not.toBeInTheDocument();
   });
 
-  it('opens a HeroUI link editor instead of a native prompt', async () => {
+  it('opens the shadcn Base UI link editor instead of a native prompt', async () => {
     render(<MarkdownRichEditor initialMarkdown="Link me" onMarkdownChange={vi.fn()} />);
 
     await screen.findByRole('textbox', { name: 'Markdown note content' });
@@ -45,14 +45,18 @@ describe('MarkdownRichEditor', () => {
 
     fireEvent.change(urlInput, { target: { value: 'https://dao.example' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByText('Link URL')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('Link URL')).not.toBeInTheDocument();
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
     fireEvent.change(await screen.findByPlaceholderText('https://example.com'), {
       target: { value: 'https://dao.example' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(screen.queryByText('Link URL')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('Link URL')).not.toBeInTheDocument();
+    });
   });
 
   it('falls back to a source textarea and preserves unsupported Markdown edits', () => {

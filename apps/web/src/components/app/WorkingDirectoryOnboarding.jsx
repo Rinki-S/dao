@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { Button, FieldError, Input, Label, Surface, TextField } from '@heroui/react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import FolderOpenIcon from '@hugeicons/core-free-icons/FolderOpenIcon';
+import { IconFolderOpen } from '@tabler/icons-react';
+import { Button } from '@/components/ui/button.jsx';
+import { Card, CardContent } from '@/components/ui/card.jsx';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field.jsx';
+import { Input } from '@/components/ui/input.jsx';
+import { Spinner } from '@/components/ui/spinner.jsx';
 import { DirectoryPickerResultSchema } from '@/features/settings/schemas.js';
+import { CornerSurface } from '@/lib/corners.jsx';
 import { AppApiErrorMessage } from './AppApiErrorMessage.jsx';
 
 const ONBOARDING_STEP_ORDER = {
@@ -13,6 +17,14 @@ const ONBOARDING_STEP_ORDER = {
 
 function getOnboardingStepProgress(step) {
   return step === 'workspace' ? 'workspace' : 'directory';
+}
+
+function SelectedDirectory({ children }) {
+  return (
+    <Card className="gap-0 py-0">
+      <CardContent className="px-3 py-2 text-sm text-muted-foreground">{children}</CardContent>
+    </Card>
+  );
 }
 
 export function WorkingDirectoryOnboarding({
@@ -135,7 +147,11 @@ export function WorkingDirectoryOnboarding({
           key={step}
           data-direction={stepDirection}
           data-step-transition
-          className={stepDirection !== 'none' ? 'animate-in fade-in-0 duration-150 ease-out data-[direction=backward]:slide-in-from-left-4 data-[direction=forward]:slide-in-from-right-4 motion-reduce:animate-none motion-reduce:transition-none' : undefined}
+          className={
+            stepDirection !== 'none'
+              ? 'animate-in fade-in-0 duration-150 ease-out data-[direction=backward]:slide-in-from-left-4 data-[direction=forward]:slide-in-from-right-4 motion-reduce:animate-none motion-reduce:transition-none'
+              : undefined
+          }
         >
           <div className="mb-6 flex flex-col gap-2" data-step-header>
             <p className="text-sm text-muted-foreground">
@@ -165,35 +181,33 @@ export function WorkingDirectoryOnboarding({
 
           {step === 'directory' ? (
             <div className="flex flex-col gap-4">
-              <Surface
-                className="rounded-xl border border-border px-3 py-2 text-sm text-muted"
-                variant="default"
-              >
-                {selectedPath || 'No directory selected'}
-              </Surface>
+              <SelectedDirectory>{selectedPath || 'No directory selected'}</SelectedDirectory>
 
               <AppApiErrorMessage>{error}</AppApiErrorMessage>
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
-                  isDisabled={isChoosing || isSaving}
-                  isPending={isChoosing}
+                  disabled={isChoosing || isSaving}
                   type="button"
                   variant="outline"
-                  onPress={handleChooseDirectory}
+                  onClick={handleChooseDirectory}
                 >
-                  <HugeiconsIcon icon={FolderOpenIcon} data-icon="inline-start" />
+                  {isChoosing ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : (
+                    <IconFolderOpen aria-hidden="true" data-icon="inline-start" />
+                  )}
                   {isChoosing ? 'Choosing...' : 'Choose folder'}
                 </Button>
                 <Button
-                  isDisabled={!selectedPath || isSaving}
+                  disabled={!selectedPath || isSaving}
                   type="button"
-                  onPress={handleContinueToWorkspace}
+                  onClick={handleContinueToWorkspace}
                 >
                   Continue
                 </Button>
                 {onCancel && (
-                  <Button isDisabled={isSaving} type="button" variant="ghost" onPress={onCancel}>
+                  <Button disabled={isSaving} type="button" variant="ghost" onClick={onCancel}>
                     Cancel
                   </Button>
                 )}
@@ -201,39 +215,32 @@ export function WorkingDirectoryOnboarding({
             </div>
           ) : step === 'strategy' ? (
             <div className="flex flex-col gap-4">
-              <Surface
-                className="rounded-xl border border-border px-3 py-2 text-sm text-muted"
-                variant="default"
-              >
-                {selectedPath}
-              </Surface>
+              <SelectedDirectory>{selectedPath}</SelectedDirectory>
 
               <div className="grid gap-2">
                 <Button
-                  className="h-auto justify-start rounded-xl border-border p-3 text-left"
-                  fullWidth
+                  className="h-auto w-full justify-start border-border p-3 text-left"
                   type="button"
                   variant={directoryStrategy === 'start-fresh' ? 'secondary' : 'outline'}
-                  onPress={() => setDirectoryStrategy('start-fresh')}
+                  onClick={() => setDirectoryStrategy('start-fresh')}
                 >
                   <span className="flex flex-col items-start">
                     <span className="font-medium text-foreground">Start fresh</span>
-                    <span className="mt-1 block text-muted">
+                    <span className="mt-1 block text-muted-foreground">
                       Use this directory for new workspace and project folders from now on.
                     </span>
                   </span>
                 </Button>
                 <Button
-                  className="h-auto justify-start rounded-xl border-border p-3 text-left"
-                  fullWidth
-                  isDisabled
+                  className="h-auto w-full justify-start border-border p-3 text-left"
+                  disabled
                   type="button"
                   variant="outline"
-                  onPress={() => setDirectoryStrategy('migrate')}
+                  onClick={() => setDirectoryStrategy('migrate')}
                 >
                   <span className="flex flex-col items-start">
                     <span className="font-medium text-foreground">Migrate files</span>
-                    <span className="mt-1 block text-muted">
+                    <span className="mt-1 block text-muted-foreground">
                       Move existing workspace and project folders to the new directory. Coming soon.
                     </span>
                   </span>
@@ -243,19 +250,19 @@ export function WorkingDirectoryOnboarding({
               <AppApiErrorMessage>{error}</AppApiErrorMessage>
 
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Button isDisabled={isSaving} type="button" onPress={handleContinueFromStrategy}>
+                <Button disabled={isSaving} type="button" onClick={handleContinueFromStrategy}>
                   Continue
                 </Button>
                 <Button
-                  isDisabled={isSaving}
+                  disabled={isSaving}
                   type="button"
                   variant="ghost"
-                  onPress={() => goToStep('directory')}
+                  onClick={() => goToStep('directory')}
                 >
                   Back
                 </Button>
                 {onCancel && (
-                  <Button isDisabled={isSaving} type="button" variant="ghost" onPress={onCancel}>
+                  <Button disabled={isSaving} type="button" variant="ghost" onClick={onCancel}>
                     Cancel
                   </Button>
                 )}
@@ -263,47 +270,36 @@ export function WorkingDirectoryOnboarding({
             </div>
           ) : (
             <form className="flex flex-col gap-4" onSubmit={handleCreateWorkspace}>
-              <Surface
-                className="rounded-xl border border-border px-3 py-2 text-sm text-muted"
-                variant="default"
-              >
-                {selectedPath}
-              </Surface>
+              <SelectedDirectory>{selectedPath}</SelectedDirectory>
 
               {!hasWorkspace && (
                 <div className="flex flex-col gap-4">
-                  <TextField
-                    isDisabled={isSaving}
-                    isInvalid={Boolean(workspaceNameError)}
-                    isRequired
-                    name="workspaceName"
-                    value={workspaceName}
-                    onChange={setWorkspaceName}
-                  >
-                    <Label htmlFor="onboarding-workspace-name">Workspace name</Label>
+                  <Field data-invalid={Boolean(workspaceNameError)}>
+                    <FieldLabel htmlFor="onboarding-workspace-name">Workspace name</FieldLabel>
                     <Input
                       autoFocus
-                      fullWidth
+                      aria-invalid={Boolean(workspaceNameError)}
+                      disabled={isSaving}
                       id="onboarding-workspace-name"
+                      name="workspaceName"
                       placeholder="Personal"
-                      variant="secondary"
+                      required
+                      value={workspaceName}
+                      onChange={(event) => setWorkspaceName(event.target.value)}
                     />
                     <FieldError>{workspaceNameError}</FieldError>
-                  </TextField>
-                  <TextField
-                    isDisabled={isSaving}
-                    name="workspaceDescription"
-                    value={workspaceDescription}
-                    onChange={setWorkspaceDescription}
-                  >
-                    <Label htmlFor="onboarding-workspace-description">Description</Label>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="onboarding-workspace-description">Description</FieldLabel>
                     <Input
-                      fullWidth
+                      disabled={isSaving}
                       id="onboarding-workspace-description"
+                      name="workspaceDescription"
                       placeholder="Optional"
-                      variant="secondary"
+                      value={workspaceDescription}
+                      onChange={(event) => setWorkspaceDescription(event.target.value)}
                     />
-                  </TextField>
+                  </Field>
                 </div>
               )}
 
@@ -311,17 +307,18 @@ export function WorkingDirectoryOnboarding({
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
-                  isDisabled={isSaving}
+                  disabled={isSaving}
                   type="button"
                   variant="outline"
-                  onPress={() => {
+                  onClick={() => {
                     setError('');
                     goToStep('directory');
                   }}
                 >
                   Back
                 </Button>
-                <Button isDisabled={isSaving} isPending={isSaving} type="submit">
+                <Button disabled={isSaving} type="submit">
+                  {isSaving && <Spinner data-icon="inline-start" />}
                   {isSaving
                     ? hasWorkspace
                       ? 'Saving...'
@@ -331,7 +328,7 @@ export function WorkingDirectoryOnboarding({
                       : 'Create workspace'}
                 </Button>
                 {onCancel && (
-                  <Button isDisabled={isSaving} type="button" variant="ghost" onPress={onCancel}>
+                  <Button disabled={isSaving} type="button" variant="ghost" onClick={onCancel}>
                     Cancel
                   </Button>
                 )}
@@ -367,12 +364,15 @@ function OnboardingStepIndicator({ currentStep }) {
         return (
           <div key={step.id} className="flex items-center gap-2">
             <div className="flex items-center gap-2">
-              <span
+              <CornerSurface
+                as="span"
                 aria-current={isActive ? 'step' : undefined}
-                className={`flex size-6 items-center justify-center rounded-full text-xs font-medium tabular-nums transition-[background-color,color,opacity] duration-150 motion-reduce:transition-none ${isActive || isComplete ? 'bg-accent text-accent-foreground' : 'bg-default text-default-foreground opacity-60'}`}
+                corner="circle"
+                dataSlot="onboarding-step"
+                className={`flex size-6 items-center justify-center text-xs font-medium tabular-nums transition-[background-color,color,opacity] duration-150 motion-reduce:transition-none ${isActive || isComplete ? 'bg-accent text-accent-foreground' : 'bg-default text-default-foreground opacity-60'}`}
               >
                 {index + 1}
-              </span>
+              </CornerSurface>
               <span
                 className={`text-xs font-medium transition-[color,opacity] duration-150 motion-reduce:transition-none ${isActive ? 'text-foreground' : 'text-muted opacity-70'}`}
               >
@@ -380,9 +380,12 @@ function OnboardingStepIndicator({ currentStep }) {
               </span>
             </div>
             {index < steps.length - 1 && (
-              <span
+              <CornerSurface
+                as="span"
                 aria-hidden="true"
-                className={`h-px w-8 rounded-full transition-[background-color,opacity] duration-150 motion-reduce:transition-none ${isComplete ? 'bg-accent' : 'bg-border opacity-70'}`}
+                corner="pill"
+                dataSlot="onboarding-step-connector"
+                className={`h-px w-8 transition-[background-color,opacity] duration-150 motion-reduce:transition-none ${isComplete ? 'bg-accent' : 'bg-border opacity-70'}`}
               />
             )}
           </div>

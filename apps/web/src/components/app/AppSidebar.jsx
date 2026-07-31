@@ -1,29 +1,34 @@
 import { useRef, useState } from 'react';
-import { Button, Tooltip } from '@heroui/react';
-import { HugeiconsIcon } from '@hugeicons/react';
+import { IconStack2 } from '@tabler/icons-react';
 import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
-import Layers01Icon from '@hugeicons/core-free-icons/Layers01Icon';
+import { Button } from '@/components/ui/button.jsx';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip.jsx';
 import { ProjectTree } from './ProjectTree.jsx';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.jsx';
 
 gsap.registerPlugin(useGSAP);
 
 function ExtensionIcon(props) {
-  return <HugeiconsIcon icon={Layers01Icon} {...props} />;
+  return <IconStack2 {...props} />;
 }
 
 const sidebarSurfaceButtonBase =
-  'app-no-drag flex h-8 w-full transform-gpu items-center justify-start gap-2 overflow-hidden rounded-md p-2 text-left text-sm font-normal ring-sidebar-ring outline-hidden transition-[background-color,color,width,height,padding,scale] duration-[250ms] ease-[var(--ease-smooth)] data-[focus-visible=true]:ring-2 active:scale-[0.96] data-[pressed=true]:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100';
+  'app-no-drag flex h-8 w-full transform-gpu items-center justify-start gap-2 overflow-hidden p-2 text-left text-sm font-normal ring-sidebar-ring outline-hidden motion-colors-layout focus-visible:ring-2 active:scale-[0.96] data-pressed:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-pressed:scale-100';
 
 const sidebarIconButtonBase =
-  'app-no-drag size-8 min-w-0 transform-gpu p-0 transition-[background-color,color,scale] duration-[250ms] ease-[var(--ease-smooth)] data-[focus-visible=true]:ring-2 active:scale-[0.96] data-[pressed=true]:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100';
+  'app-no-drag size-8 min-w-0 transform-gpu p-0 motion-colors focus-visible:ring-2 active:scale-[0.96] data-pressed:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-pressed:scale-100';
 
 const activeSurfaceButtonClass =
-  'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground data-[pressed=true]:bg-accent-soft-hover data-[pressed=true]:text-accent-soft-foreground';
+  'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground data-pressed:bg-accent-soft-hover data-pressed:text-accent-soft-foreground';
 
 const inactiveSurfaceButtonClass =
-  'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[pressed=true]:bg-sidebar-accent data-[pressed=true]:text-sidebar-accent-foreground';
+  'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-pressed:bg-sidebar-accent data-pressed:text-sidebar-accent-foreground';
 
 export function AppSidebar({
   activeSurfaceId,
@@ -283,7 +288,7 @@ export function AppSidebar({
       >
         <section className="relative flex w-full min-w-0 flex-col p-2">
           <div
-            className={`flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ${!isSidebarVisuallyOpen ? '-mt-8 opacity-0' : ''}`}
+            className={`flex h-8 shrink-0 items-center px-2 text-xs font-medium text-sidebar-foreground/70 ${!isSidebarVisuallyOpen ? '-mt-8 opacity-0' : ''}`}
           >
             Workspace
           </div>
@@ -299,7 +304,7 @@ export function AppSidebar({
                     className={`${sidebarSurfaceButtonBase} justify-start ${isActive ? `font-medium ${activeSurfaceButtonClass}` : inactiveSurfaceButtonClass}`}
                     type="button"
                     variant="ghost"
-                    onPress={() => onSelectSurface(surfaceId)}
+                    onClick={() => onSelectSurface(surfaceId)}
                   >
                     <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
                     <span className="truncate">{item.label}</span>
@@ -328,36 +333,41 @@ export function AppSidebar({
 
       {footerSidebarItems.length > 0 && (
         <div data-sidebar-content className="flex flex-col gap-2 p-2">
-          <ul className="flex min-w-0 flex-col gap-0">
-            {footerSidebarItems.map((item) => {
-              const surfaceId = item.href.replace(/^#/, '');
-              const Icon = item.icon ?? ExtensionIcon;
-              const isActive = surfaceId === activeSurfaceId;
-              const surfaceButton = (
-                <Button
-                  aria-label={item.label}
-                  className={`${sidebarIconButtonBase} ${isActive ? activeSurfaceButtonClass : inactiveSurfaceButtonClass}`}
-                  isIconOnly
-                  size="sm"
-                  type="button"
-                  variant="ghost"
-                  onPress={() => onSelectSurface(surfaceId)}
-                >
-                  <Icon aria-hidden="true" className="size-[18px] shrink-0 translate-y-px" />
-                  <span className="sr-only">{item.label}</span>
-                </Button>
-              );
+          <TooltipProvider delay={0}>
+            <ul className="flex min-w-0 flex-col gap-0">
+              {footerSidebarItems.map((item) => {
+                const surfaceId = item.href.replace(/^#/, '');
+                const Icon = item.icon ?? ExtensionIcon;
+                const isActive = surfaceId === activeSurfaceId;
+                const surfaceButton = (
+                  <Button
+                    aria-label={item.label}
+                    className={`${sidebarIconButtonBase} ${isActive ? activeSurfaceButtonClass : inactiveSurfaceButtonClass}`}
+                    size="icon-lg"
+                    type="button"
+                    variant="ghost"
+                    onClick={() => onSelectSurface(surfaceId)}
+                  >
+                    <Icon
+                      aria-hidden="true"
+                      className="size-[18px] shrink-0 translate-y-px"
+                      data-icon="inline-start"
+                    />
+                    <span className="sr-only">{item.label}</span>
+                  </Button>
+                );
 
-              return (
-                <li key={item.id} className="relative">
-                  <Tooltip delay={0}>
-                    {surfaceButton}
-                    <Tooltip.Content placement="right">{item.label}</Tooltip.Content>
-                  </Tooltip>
-                </li>
-              );
-            })}
-          </ul>
+                return (
+                  <li key={item.id} className="relative">
+                    <Tooltip>
+                      <TooltipTrigger render={surfaceButton} />
+                      <TooltipContent side="right">{item.label}</TooltipContent>
+                    </Tooltip>
+                  </li>
+                );
+              })}
+            </ul>
+          </TooltipProvider>
         </div>
       )}
 

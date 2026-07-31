@@ -1,28 +1,77 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
-import Calendar03Icon from '@hugeicons/core-free-icons/Calendar03Icon';
-import Delete02Icon from '@hugeicons/core-free-icons/Delete02Icon';
-import Edit02Icon from '@hugeicons/core-free-icons/Edit02Icon';
-import TaskDone01Icon from '@hugeicons/core-free-icons/TaskDone01Icon';
+import { IconCalendar, IconChecklist, IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
 import { gsap } from 'gsap';
 import {
-  Button,
-  Checkbox,
-  Chip,
-  Dropdown,
-  FieldError,
-  Form,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
   InputGroup,
-  Label,
-  Modal,
-  Popover,
-  ScrollShadow,
-  Skeleton,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group';
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
+import {
   Table,
-  TextArea,
-  TextField,
-} from '@heroui/react';
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import { notifyActivityChanged } from '../../activities/events.js';
 import { listProjects } from '../../projects/api.js';
 import { createTask, deleteTask, listTasks, updateTask, updateTaskStatus } from '../api.js';
@@ -51,12 +100,6 @@ const prioritySortOrder = {
   medium: 1,
   low: 2,
 };
-
-const quickAddAccessoryButtonClassName =
-  '[--button-fg:var(--field-placeholder)] hover:[--button-fg:var(--field-foreground)] focus-visible:[--button-fg:var(--field-foreground)]';
-
-const taskRowIconButtonClassName =
-  'size-7 min-w-0 p-0 [--button-fg:var(--muted)] hover:[--button-fg:var(--foreground)] focus-visible:[--button-fg:var(--foreground)]';
 
 const childTaskFormAnimationDurationMs = 180;
 const disclosureAnimationDuration = 0.16;
@@ -196,12 +239,15 @@ function GsapDisclosure({ children, className, contentClassName, dataSlot, isOpe
       ref={rootRef}
       data-slot={dataSlot}
       aria-hidden={!isOpen}
-      className={`overflow-hidden ${className ?? ''}`}
+      className={cn('overflow-hidden', className)}
       {...(!isOpen ? { inert: true } : {})}
     >
       <div
         ref={contentRef}
-        className={`min-h-0 transform-gpu overflow-visible [will-change:transform,opacity] ${contentClassName ?? ''}`}
+        className={cn(
+          'min-h-0 transform-gpu overflow-visible [will-change:transform,opacity]',
+          contentClassName,
+        )}
       >
         {children}
       </div>
@@ -215,7 +261,7 @@ function TaskApiErrorMessage({ children, className }) {
   }
 
   return (
-    <p role="alert" className={`text-sm text-danger ${className ?? ''}`}>
+    <p role="alert" className={cn('text-sm text-destructive', className)}>
       {children}
     </p>
   );
@@ -242,7 +288,6 @@ export function TaskPanel({ currentWorkspace }) {
   const [childTaskError, setChildTaskError] = useState('');
   const [isCreatingChild, setIsCreatingChild] = useState(false);
   const [expandedTaskIds, setExpandedTaskIds] = useState(() => new Set());
-  const [taskContextMenu, setTaskContextMenu] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
   const [taskPendingDelete, setTaskPendingDelete] = useState(null);
   const [editTaskTitle, setEditTaskTitle] = useState('');
@@ -266,6 +311,16 @@ export function TaskPanel({ currentWorkspace }) {
     return new Map(projects.map((project) => [project.id, project.name]));
   }, [projects]);
 
+  const projectOptions = useMemo(() => {
+    return [
+      { label: 'No project', value: 'none' },
+      ...workspaceProjects.map((project) => ({
+        label: project.name,
+        value: project.id,
+      })),
+    ];
+  }, [workspaceProjects]);
+
   const selectedWorkspaceProjectId = useMemo(() => {
     if (workspaceProjects.some((project) => project.id === selectedProjectId)) {
       return selectedProjectId;
@@ -285,14 +340,6 @@ export function TaskPanel({ currentWorkspace }) {
   const parentTasks = useMemo(() => {
     return visibleTasks.filter((task) => task.parentId === null).toSorted(compareTasks);
   }, [visibleTasks]);
-
-  const taskContextMenuTask = useMemo(() => {
-    if (!taskContextMenu) {
-      return null;
-    }
-
-    return visibleTasks.find((task) => task.id === taskContextMenu.taskId) ?? null;
-  }, [taskContextMenu, visibleTasks]);
 
   const childrenByParentId = useMemo(() => {
     const nextChildrenByParentId = new Map();
@@ -534,23 +581,19 @@ export function TaskPanel({ currentWorkspace }) {
     return task.status === 'done';
   }
 
-  function renderTaskCheckbox(task, isDisabled) {
+  function renderTaskCheckbox(task, disabled) {
     const checkboxState = getCheckboxState(task);
 
     return (
       <Checkbox
         aria-label={`Toggle ${task.title}`}
-        isDisabled={isDisabled}
-        isIndeterminate={checkboxState === 'indeterminate'}
-        isSelected={checkboxState === true}
-        onChange={() => {
+        checked={checkboxState === true}
+        disabled={disabled}
+        indeterminate={checkboxState === 'indeterminate'}
+        onCheckedChange={() => {
           void handleToggleTaskDone(task);
         }}
-      >
-        <Checkbox.Control>
-          <Checkbox.Indicator />
-        </Checkbox.Control>
-      </Checkbox>
+      />
     );
   }
 
@@ -568,22 +611,7 @@ export function TaskPanel({ currentWorkspace }) {
     });
   }
 
-  function openTaskContextMenu(event, task) {
-    event.preventDefault();
-    event.stopPropagation();
-    setTaskContextMenu({
-      taskId: task.id,
-      x: event.clientX,
-      y: event.clientY,
-    });
-  }
-
-  function closeTaskContextMenu() {
-    setTaskContextMenu(null);
-  }
-
   function openEditTaskDialog(task) {
-    closeTaskContextMenu();
     setEditingTask(task);
     setEditTaskTitle(task.title);
     setEditTaskDescription(task.description);
@@ -604,7 +632,6 @@ export function TaskPanel({ currentWorkspace }) {
   }
 
   function openDeleteTaskDialog(task) {
-    closeTaskContextMenu();
     setTaskPendingDelete(task);
     setDeleteTaskError('');
   }
@@ -673,721 +700,634 @@ export function TaskPanel({ currentWorkspace }) {
     }
   }
 
-  function handleTaskContextMenuAction(actionKey) {
-    if (!taskContextMenuTask) {
-      return;
-    }
-
-    if (actionKey === 'edit') {
-      openEditTaskDialog(taskContextMenuTask);
-      return;
-    }
-
-    if (actionKey === 'delete') {
-      openDeleteTaskDialog(taskContextMenuTask);
-    }
+  function renderTaskContextMenu(task) {
+    return (
+      <ContextMenuContent className="w-40">
+        <ContextMenuGroup>
+          <ContextMenuItem onClick={() => openEditTaskDialog(task)}>
+            <IconEdit aria-hidden="true" />
+            Edit
+          </ContextMenuItem>
+          <ContextMenuItem variant="destructive" onClick={() => openDeleteTaskDialog(task)}>
+            <IconTrash aria-hidden="true" />
+            Delete
+          </ContextMenuItem>
+        </ContextMenuGroup>
+      </ContextMenuContent>
+    );
   }
 
   return (
     <section id="tasks" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <Form
+      <form
         className="flex shrink-0 flex-col gap-3 px-8 py-4"
-        validationBehavior="native"
         onSubmit={handleCreateTask}
         onKeyDown={handleQuickAddKeyDown}
       >
-        <div className="flex w-full flex-col gap-3">
-          <TextField
-            className="w-full min-w-0"
-            fullWidth
-            isDisabled={!currentWorkspace || isCreating}
-            isRequired
-            name="task-title"
-            validate={(value) => (value.trim() ? null : 'Task title is required')}
-            value={taskTitle}
-            onChange={setTaskTitle}
-          >
-            <Label className="sr-only" htmlFor="task-title">
+        <FieldGroup className="gap-3">
+          <Field data-disabled={!currentWorkspace || isCreating}>
+            <FieldLabel className="sr-only" htmlFor="task-title">
               Task title
-            </Label>
+            </FieldLabel>
             <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row">
-              <InputGroup className="w-full min-w-0 flex-1" fullWidth>
-                <InputGroup.Input
+              <InputGroup className="w-full min-w-0 flex-1">
+                <InputGroupInput
                   id="task-title"
                   ref={taskTitleInputRef}
                   data-command-target="task-title"
+                  disabled={!currentWorkspace || isCreating}
+                  name="task-title"
                   placeholder="Add a task..."
+                  required
+                  value={taskTitle}
+                  onChange={(event) => setTaskTitle(event.target.value)}
                 />
 
-                <InputGroup.Suffix className="gap-1 pr-1">
-                  <Dropdown>
-                    <Button
-                      aria-label="Select project"
-                      className={quickAddAccessoryButtonClassName}
-                      isDisabled={!currentWorkspace || isCreating}
-                      size="sm"
-                      variant="ghost"
+                <InputGroupAddon align="inline-end" className="gap-1 pr-1">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <InputGroupButton
+                          aria-label="Select project"
+                          disabled={!currentWorkspace || isCreating}
+                        />
+                      }
                     >
-                      {({ isPressed }) => (
-                        <span className={isPressed ? 'scale-[0.97]' : undefined}>
-                          {selectedWorkspaceProjectId
-                            ? (projectNameById.get(selectedWorkspaceProjectId) ?? 'Project')
-                            : 'No project'}
-                        </span>
-                      )}
-                    </Button>
-                    <Dropdown.Popover className="w-52" placement="bottom end">
-                      <Dropdown.Menu
-                        selectedKeys={new Set([selectedWorkspaceProjectId || 'none'])}
-                        selectionMode="single"
-                        onSelectionChange={(keys) => {
-                          const [nextProjectId] = [...keys];
-                          handleProjectChange(String(nextProjectId ?? 'none'));
-                        }}
-                      >
-                        <Dropdown.Item id="none" textValue="No project">
-                          <Dropdown.ItemIndicator />
-                          <Label>No project</Label>
-                        </Dropdown.Item>
-                        {workspaceProjects.map((project) => (
-                          <Dropdown.Item id={project.id} key={project.id} textValue={project.name}>
-                            <Dropdown.ItemIndicator />
-                            <Label>{project.name}</Label>
-                          </Dropdown.Item>
-                        ))}
-                      </Dropdown.Menu>
-                    </Dropdown.Popover>
-                  </Dropdown>
+                      {selectedWorkspaceProjectId
+                        ? (projectNameById.get(selectedWorkspaceProjectId) ?? 'Project')
+                        : 'No project'}
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuGroup>
+                        <DropdownMenuRadioGroup
+                          value={selectedWorkspaceProjectId || 'none'}
+                          onValueChange={handleProjectChange}
+                        >
+                          {projectOptions.map((option) => (
+                            <DropdownMenuRadioItem
+                              closeOnClick
+                              key={option.value}
+                              value={option.value}
+                            >
+                              {option.label}
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-                  <Dropdown>
-                    <Button
-                      aria-label="Select priority"
-                      className={quickAddAccessoryButtonClassName}
-                      isDisabled={!currentWorkspace || isCreating}
-                      size="sm"
-                      variant="ghost"
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <InputGroupButton
+                          aria-label="Select priority"
+                          disabled={!currentWorkspace || isCreating}
+                        />
+                      }
                     >
-                      {({ isPressed }) => (
-                        <span className={isPressed ? 'scale-[0.97]' : undefined}>
-                          {priorityLabels[taskPriority]}
-                        </span>
-                      )}
-                    </Button>
-                    <Dropdown.Popover className="w-36" placement="bottom end">
-                      <Dropdown.Menu
-                        selectedKeys={new Set([taskPriority])}
-                        selectionMode="single"
-                        onSelectionChange={(keys) => {
-                          const [nextPriority] = [...keys];
-                          if (nextPriority) {
-                            setTaskPriority(String(nextPriority));
-                          }
-                        }}
-                      >
-                        {priorityOptions.map((option) => (
-                          <Dropdown.Item
-                            id={option.value}
-                            key={option.value}
-                            textValue={option.label}
-                          >
-                            <Dropdown.ItemIndicator />
-                            <Label>{option.label}</Label>
-                          </Dropdown.Item>
-                        ))}
-                      </Dropdown.Menu>
-                    </Dropdown.Popover>
-                  </Dropdown>
+                      {priorityLabels[taskPriority]}
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-36">
+                      <DropdownMenuGroup>
+                        <DropdownMenuRadioGroup
+                          value={taskPriority}
+                          onValueChange={setTaskPriority}
+                        >
+                          {priorityOptions.map((option) => (
+                            <DropdownMenuRadioItem
+                              closeOnClick
+                              key={option.value}
+                              value={option.value}
+                            >
+                              {option.label}
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
                   <Popover
-                    isOpen={isDescriptionPopoverOpen}
+                    open={isDescriptionPopoverOpen}
                     onOpenChange={setIsDescriptionPopoverOpen}
                   >
-                    <Button
-                      aria-label="Edit description"
-                      className={quickAddAccessoryButtonClassName}
-                      isDisabled={!currentWorkspace || isCreating}
-                      size="sm"
-                      variant="ghost"
+                    <PopoverTrigger
+                      render={
+                        <InputGroupButton
+                          aria-label="Edit description"
+                          disabled={!currentWorkspace || isCreating}
+                        />
+                      }
                     >
                       {taskDescription.trim() ? 'Description' : 'No description'}
-                    </Button>
-                    <Popover.Content className="w-80" placement="bottom end">
-                      <Popover.Dialog className="flex flex-col gap-2">
-                        <Label htmlFor="task-description">Description</Label>
-                        <TextArea
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="end"
+                      className="w-80"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <PopoverTitle>Description</PopoverTitle>
+                      <Field data-disabled={!currentWorkspace || isCreating}>
+                        <FieldLabel className="sr-only" htmlFor="task-description">
+                          Description
+                        </FieldLabel>
+                        <Textarea
                           id="task-description"
                           className="max-h-48 min-h-28 resize-none overflow-y-auto"
+                          disabled={!currentWorkspace || isCreating}
+                          placeholder="Add details..."
                           value={taskDescription}
                           onChange={(event) => setTaskDescription(event.target.value)}
-                          placeholder="Add details..."
-                          isDisabled={!currentWorkspace || isCreating}
-                          variant="secondary"
                         />
-                      </Popover.Dialog>
-                    </Popover.Content>
+                      </Field>
+                    </PopoverContent>
                   </Popover>
-                </InputGroup.Suffix>
+                </InputGroupAddon>
               </InputGroup>
 
               <Button
                 className="h-9 shrink-0"
-                isDisabled={isCreating || !currentWorkspace || taskTitle.trim() === ''}
-                isPending={isCreating}
+                disabled={isCreating || !currentWorkspace || taskTitle.trim() === ''}
                 type="submit"
               >
+                {isCreating && <Spinner data-icon="inline-start" />}
                 {isCreating ? 'Adding...' : 'Add'}
               </Button>
             </div>
-            <FieldError />
-          </TextField>
+          </Field>
 
           <TaskApiErrorMessage>{quickAddError || taskActionError}</TaskApiErrorMessage>
-        </div>
-      </Form>
+        </FieldGroup>
+      </form>
 
       <div className="min-h-0 flex-1">
-        <ScrollShadow className="h-full min-h-0" orientation="vertical" size={20}>
+        <ScrollArea className="h-full min-h-0">
           {status === 'loading' && (
             <div className="flex flex-col gap-4 px-8 py-6">
-              <div className="flex items-center gap-3">
-                <Skeleton className="size-5 rounded" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-3/4 rounded" />
-                  <Skeleton className="h-3 w-1/2 rounded" />
+              {[0, 1, 2].map((row) => (
+                <div key={row} className="flex items-center gap-3">
+                  <Skeleton className="size-5" />
+                  <div className="flex flex-1 flex-col gap-2">
+                    <Skeleton className={row === 1 ? 'h-4 w-2/3' : 'h-4 w-3/4'} />
+                    <Skeleton className={row === 2 ? 'h-3 w-1/3' : 'h-3 w-1/2'} />
+                  </div>
+                  <Skeleton className="h-6 w-16" />
+                  <Skeleton className="size-7" />
                 </div>
-                <Skeleton className="h-6 w-16 rounded-full" />
-                <Skeleton className="size-7 rounded" />
-              </div>
-              <div className="flex items-center gap-3">
-                <Skeleton className="size-5 rounded" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-2/3 rounded" />
-                  <Skeleton className="h-3 w-2/5 rounded" />
-                </div>
-                <Skeleton className="h-6 w-16 rounded-full" />
-                <Skeleton className="size-7 rounded" />
-              </div>
-              <div className="flex items-center gap-3">
-                <Skeleton className="size-5 rounded" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-4/5 rounded" />
-                  <Skeleton className="h-3 w-1/3 rounded" />
-                </div>
-                <Skeleton className="h-6 w-16 rounded-full" />
-                <Skeleton className="size-7 rounded" />
-              </div>
+              ))}
             </div>
           )}
 
           {status === 'error' && (
-            <TaskApiErrorMessage className="px-8">{loadError}</TaskApiErrorMessage>
+            <TaskApiErrorMessage className="px-8 py-6">{loadError}</TaskApiErrorMessage>
           )}
 
           {status === 'ready' && !currentWorkspace && (
-            <p className="px-8 text-sm text-muted-foreground">
-              Create a workspace before adding tasks.
-            </p>
+            <Empty className="mx-8 min-h-40 border">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <IconChecklist aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>No workspace selected</EmptyTitle>
+                <EmptyDescription>Create a workspace before adding tasks.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           )}
 
           {status === 'ready' && currentWorkspace && visibleTasks.length === 0 && (
-            <div className="mx-8 flex min-h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border text-center">
-              <HugeiconsIcon
-                icon={TaskDone01Icon}
-                aria-hidden="true"
-                className="size-[18px] shrink-0 translate-y-px"
-              />
-              <p className="text-sm font-medium text-foreground">No tasks yet</p>
-              <p className="max-w-sm text-sm text-muted-foreground text-pretty">
-                Capture the next concrete action for this workspace.
-              </p>
-            </div>
+            <Empty className="mx-8 min-h-40 border">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <IconChecklist aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>No tasks yet</EmptyTitle>
+                <EmptyDescription>
+                  Capture the next concrete action for this workspace.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           )}
 
           {status === 'ready' &&
             currentWorkspace &&
             visibleTasks.length > 0 &&
             parentTasks.length === 0 && (
-              <div className="mx-8 flex min-h-32 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-                No tasks match this filter.
-              </div>
+              <Empty className="mx-8 min-h-32 border">
+                <EmptyHeader>
+                  <EmptyTitle>No tasks match this filter</EmptyTitle>
+                </EmptyHeader>
+              </Empty>
             )}
 
           {status === 'ready' && parentTasks.length > 0 && (
             <div className="px-8">
-              <Table className="border-b" variant="secondary">
-                <Table.ScrollContainer className="w-full overflow-x-auto">
-                  <Table.Content aria-label="Tasks" className="w-full min-w-full">
-                    <Table.Header className="sr-only">
-                      <Table.Column isRowHeader>Task</Table.Column>
-                      <Table.Column>Due</Table.Column>
-                      <Table.Column>Actions</Table.Column>
-                    </Table.Header>
-                    <Table.Body>
-                      {parentTasks.map((task) => {
-                        const taskChildren = childrenByParentId.get(task.id) ?? [];
-                        const projectName = task.projectId
-                          ? projectNameById.get(task.projectId)
-                          : null;
-                        const dueDate = formatDate(task.dueDate);
-                        const isDone = task.status === 'done';
-                        const isUpdating = updatingTaskIds.has(task.id);
-                        const isRenderingChildForm = renderedChildTaskParentId === task.id;
-                        const hasChildren = taskChildren.length > 0;
-                        const isExpanded = expandedTaskIds.has(task.id);
-                        const hasDescription = task.description.trim() !== '';
-                        const hasVisibleChildren = hasChildren && isExpanded;
-                        const isChildFormVisible =
-                          visibleChildTaskParentId === task.id && isExpanded;
-                        const canShowTaskDetails =
-                          hasDescription || hasChildren || isRenderingChildForm;
-                        const isTaskDetailVisible = isExpanded && canShowTaskDetails;
-                        const completedChildCount = taskChildren.filter(
-                          (childTask) => childTask.status === 'done',
-                        ).length;
+              <Table aria-label="Tasks" className="border-b">
+                <TableHeader className="sr-only">
+                  <TableRow>
+                    <TableHead scope="col">Task</TableHead>
+                    <TableHead scope="col">Due</TableHead>
+                    <TableHead scope="col">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {parentTasks.map((task) => {
+                    const taskChildren = childrenByParentId.get(task.id) ?? [];
+                    const projectName = task.projectId ? projectNameById.get(task.projectId) : null;
+                    const dueDate = formatDate(task.dueDate);
+                    const isDone = task.status === 'done';
+                    const isUpdating = updatingTaskIds.has(task.id);
+                    const isRenderingChildForm = renderedChildTaskParentId === task.id;
+                    const hasChildren = taskChildren.length > 0;
+                    const isExpanded = expandedTaskIds.has(task.id);
+                    const hasDescription = task.description.trim() !== '';
+                    const hasVisibleChildren = hasChildren && isExpanded;
+                    const isChildFormVisible = visibleChildTaskParentId === task.id && isExpanded;
+                    const canShowTaskDetails =
+                      hasDescription || hasChildren || isRenderingChildForm;
+                    const isTaskDetailVisible = isExpanded && canShowTaskDetails;
+                    const completedChildCount = taskChildren.filter(
+                      (childTask) => childTask.status === 'done',
+                    ).length;
 
-                        return (
-                          <Table.Row key={task.id} id={task.id}>
-                            <Table.Cell className="p-0" colSpan={3}>
-                              <div
-                                data-slot="task-row-layout"
-                                className="flex min-w-0 flex-col"
-                                onContextMenu={(event) => openTaskContextMenu(event, task)}
-                              >
-                                <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_7rem_5rem] items-center">
-                                  <div className="relative min-w-0 py-1.5 pl-4">
-                                    <div className="flex min-w-0 items-center gap-3">
-                                      {renderTaskCheckbox(task, isUpdating)}
+                    return (
+                      <TableRow key={task.id} id={task.id}>
+                        <TableCell className="p-0" colSpan={3}>
+                          <div data-slot="task-row-layout" className="flex min-w-0 flex-col">
+                            <ContextMenu>
+                              <ContextMenuTrigger className="grid min-h-11 grid-cols-[minmax(0,1fr)_7rem_5rem] items-center">
+                                <div className="relative min-w-0 py-1.5 pl-4">
+                                  <div className="flex min-w-0 items-center gap-3">
+                                    {renderTaskCheckbox(task, isUpdating)}
 
-                                      <Button
-                                        aria-expanded={canShowTaskDetails ? isExpanded : undefined}
-                                        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${task.title}`}
-                                        className={`min-w-0 flex-1 transform-gpu justify-start rounded-md px-2 py-1.5 text-left transition-[background-color,scale] duration-150 ease-out active:scale-[0.96] data-[pressed=true]:scale-[0.96] ${canShowTaskDetails ? 'hover:bg-surface-secondary focus-visible:ring-2 focus-visible:ring-focus' : 'pointer-events-none opacity-100'}`}
-                                        data-slot="task-details-trigger"
-                                        aria-disabled={!canShowTaskDetails}
-                                        type="button"
-                                        variant="ghost"
-                                        onPress={() => {
-                                          if (canShowTaskDetails) {
-                                            toggleTaskDetails(task.id);
-                                          }
-                                        }}
-                                      >
-                                        <div className="flex min-w-0 items-center gap-2">
-                                          <div
-                                            className={`min-w-0 truncate text-sm font-medium ${isDone ? 'text-muted-foreground line-through' : 'text-foreground'}`}
-                                          >
-                                            {task.title}
-                                            {projectName && (
-                                              <span className="font-normal text-muted-foreground">
-                                                /{projectName}
-                                              </span>
-                                            )}
-                                          </div>
-                                          <Chip
-                                            color={task.priority === 'high' ? 'accent' : 'default'}
-                                            size="sm"
-                                            variant={task.priority === 'high' ? 'primary' : 'soft'}
-                                          >
-                                            {priorityLabels[task.priority]}
-                                          </Chip>
-                                          {hasDescription && (
-                                            <span className="shrink-0 text-xs font-normal text-muted-foreground">
-                                              Note
-                                            </span>
+                                    <Button
+                                      aria-expanded={canShowTaskDetails ? isExpanded : undefined}
+                                      aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${task.title}`}
+                                      className="min-w-0 flex-1 transform-gpu justify-start px-2 py-1.5 text-left transition-[background-color,scale] duration-150 ease-out active:scale-[0.96] data-pressed:scale-[0.96]"
+                                      data-slot="task-details-trigger"
+                                      disabled={!canShowTaskDetails}
+                                      type="button"
+                                      variant="ghost"
+                                      onClick={() => toggleTaskDetails(task.id)}
+                                    >
+                                      <div className="flex min-w-0 items-center gap-2">
+                                        <div
+                                          className={cn(
+                                            'min-w-0 truncate text-sm font-medium',
+                                            isDone
+                                              ? 'text-muted-foreground line-through'
+                                              : 'text-foreground',
                                           )}
-                                          {hasChildren && (
-                                            <span className="shrink-0 text-xs font-normal text-muted-foreground tabular-nums">
-                                              {completedChildCount}/{taskChildren.length}
+                                        >
+                                          {task.title}
+                                          {projectName && (
+                                            <span className="font-normal text-muted-foreground">
+                                              /{projectName}
                                             </span>
                                           )}
                                         </div>
-                                      </Button>
-                                    </div>
-                                  </div>
-
-                                  <div className="px-2 text-muted-foreground">
-                                    {dueDate && (
-                                      <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
-                                        <HugeiconsIcon
-                                          icon={Calendar03Icon}
-                                          aria-hidden="true"
-                                          className="size-3 shrink-0"
-                                        />
-                                        {dueDate}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <div className="pr-4 text-right">
-                                    <div className="flex justify-end gap-1">
-                                      <Button
-                                        aria-label={`Add child todo to ${task.title}`}
-                                        className={taskRowIconButtonClassName}
-                                        isDisabled={isCreatingChild}
-                                        isIconOnly
-                                        size="sm"
-                                        type="button"
-                                        variant="ghost"
-                                        onPress={() => openChildTaskForm(task.id)}
-                                      >
-                                        <HugeiconsIcon
-                                          icon={Add01Icon}
-                                          aria-hidden="true"
-                                          className="size-[18px] shrink-0 translate-y-px"
-                                        />
-                                      </Button>
-                                    </div>
+                                        <Badge
+                                          variant={
+                                            task.priority === 'high' ? 'default' : 'secondary'
+                                          }
+                                        >
+                                          {priorityLabels[task.priority]}
+                                        </Badge>
+                                        {hasDescription && (
+                                          <span className="shrink-0 text-xs font-normal text-muted-foreground">
+                                            Note
+                                          </span>
+                                        )}
+                                        {hasChildren && (
+                                          <span className="shrink-0 text-xs font-normal text-muted-foreground tabular-nums">
+                                            {completedChildCount}/{taskChildren.length}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </Button>
                                   </div>
                                 </div>
 
-                                <GsapDisclosure dataSlot="task-detail" isOpen={isTaskDetailVisible}>
-                                  <div className="flex flex-col gap-2 pb-2 pl-15 pr-8">
-                                    {hasDescription && (
-                                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                                        {task.description}
-                                      </p>
-                                    )}
+                                <div className="px-2 text-muted-foreground">
+                                  {dueDate && (
+                                    <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
+                                      <IconCalendar
+                                        aria-hidden="true"
+                                        className="size-3 shrink-0"
+                                      />
+                                      {dueDate}
+                                    </span>
+                                  )}
+                                </div>
 
-                                    {isRenderingChildForm && (
-                                      <GsapDisclosure
-                                        className="overflow-visible"
-                                        contentClassName="px-0.5 py-0.5"
-                                        dataSlot="task-child-form"
-                                        isOpen={isChildFormVisible}
-                                      >
-                                        <Form
-                                          className="flex flex-col gap-2"
-                                          validationBehavior="native"
-                                          onSubmit={(event) => {
-                                            void handleCreateChildTask(event, task);
-                                          }}
+                                <div className="pr-4 text-right">
+                                  <div className="flex justify-end gap-1">
+                                    <Button
+                                      aria-label={`Add child todo to ${task.title}`}
+                                      disabled={isCreatingChild}
+                                      size="icon-sm"
+                                      type="button"
+                                      variant="ghost"
+                                      onClick={() => openChildTaskForm(task.id)}
+                                    >
+                                      <IconPlus data-icon="inline-start" aria-hidden="true" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </ContextMenuTrigger>
+                              {renderTaskContextMenu(task)}
+                            </ContextMenu>
+
+                            <GsapDisclosure dataSlot="task-detail" isOpen={isTaskDetailVisible}>
+                              <div className="flex flex-col gap-2 pb-2 pl-15 pr-8">
+                                {hasDescription && (
+                                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                                    {task.description}
+                                  </p>
+                                )}
+
+                                {isRenderingChildForm && (
+                                  <GsapDisclosure
+                                    className="overflow-visible"
+                                    contentClassName="px-0.5 py-0.5"
+                                    dataSlot="task-child-form"
+                                    isOpen={isChildFormVisible}
+                                  >
+                                    <form
+                                      className="flex flex-col gap-2"
+                                      onSubmit={(event) => {
+                                        void handleCreateChildTask(event, task);
+                                      }}
+                                    >
+                                      <FieldGroup className="gap-2">
+                                        <Field
+                                          data-disabled={isCreatingChild}
+                                          orientation="horizontal"
                                         >
-                                          <div className="flex items-center gap-2">
-                                            <TextField
+                                          <FieldLabel
+                                            className="sr-only"
+                                            htmlFor={`child-task-title-${task.id}`}
+                                          >
+                                            Child todo for {task.title}
+                                          </FieldLabel>
+                                          <InputGroup className="h-8 min-h-8 shadow-none">
+                                            <InputGroupInput
+                                              id={`child-task-title-${task.id}`}
                                               aria-label={`Child todo for ${task.title}`}
-                                              className="min-w-0 flex-1"
-                                              fullWidth
-                                              isDisabled={isCreatingChild}
-                                              isRequired
+                                              disabled={isCreatingChild}
                                               name={`child-task-title-${task.id}`}
-                                              validate={(value) =>
-                                                value.trim() ? null : 'Child todo title is required'
-                                              }
+                                              placeholder="Add child todo..."
+                                              required
                                               value={childTaskTitle}
-                                              onChange={setChildTaskTitle}
-                                            >
-                                              <InputGroup
-                                                className="h-8 min-h-8 shadow-none"
-                                                fullWidth
-                                              >
-                                                <InputGroup.Input placeholder="Add child todo..." />
-                                              </InputGroup>
-                                              <FieldError />
-                                            </TextField>
-                                            <Button
-                                              isDisabled={
-                                                isCreatingChild || childTaskTitle.trim() === ''
+                                              onChange={(event) =>
+                                                setChildTaskTitle(event.target.value)
                                               }
-                                              size="sm"
-                                              type="submit"
-                                            >
-                                              Add
-                                            </Button>
-                                            <Button
-                                              isDisabled={isCreatingChild}
-                                              size="sm"
-                                              type="button"
-                                              variant="ghost"
-                                              onPress={closeChildTaskForm}
-                                            >
-                                              Cancel
-                                            </Button>
-                                          </div>
-                                          <TaskApiErrorMessage>
-                                            {childTaskError}
-                                          </TaskApiErrorMessage>
-                                        </Form>
-                                      </GsapDisclosure>
-                                    )}
+                                            />
+                                          </InputGroup>
+                                          <Button
+                                            disabled={
+                                              isCreatingChild || childTaskTitle.trim() === ''
+                                            }
+                                            size="sm"
+                                            type="submit"
+                                          >
+                                            {isCreatingChild && (
+                                              <Spinner data-icon="inline-start" />
+                                            )}
+                                            {isCreatingChild ? 'Adding...' : 'Add'}
+                                          </Button>
+                                          <Button
+                                            disabled={isCreatingChild}
+                                            size="sm"
+                                            type="button"
+                                            variant="ghost"
+                                            onClick={closeChildTaskForm}
+                                          >
+                                            Cancel
+                                          </Button>
+                                        </Field>
+                                        <TaskApiErrorMessage>{childTaskError}</TaskApiErrorMessage>
+                                      </FieldGroup>
+                                    </form>
+                                  </GsapDisclosure>
+                                )}
 
-                                    {hasVisibleChildren && (
-                                      <div
-                                        data-slot="task-children"
-                                        aria-hidden={!hasVisibleChildren}
-                                        className="overflow-visible"
-                                        {...(!hasVisibleChildren ? { inert: true } : {})}
-                                      >
-                                        <div className="flex flex-col">
-                                          {taskChildren.map((childTask) => {
-                                            const childProjectName = childTask.projectId
-                                              ? projectNameById.get(childTask.projectId)
-                                              : null;
-                                            const childDueDate = formatDate(childTask.dueDate);
-                                            const isChildDone = childTask.status === 'done';
-                                            const isChildUpdating = updatingTaskIds.has(
-                                              childTask.id,
-                                            );
-                                            return (
-                                              <div
-                                                key={childTask.id}
-                                                id={childTask.id}
-                                                data-slot="task-child-row"
-                                                className="grid min-h-10 grid-cols-[minmax(0,1fr)_7rem_5rem] items-start"
-                                                onContextMenu={(event) =>
-                                                  openTaskContextMenu(event, childTask)
-                                                }
-                                              >
-                                                <div className="min-w-0 py-1.5 pl-1">
-                                                  <div className="flex min-w-0 items-center gap-3">
-                                                    {renderTaskCheckbox(childTask, isChildUpdating)}
+                                {hasVisibleChildren && (
+                                  <div
+                                    data-slot="task-children"
+                                    aria-hidden={!hasVisibleChildren}
+                                    className="overflow-visible"
+                                    {...(!hasVisibleChildren ? { inert: true } : {})}
+                                  >
+                                    <div className="flex flex-col">
+                                      {taskChildren.map((childTask) => {
+                                        const childProjectName = childTask.projectId
+                                          ? projectNameById.get(childTask.projectId)
+                                          : null;
+                                        const childDueDate = formatDate(childTask.dueDate);
+                                        const isChildDone = childTask.status === 'done';
+                                        const isChildUpdating = updatingTaskIds.has(childTask.id);
 
-                                                    <div className="min-w-0 flex-1">
-                                                      <div
-                                                        className={`min-w-0 truncate text-sm font-medium ${isChildDone ? 'text-muted-foreground line-through' : 'text-foreground'}`}
-                                                      >
-                                                        {childTask.title}
-                                                        {childProjectName && (
-                                                          <span className="font-normal text-muted-foreground">
-                                                            /{childProjectName}
-                                                          </span>
-                                                        )}
-                                                      </div>
+                                        return (
+                                          <ContextMenu key={childTask.id}>
+                                            <ContextMenuTrigger
+                                              id={childTask.id}
+                                              data-slot="task-child-row"
+                                              className="grid min-h-10 grid-cols-[minmax(0,1fr)_7rem_5rem] items-start"
+                                            >
+                                              <div className="min-w-0 py-1.5 pl-1">
+                                                <div className="flex min-w-0 items-center gap-3">
+                                                  {renderTaskCheckbox(childTask, isChildUpdating)}
+
+                                                  <div className="min-w-0 flex-1">
+                                                    <div
+                                                      className={cn(
+                                                        'min-w-0 truncate text-sm font-medium',
+                                                        isChildDone
+                                                          ? 'text-muted-foreground line-through'
+                                                          : 'text-foreground',
+                                                      )}
+                                                    >
+                                                      {childTask.title}
+                                                      {childProjectName && (
+                                                        <span className="font-normal text-muted-foreground">
+                                                          /{childProjectName}
+                                                        </span>
+                                                      )}
                                                     </div>
                                                   </div>
-
-                                                  {childTask.description.trim() !== '' && (
-                                                    <p className="mt-1 whitespace-pre-wrap pl-8 text-sm leading-relaxed text-muted-foreground">
-                                                      {childTask.description}
-                                                    </p>
-                                                  )}
                                                 </div>
 
-                                                <div className="px-2 py-2 text-muted-foreground">
-                                                  {childDueDate && (
-                                                    <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
-                                                      <HugeiconsIcon
-                                                        icon={Calendar03Icon}
-                                                        aria-hidden="true"
-                                                        className="size-3 shrink-0"
-                                                      />
-                                                      {childDueDate}
-                                                    </span>
-                                                  )}
-                                                </div>
-
-                                                <div className="py-1.5 text-right" />
+                                                {childTask.description.trim() !== '' && (
+                                                  <p className="mt-1 whitespace-pre-wrap pl-8 text-sm leading-relaxed text-muted-foreground">
+                                                    {childTask.description}
+                                                  </p>
+                                                )}
                                               </div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    )}
+
+                                              <div className="px-2 py-2 text-muted-foreground">
+                                                {childDueDate && (
+                                                  <span className="flex items-center justify-end gap-1 text-xs tabular-nums">
+                                                    <IconCalendar
+                                                      aria-hidden="true"
+                                                      className="size-3 shrink-0"
+                                                    />
+                                                    {childDueDate}
+                                                  </span>
+                                                )}
+                                              </div>
+
+                                              <div className="py-1.5 text-right" />
+                                            </ContextMenuTrigger>
+                                            {renderTaskContextMenu(childTask)}
+                                          </ContextMenu>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
-                                </GsapDisclosure>
+                                )}
                               </div>
-                            </Table.Cell>
-                          </Table.Row>
-                        );
-                      })}
-                    </Table.Body>
-                  </Table.Content>
-                </Table.ScrollContainer>
+                            </GsapDisclosure>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
               </Table>
             </div>
           )}
-        </ScrollShadow>
+        </ScrollArea>
       </div>
 
-      <Dropdown
-        isOpen={Boolean(taskContextMenu && taskContextMenuTask)}
+      <Dialog
+        open={Boolean(editingTask)}
         onOpenChange={(isOpen) => {
           if (!isOpen) {
-            closeTaskContextMenu();
+            closeEditTaskDialog();
           }
         }}
       >
-        <Button
-          aria-label="Task context menu"
-          className="fixed z-50 size-px opacity-0"
-          isIconOnly
-          style={{
-            left: taskContextMenu?.x ?? 0,
-            top: taskContextMenu?.y ?? 0,
-          }}
-          type="button"
-          variant="ghost"
-        >
-          <span className="sr-only">Task context menu</span>
-        </Button>
-        <Dropdown.Popover className="w-40" placement="bottom start">
-          <Dropdown.Menu aria-label="Task actions" onAction={handleTaskContextMenuAction}>
-            <Dropdown.Item id="edit" textValue="Edit">
-              <HugeiconsIcon icon={Edit02Icon} aria-hidden="true" className="size-4" />
-              <Label>Edit</Label>
-            </Dropdown.Item>
-            <Dropdown.Item
-              id="delete"
-              className="hover:bg-danger-soft-hover data-[hovered=true]:bg-danger-soft-hover data-[pressed=true]:bg-danger-soft-hover"
-              textValue="Delete"
-              variant="danger"
-            >
-              <HugeiconsIcon
-                icon={Delete02Icon}
-                aria-hidden="true"
-                className="size-4 text-danger"
-              />
-              <Label>Delete</Label>
-            </Dropdown.Item>
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
+        <DialogContent aria-label="Edit task">
+          <DialogHeader>
+            <DialogTitle>Edit task</DialogTitle>
+          </DialogHeader>
 
-      <Modal
-        isOpen={Boolean(editingTask)}
-        onOpenChange={(isOpen) => !isOpen && closeEditTaskDialog()}
-      >
-        <Modal.Backdrop>
-          <Modal.Container size="sm">
-            <Modal.Dialog aria-label="Edit task">
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Heading>Edit task</Modal.Heading>
-              </Modal.Header>
-
-              <Form validationBehavior="native" onSubmit={handleSaveTaskEdit}>
-                <Modal.Body className="flex flex-col gap-3">
-                  <TextField
-                    fullWidth
-                    isDisabled={isSavingTaskEdit}
-                    isRequired
+          <form className="flex flex-col gap-4" onSubmit={handleSaveTaskEdit}>
+            <FieldGroup>
+              <Field data-disabled={isSavingTaskEdit}>
+                <FieldLabel htmlFor="edit-task-title">Title</FieldLabel>
+                <InputGroup>
+                  <InputGroupInput
+                    id="edit-task-title"
+                    disabled={isSavingTaskEdit}
                     name="edit-task-title"
-                    validate={(value) => (value.trim() ? null : 'Task title is required')}
+                    required
                     value={editTaskTitle}
-                    onChange={setEditTaskTitle}
-                  >
-                    <Label htmlFor="edit-task-title">Title</Label>
-                    <InputGroup fullWidth>
-                      <InputGroup.Input id="edit-task-title" />
-                    </InputGroup>
-                    <FieldError />
-                  </TextField>
+                    onChange={(event) => setEditTaskTitle(event.target.value)}
+                  />
+                </InputGroup>
+              </Field>
 
-                  <TextField
-                    fullWidth
-                    isDisabled={isSavingTaskEdit}
-                    name="edit-task-description"
-                    value={editTaskDescription}
-                    onChange={setEditTaskDescription}
-                  >
-                    <Label>Description</Label>
-                    <TextArea
-                      fullWidth
-                      className="max-h-48 min-h-28 resize-none overflow-y-auto"
-                      variant="secondary"
-                    />
-                  </TextField>
+              <Field data-disabled={isSavingTaskEdit}>
+                <FieldLabel htmlFor="edit-task-description">Description</FieldLabel>
+                <Textarea
+                  id="edit-task-description"
+                  className="max-h-48 min-h-28 resize-none overflow-y-auto"
+                  disabled={isSavingTaskEdit}
+                  name="edit-task-description"
+                  value={editTaskDescription}
+                  onChange={(event) => setEditTaskDescription(event.target.value)}
+                />
+              </Field>
 
-                  <Dropdown>
-                    <Button
-                      className="justify-between"
-                      fullWidth
-                      isDisabled={isSavingTaskEdit}
-                      type="button"
-                      variant="secondary"
-                    >
-                      Priority: {priorityLabels[editTaskPriority]}
-                    </Button>
-                    <Dropdown.Popover className="w-40" placement="bottom start">
-                      <Dropdown.Menu
-                        selectedKeys={new Set([editTaskPriority])}
-                        selectionMode="single"
-                        onSelectionChange={(keys) => {
-                          const [nextPriority] = [...keys];
-                          if (nextPriority) {
-                            setEditTaskPriority(String(nextPriority));
-                          }
-                        }}
-                      >
-                        {priorityOptions.map((option) => (
-                          <Dropdown.Item
-                            id={option.value}
-                            key={option.value}
-                            textValue={option.label}
-                          >
-                            <Dropdown.ItemIndicator />
-                            <Label>{option.label}</Label>
-                          </Dropdown.Item>
-                        ))}
-                      </Dropdown.Menu>
-                    </Dropdown.Popover>
-                  </Dropdown>
+              <Field data-disabled={isSavingTaskEdit}>
+                <FieldLabel htmlFor="edit-task-priority">Priority</FieldLabel>
+                <Select
+                  id="edit-task-priority"
+                  disabled={isSavingTaskEdit}
+                  items={priorityOptions}
+                  value={editTaskPriority}
+                  onValueChange={setEditTaskPriority}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    <SelectGroup>
+                      {priorityOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </FieldGroup>
 
-                  <TaskApiErrorMessage>{editTaskError}</TaskApiErrorMessage>
-                </Modal.Body>
+            <TaskApiErrorMessage>{editTaskError}</TaskApiErrorMessage>
 
-                <Modal.Footer>
-                  <Button isDisabled={isSavingTaskEdit} isPending={isSavingTaskEdit} type="submit">
-                    {isSavingTaskEdit ? 'Saving...' : 'Save'}
-                  </Button>
-                </Modal.Footer>
-              </Form>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+            <DialogFooter>
+              <Button disabled={isSavingTaskEdit} type="submit">
+                {isSavingTaskEdit && <Spinner data-icon="inline-start" />}
+                {isSavingTaskEdit ? 'Saving...' : 'Save'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      <Modal
-        isOpen={Boolean(taskPendingDelete)}
-        onOpenChange={(isOpen) => !isOpen && closeDeleteTaskDialog()}
+      <AlertDialog
+        open={Boolean(taskPendingDelete)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            closeDeleteTaskDialog();
+          }
+        }}
       >
-        <Modal.Backdrop>
-          <Modal.Container size="sm">
-            <Modal.Dialog aria-label="Delete task">
-              <Modal.Header>
-                <Modal.Heading>Delete task?</Modal.Heading>
-              </Modal.Header>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete task</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete{' '}
+              <span className="font-medium text-foreground">{taskPendingDelete?.title}</span>
+              {taskPendingDeleteChildCount > 0 ? (
+                <>
+                  {' '}
+                  and {taskPendingDeleteChildCount} child{' '}
+                  {taskPendingDeleteChildCount === 1 ? 'todo' : 'todos'}.
+                </>
+              ) : (
+                '.'
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
-              <Modal.Body>
-                <p>
-                  This will delete{' '}
-                  <span className="font-medium text-foreground">{taskPendingDelete?.title}</span>
-                  {taskPendingDeleteChildCount > 0 ? (
-                    <>
-                      {' '}
-                      and {taskPendingDeleteChildCount} child{' '}
-                      {taskPendingDeleteChildCount === 1 ? 'todo' : 'todos'}.
-                    </>
-                  ) : (
-                    '.'
-                  )}
-                </p>
-                <TaskApiErrorMessage>{deleteTaskError}</TaskApiErrorMessage>
-              </Modal.Body>
+          <TaskApiErrorMessage>{deleteTaskError}</TaskApiErrorMessage>
 
-              <Modal.Footer>
-                <Button
-                  isDisabled={isDeletingTask}
-                  type="button"
-                  variant="tertiary"
-                  onPress={closeDeleteTaskDialog}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  isPending={isDeletingTask}
-                  type="button"
-                  variant="danger"
-                  onPress={() => {
-                    void handleConfirmDeleteTask();
-                  }}
-                >
-                  {isDeletingTask ? 'Deleting...' : 'Delete'}
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={isDeletingTask}
+              type="button"
+              onClick={closeDeleteTaskDialog}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeletingTask}
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                void handleConfirmDeleteTask();
+              }}
+            >
+              {isDeletingTask && <Spinner data-icon="inline-start" />}
+              {isDeletingTask ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

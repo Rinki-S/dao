@@ -132,7 +132,7 @@ It is concrete, searchable, and easy to understand from a README.
 
 ## 5.2 Jade UI
 
-A compact React UI kit for developer tools, extracted only after Dao validates real product composition patterns on top of HeroUI and Tailwind CSS.
+A compact React UI kit for developer tools, extracted only after Dao validates real product composition patterns on top of shadcn, Base UI, Tailwind CSS, and Lisse.
 
 ### Problem
 
@@ -165,9 +165,9 @@ It shows design system ability, React component abstraction, accessibility aware
 
 This project should become a focused component system for developer tools.
 
-It should not be extracted while Dao is still deciding its core UI patterns. The app should first validate direct HeroUI usage, Dao design tokens, density, forms, command palette, sidebar, panel, and dialog patterns in real product surfaces.
+It should not be extracted while Dao is still deciding its core UI patterns. The app should first validate its local shadcn components, Base UI behavior, Lisse corner system, Dao design tokens, density, forms, command palette, sidebar, panel, and dialog patterns in real product surfaces.
 
-This should not become a wrapper package that merely hides HeroUI. Extract only product-specific composition, density, styling, and interaction patterns that prove reusable through repeated Dao usage.
+This should not become a thin re-export of shadcn or Base UI. Extract only product-specific composition, density, styling, corner geometry, and interaction patterns that prove reusable through repeated Dao usage.
 
 ## 5.3 dao-command-kit
 
@@ -350,7 +350,7 @@ Extracted from real engineering needs in Dao and continuously validated through 
 Example resume wording:
 
 ```txt
-Extracted and maintained reusable infrastructure packages from Dao, including an Electron-Go service bridge and a compact HeroUI-based developer-tool UI kit, both validated through continuous use in the main product.
+Extracted and maintained reusable infrastructure packages from Dao, including an Electron-Go service bridge and a compact shadcn/Base UI developer-tool kit, both validated through continuous use in the main product.
 ```
 
 The goal is to show engineering judgment, not repository count.

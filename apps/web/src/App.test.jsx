@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetNoteSaveQueueForTests, waitForNoteSaves } from '@/features/notes/note-save-queue.js';
@@ -146,7 +146,10 @@ describe('App', () => {
     expect(window.location.hash).toBe('#settings');
     expect(screen.getByRole('tab', { name: /Settings/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Working Directory')).toBeInTheDocument();
-    expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+    // The dialog stays mounted until its exit animation finishes.
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+    });
   });
 
   it('reuses existing surface tabs and closes active tabs to the left neighbor', async () => {

@@ -5,20 +5,22 @@ import { describe, expect, it } from 'vitest';
 
 const appSidebarPath = path.resolve(import.meta.dirname, 'AppSidebar.jsx');
 
-describe('AppSidebar HeroUI migration boundary', () => {
-  it('uses HeroUI primitives directly for sidebar surface actions', () => {
+describe('AppSidebar shadcn Base UI boundary', () => {
+  it('uses shadcn Base UI primitives for sidebar surface actions', () => {
     const source = fs.readFileSync(appSidebarPath, 'utf8');
 
-    expect(source).toContain("from '@heroui/react'");
+    expect(source).toContain('@/components/ui/button.jsx');
+    expect(source).toContain('@/components/ui/tooltip.jsx');
     expect(source).toContain('Button');
     expect(source).toContain('Tooltip');
-    expect(source).not.toContain('@/components/ui/');
+    expect(source).not.toContain('@heroui');
+    expect(source).not.toMatch(/rounded-|border-radius|borderRadius/);
   });
 
   it('uses button semantics instead of anchor-style surface controls', () => {
     const source = fs.readFileSync(appSidebarPath, 'utf8');
 
-    expect(source).toContain('onPress={() => onSelectSurface(surfaceId)}');
+    expect(source).toContain('onClick={() => onSelectSurface(surfaceId)}');
     expect(source).not.toMatch(/<a(?=[\s>])/);
     expect(source).not.toContain('href={item.href}');
   });
@@ -27,7 +29,7 @@ describe('AppSidebar HeroUI migration boundary', () => {
     const source = fs.readFileSync(appSidebarPath, 'utf8');
 
     expect(source).toContain('active:scale-[0.96]');
-    expect(source).toContain('data-[pressed=true]:scale-[0.96]');
+    expect(source).toContain('data-pressed:scale-[0.96]');
     expect(source).toContain('bg-accent-soft');
     expect(source).toContain('bg-accent-soft-hover');
     expect(source).toContain('text-accent-soft-foreground');

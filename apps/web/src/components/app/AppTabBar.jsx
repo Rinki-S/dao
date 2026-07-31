@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Button } from '@heroui/react';
+import { Button } from '@/components/ui/button.jsx';
 
 export function AppTabBar({ tabs, activeTabId, onSelectTab, onCloseTab }) {
   const tabListRef = useRef(null);
@@ -48,11 +48,11 @@ export function AppTabBar({ tabs, activeTabId, onSelectTab, onCloseTab }) {
                 </button>
                 <Button
                   aria-label={`Close ${tab.title} tab`}
-                  className="size-5 min-w-0 rounded-md p-0 text-muted-foreground opacity-70 transition-opacity hover:text-foreground group-hover:opacity-100"
-                  size="sm"
+                  className="text-muted-foreground opacity-70 transition-opacity hover:text-foreground group-hover:opacity-100"
+                  size="icon-xs"
                   type="button"
                   variant="ghost"
-                  onPress={() => onCloseTab(tab.id)}
+                  onClick={() => onCloseTab(tab.id)}
                 >
                   <span aria-hidden="true" className="text-sm leading-none">
                     ×

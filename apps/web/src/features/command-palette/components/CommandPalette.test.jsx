@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CommandPalette } from './CommandPalette.jsx';
@@ -30,39 +30,33 @@ describe('CommandPalette', () => {
     vi.restoreAllMocks();
   });
 
-  it('uses cmdk directly with a HeroUI shell instead of the legacy command wrappers', () => {
+  it('uses the shadcn command, dialog, and keyboard wrappers', () => {
     const source = fs.readFileSync(commandPalettePath, 'utf8');
 
-    expect(source).toContain("from '@heroui/react'");
-    expect(source).toContain("from 'cmdk'");
-    expect(source).toContain('CommandPrimitive');
-    expect(source).toContain('Modal');
+    expect(source).toContain('@/components/ui/command.jsx');
+    expect(source).toContain('@/components/ui/kbd.jsx');
+    expect(source).toContain('CommandDialog');
+    expect(source).toContain('CommandItem');
     expect(source).toContain('Kbd');
-    expect(source).not.toContain('@/components/ui/command');
-    expect(source).not.toContain('@/components/ui/kbd');
+    expect(source).not.toContain('@heroui');
+    expect(source).not.toMatch(/rounded-|border-radius|borderRadius/);
   });
 
-  it('uses HeroUI color tokens for the cmdk surface', () => {
+  it('uses shadcn semantic color tokens for the cmdk surface', () => {
     const source = fs.readFileSync(commandPalettePath, 'utf8');
 
-    expect(source).toContain('bg-surface');
-    expect(source).toContain('text-surface-foreground');
-    expect(source).toContain('bg-field');
-    expect(source).toContain('text-field-foreground');
-    expect(source).toContain('placeholder:text-field-placeholder');
+    expect(source).toContain('text-popover-foreground');
+    expect(source).toContain('text-muted-foreground');
     expect(source).toContain('bg-accent-soft');
-    expect(source).toContain('text-danger');
-    expect(source).not.toMatch(
-      /\b(bg-popover|text-popover-foreground|border-input|bg-input|border-ring|ring-ring|bg-muted|text-destructive|text-muted-foreground)\b/,
-    );
+    expect(source).toContain('text-destructive');
   });
 
   it('centers above the app titlebar overlay layer', () => {
     const source = fs.readFileSync(commandPalettePath, 'utf8');
 
-    expect(source).toContain('<Modal.Backdrop className="z-[200]!"');
-    expect(source).toContain('<Modal.Container placement="center" size="sm">');
-    expect(source).not.toContain('placement="top"');
+    expect(source).toContain('className="top-1/2 z-[201] max-w-sm -translate-y-1/2"');
+    expect(source).toContain('overlayClassName="z-[200]"');
+    expect(source).not.toContain('top-1/3');
   });
 
   it('opens with the command palette shortcut and closes with Escape', async () => {
@@ -78,7 +72,9 @@ describe('CommandPalette', () => {
 
     await user.keyboard('{Escape}');
 
-    expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+    });
   });
 
   it('filters commands from the query input', async () => {
@@ -116,7 +112,9 @@ describe('CommandPalette', () => {
     await user.keyboard('{Enter}');
 
     expect(window.location.hash).toBe('#settings');
-    expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+    });
   });
 
   it('moves selection with arrow keys before running a command', async () => {
@@ -146,7 +144,9 @@ describe('CommandPalette', () => {
       'switch-workspace',
       expect.objectContaining({ id: 'switch-workspace' }),
     );
-    expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+    });
   });
 
   it('runs the create workspace action command', async () => {

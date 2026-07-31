@@ -1,27 +1,43 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Button,
-  Checkbox,
-  Dropdown,
-  FieldError,
-  Form,
-  Input,
-  Label,
-  ListBox,
-  Modal,
+  IconFilePlus,
+  IconFolder,
+  IconFolderOpen,
+  IconPencil,
+  IconPlus,
+  IconTrash,
+} from '@tabler/icons-react';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import {
   Select,
-  Skeleton,
-  TextArea,
-  TextField,
-  Tooltip,
-} from '@heroui/react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
-import Delete02Icon from '@hugeicons/core-free-icons/Delete02Icon';
-import Edit02Icon from '@hugeicons/core-free-icons/Edit02Icon';
-import Folder01Icon from '@hugeicons/core-free-icons/Folder01Icon';
-import FolderOpenIcon from '@hugeicons/core-free-icons/FolderOpenIcon';
-import NoteAddIcon from '@hugeicons/core-free-icons/NoteAddIcon';
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getContentFormatIcon } from '@/extensions/registry.js';
 import { notifyActivityChanged, subscribeToActivityChanged } from '@/features/activities/events.js';
 import { createNote, deleteNote, listNotes, updateNote } from '@/features/notes/api.js';
@@ -32,6 +48,13 @@ import {
   updateProject,
 } from '@/features/projects/api.js';
 import { AppApiErrorMessage } from './AppApiErrorMessage.jsx';
+
+const contentTypeOptions = [
+  { label: 'Note', value: 'note' },
+  { label: 'GitHub integration', value: 'github', disabled: true },
+  { label: 'Website', value: 'website', disabled: true },
+  { label: 'LeetCode', value: 'leetcode', disabled: true },
+];
 
 const noteTypeOptions = [
   { label: 'General', value: 'general' },
@@ -60,15 +83,17 @@ export function ProjectTree({
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [isContentDialogOpen, setIsContentDialogOpen] = useState(false);
   const [projectName, setProjectName] = useState('');
+  const [projectNameError, setProjectNameError] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [contentType, setContentType] = useState('note');
   const [contentProjectId, setContentProjectId] = useState('none');
   const [noteTitle, setNoteTitle] = useState('');
+  const [noteTitleError, setNoteTitleError] = useState('');
   const [noteContent, setNoteContent] = useState('');
   const [noteType, setNoteType] = useState('general');
-  const [treeContextMenu, setTreeContextMenu] = useState(null);
   const [renameTarget, setRenameTarget] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const [renameFieldError, setRenameFieldError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteProjectNotes, setDeleteProjectNotes] = useState(false);
   const [treeActionError, setTreeActionError] = useState('');
@@ -111,6 +136,14 @@ export function ProjectTree({
 
     return notes.filter((note) => note.workspaceId === currentWorkspace.id && !note.projectId);
   }, [currentWorkspace, notes]);
+
+  const projectOptions = useMemo(
+    () => [
+      { label: 'No project', value: 'none' },
+      ...workspaceProjects.map((project) => ({ label: project.name, value: project.id })),
+    ],
+    [workspaceProjects],
+  );
 
   const deleteProjectNoteCount =
     deleteTarget?.type === 'project'
@@ -161,10 +194,19 @@ export function ProjectTree({
     };
   }, [currentWorkspace, loadTreeData]);
 
+  function openProjectDialog() {
+    setProjectName('');
+    setProjectNameError('');
+    setProjectDescription('');
+    setProjectCreateError('');
+    setIsProjectDialogOpen(true);
+  }
+
   function openContentDialog(projectId = selectedProjectId) {
     setContentProjectId(projectId || 'none');
     setContentType('note');
     setNoteTitle('');
+    setNoteTitleError('');
     setNoteContent('');
     setNoteType('general');
     setContentCreateError('');
@@ -195,6 +237,11 @@ export function ProjectTree({
       return;
     }
 
+    if (!projectName.trim()) {
+      setProjectNameError('Project name is required');
+      return;
+    }
+
     try {
       setIsCreatingProject(true);
       setProjectCreateError('');
@@ -206,6 +253,7 @@ export function ProjectTree({
       });
 
       setProjectName('');
+      setProjectNameError('');
       setProjectDescription('');
       setIsProjectDialogOpen(false);
       onSelectProject(createdProject);
@@ -237,6 +285,11 @@ export function ProjectTree({
       return;
     }
 
+    if (!noteTitle.trim()) {
+      setNoteTitleError('Note title is required');
+      return;
+    }
+
     try {
       setIsCreatingContent(true);
       setContentCreateError('');
@@ -251,6 +304,7 @@ export function ProjectTree({
       });
 
       setNoteTitle('');
+      setNoteTitleError('');
       setNoteContent('');
       setNoteType('general');
       setIsContentDialogOpen(false);
@@ -274,66 +328,17 @@ export function ProjectTree({
     }
   }
 
-  function openTreeContextMenu(event, type, item) {
-    event.preventDefault();
-    event.stopPropagation();
-    setTreeActionError('');
-
-    const treeRoot = event.currentTarget.closest('[data-slot="project-tree"]');
-    const treeRect = treeRoot?.getBoundingClientRect();
-
-    setTreeContextMenu({
-      x: treeRect ? event.clientX - treeRect.left : event.clientX,
-      y: treeRect ? event.clientY - treeRect.top : event.clientY,
-      type,
-      item,
-    });
-  }
-
-  function closeTreeContextMenu() {
-    setTreeContextMenu(null);
-  }
-
   function openRenameDialog(type, item) {
-    closeTreeContextMenu();
     setRenameTarget({ type, item });
     setRenameValue(type === 'project' ? item.name : item.title);
+    setRenameFieldError('');
     setTreeActionError('');
   }
 
   function openDeleteDialog(type, item) {
-    closeTreeContextMenu();
     setDeleteTarget({ type, item });
     setDeleteProjectNotes(false);
     setTreeActionError('');
-  }
-
-  function handleTreeContextMenuAction(actionKey) {
-    if (!treeContextMenu) return;
-
-    const { type, item } = treeContextMenu;
-
-    if (actionKey === 'open') {
-      closeTreeContextMenu();
-      if (type === 'project') onSelectProject(item);
-      if (type === 'note') onSelectNote(item);
-      return;
-    }
-
-    if (actionKey === 'new-note' && type === 'project') {
-      closeTreeContextMenu();
-      openContentDialog(item.id);
-      return;
-    }
-
-    if (actionKey === 'rename') {
-      openRenameDialog(type, item);
-      return;
-    }
-
-    if (actionKey === 'delete') {
-      openDeleteDialog(type, item);
-    }
   }
 
   async function handleRenameSubmit(event) {
@@ -342,7 +347,7 @@ export function ProjectTree({
 
     const nextValue = renameValue.trim();
     if (!nextValue) {
-      setTreeActionError(
+      setRenameFieldError(
         renameTarget.type === 'project' ? 'Project name is required' : 'Note title is required',
       );
       return;
@@ -358,6 +363,7 @@ export function ProjectTree({
       }
       setRenameTarget(null);
       setRenameValue('');
+      setRenameFieldError('');
       await loadTreeData();
       notifyActivityChanged();
     } catch (err) {
@@ -390,537 +396,520 @@ export function ProjectTree({
     }
   }
 
-  return (
-    <section data-slot="project-tree" className="relative flex w-full min-w-0 flex-col p-2">
-      <div
-        className={`flex h-8 items-center justify-between gap-2 px-2 text-xs font-medium text-sidebar-foreground/70 transition-[margin,opacity] duration-200 ease-linear ${!isSidebarOpen ? '-mt-8 opacity-0' : ''}`}
-      >
-        <span>Projects</span>
-        <div className="flex items-center gap-1">
-          <Button
-            aria-label="Create project"
-            className="app-no-drag size-7 min-w-0 transform-gpu p-0 transition-[background-color,color,scale] duration-[250ms] ease-[var(--ease-smooth)] active:scale-[0.96] active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[pressed=true]:scale-[0.96] data-[pressed=true]:bg-sidebar-accent data-[pressed=true]:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100"
-            isDisabled={!currentWorkspace}
-            isIconOnly
-            size="sm"
-            type="button"
-            variant="ghost"
-            onPress={() => {
-              setProjectCreateError('');
-              setIsProjectDialogOpen(true);
+  function renderTreeContextMenu(type, item) {
+    return (
+      <ContextMenuContent className="w-44">
+        <ContextMenuGroup>
+          <ContextMenuItem
+            label="Open"
+            onClick={() => {
+              if (type === 'project') onSelectProject(item);
+              if (type === 'note') onSelectNote(item);
             }}
           >
-            <HugeiconsIcon
-              icon={Add01Icon}
-              aria-hidden="true"
-              className="size-[18px] shrink-0 translate-y-px"
-            />
-          </Button>
-          <Button
-            aria-label="Create content"
-            className="app-no-drag size-7 min-w-0 transform-gpu p-0 transition-[background-color,color,scale] duration-[250ms] ease-[var(--ease-smooth)] active:scale-[0.96] active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[pressed=true]:scale-[0.96] data-[pressed=true]:bg-sidebar-accent data-[pressed=true]:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100"
-            isDisabled={!currentWorkspace}
-            isIconOnly
-            size="sm"
-            type="button"
-            variant="ghost"
-            onPress={() => openContentDialog()}
+            Open
+          </ContextMenuItem>
+          {type === 'project' && (
+            <ContextMenuItem label="New note" onClick={() => openContentDialog(item.id)}>
+              <IconFilePlus aria-hidden="true" data-icon="inline-start" />
+              New note
+            </ContextMenuItem>
+          )}
+          <ContextMenuItem label="Rename" onClick={() => openRenameDialog(type, item)}>
+            <IconPencil aria-hidden="true" data-icon="inline-start" />
+            Rename
+          </ContextMenuItem>
+          <ContextMenuItem
+            label="Delete"
+            variant="destructive"
+            onClick={() => openDeleteDialog(type, item)}
           >
-            <HugeiconsIcon
-              icon={NoteAddIcon}
-              aria-hidden="true"
-              className="size-[18px] shrink-0 translate-y-px"
-            />
-          </Button>
+            <IconTrash aria-hidden="true" data-icon="inline-start" />
+            Delete
+          </ContextMenuItem>
+        </ContextMenuGroup>
+      </ContextMenuContent>
+    );
+  }
+
+  return (
+    <TooltipProvider delay={0}>
+      <section data-slot="project-tree" className="relative flex w-full min-w-0 flex-col p-2">
+        <div
+          className={`flex h-8 items-center justify-between gap-2 px-2 text-xs font-medium text-sidebar-foreground/70 transition-[margin,opacity] duration-200 ease-linear ${!isSidebarOpen ? '-mt-8 opacity-0' : ''}`}
+        >
+          <span>Projects</span>
+          <div className="flex items-center gap-1">
+            <Button
+              aria-label="Create project"
+              className="app-no-drag size-7 transform-gpu p-0 motion-colors active:scale-[0.96] active:bg-sidebar-accent active:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100"
+              disabled={!currentWorkspace}
+              size="icon"
+              type="button"
+              variant="ghost"
+              onClick={openProjectDialog}
+            >
+              <IconPlus
+                aria-hidden="true"
+                className="size-[18px] shrink-0 translate-y-px"
+                data-icon="inline-start"
+              />
+            </Button>
+            <Button
+              aria-label="Create content"
+              className="app-no-drag size-7 transform-gpu p-0 motion-colors active:scale-[0.96] active:bg-sidebar-accent active:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100"
+              disabled={!currentWorkspace}
+              size="icon"
+              type="button"
+              variant="ghost"
+              onClick={() => openContentDialog()}
+            >
+              <IconFilePlus
+                aria-hidden="true"
+                className="size-[18px] shrink-0 translate-y-px"
+                data-icon="inline-start"
+              />
+            </Button>
+          </div>
         </div>
-      </div>
-      <div className="w-full text-sm">
-        <ul className="flex w-full min-w-0 flex-col gap-0">
-          {status === 'loading' && (
-            <li className="relative">
-              <div className="flex flex-col gap-2 px-2 py-1">
-                <div className="flex items-center gap-2">
-                  <Skeleton className="size-[18px] rounded" />
-                  <Skeleton className="h-4 w-32 rounded" />
+
+        <div className="w-full text-sm">
+          <ul className="flex w-full min-w-0 flex-col gap-0">
+            {status === 'loading' && (
+              <li className="relative">
+                <div className="flex flex-col gap-2 px-2 py-1">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="size-[18px]" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="size-[18px]" />
+                    <Skeleton className="h-4 w-28" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="size-[18px]" />
+                    <Skeleton className="h-4 w-36" />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Skeleton className="size-[18px] rounded" />
-                  <Skeleton className="h-4 w-28 rounded" />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Skeleton className="size-[18px] rounded" />
-                  <Skeleton className="h-4 w-36 rounded" />
-                </div>
-              </div>
-            </li>
-          )}
-
-          {status === 'error' && (
-            <li className="relative">
-              <AppApiErrorMessage className="block px-2 py-1 text-xs">
-                {treeError}
-              </AppApiErrorMessage>
-            </li>
-          )}
-
-          {status === 'ready' && workspaceProjects.length === 0 && unassignedNotes.length === 0 && (
-            <li className="relative">
-              <span className="block px-2 py-1 text-xs text-muted-foreground">No projects</span>
-            </li>
-          )}
-
-          {workspaceProjects.map((project) => {
-            const isExpanded = expandedProjectIds.has(project.id);
-            const projectNotes = notesByProjectId.get(project.id) ?? [];
-            const projectIcon = isExpanded ? FolderOpenIcon : Folder01Icon;
-
-            return (
-              <li key={project.id} className="relative">
-                <ProjectTreeButton
-                  icon={projectIcon}
-                  isActive={project.id === selectedProjectId}
-                  isSidebarOpen={isSidebarOpen}
-                  label={project.name}
-                  onClick={() => toggleProject(project)}
-                  onContextMenu={(event) => openTreeContextMenu(event, 'project', project)}
-                />
-
-                {isExpanded && isSidebarOpen && (
-                  <ul className="mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5">
-                    {projectNotes.length === 0 && (
-                      <li className="relative">
-                        <span className="block px-2 py-1 text-xs text-muted-foreground">
-                          No notes
-                        </span>
-                      </li>
-                    )}
-
-                    {projectNotes.map((note) => {
-                      const ContentIcon = getContentFormatIcon(note.contentType);
-
-                      return (
-                        <li key={note.id} className="relative">
-                          <Button
-                            className={`app-no-drag flex h-7 w-full min-w-0 -translate-x-px transform-gpu items-center justify-start gap-2 overflow-hidden rounded-md px-2 text-sm font-normal text-sidebar-foreground ring-sidebar-ring outline-hidden transition-[background-color,color,scale] duration-[250ms] ease-[var(--ease-smooth)] data-[focus-visible=true]:ring-2 active:scale-[0.96] data-[pressed=true]:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100 ${note.id === selectedNoteId ? 'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground data-[pressed=true]:bg-accent-soft-hover data-[pressed=true]:text-accent-soft-foreground' : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[pressed=true]:bg-sidebar-accent data-[pressed=true]:text-sidebar-accent-foreground'}`}
-                            type="button"
-                            variant="ghost"
-                            onContextMenu={(event) => openTreeContextMenu(event, 'note', note)}
-                            onPress={() => onSelectNote(note)}
-                          >
-                            <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
-                            <span className="truncate">{note.title}</span>
-                          </Button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
               </li>
-            );
-          })}
+            )}
 
-          {status === 'ready' &&
-            unassignedNotes.map((note) => {
-              const ContentIcon = getContentFormatIcon(note.contentType);
+            {status === 'error' && (
+              <li className="relative">
+                <AppApiErrorMessage className="block px-2 py-1 text-xs">
+                  {treeError}
+                </AppApiErrorMessage>
+              </li>
+            )}
+
+            {status === 'ready' &&
+              workspaceProjects.length === 0 &&
+              unassignedNotes.length === 0 && (
+                <li className="relative">
+                  <span className="block px-2 py-1 text-xs text-muted-foreground">No projects</span>
+                </li>
+              )}
+
+            {workspaceProjects.map((project) => {
+              const isExpanded = expandedProjectIds.has(project.id);
+              const projectNotes = notesByProjectId.get(project.id) ?? [];
+              const ProjectIcon = isExpanded ? IconFolderOpen : IconFolder;
 
               return (
-                <li key={note.id} className="relative">
-                  <ProjectTreeButton
-                    icon={ContentIcon}
-                    isActive={note.id === selectedNoteId}
-                    isSidebarOpen={isSidebarOpen}
-                    label={note.title}
-                    onClick={() => onSelectNote(note)}
-                    onContextMenu={(event) => openTreeContextMenu(event, 'note', note)}
-                  />
+                <li key={project.id} className="relative">
+                  <ContextMenu>
+                    <ContextMenuTrigger className="contents">
+                      <ProjectTreeButton
+                        icon={ProjectIcon}
+                        isActive={project.id === selectedProjectId}
+                        isSidebarOpen={isSidebarOpen}
+                        label={project.name}
+                        onClick={() => toggleProject(project)}
+                      />
+                    </ContextMenuTrigger>
+                    {renderTreeContextMenu('project', project)}
+                  </ContextMenu>
+
+                  {isExpanded && isSidebarOpen && (
+                    <ul className="mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5">
+                      {projectNotes.length === 0 && (
+                        <li className="relative">
+                          <span className="block px-2 py-1 text-xs text-muted-foreground">
+                            No notes
+                          </span>
+                        </li>
+                      )}
+
+                      {projectNotes.map((note) => {
+                        const ContentIcon = getContentFormatIcon(note.contentType);
+
+                        return (
+                          <li key={note.id} className="relative">
+                            <ContextMenu>
+                              <ContextMenuTrigger className="contents">
+                                <Button
+                                  className={`app-no-drag flex h-7 w-full min-w-0 -translate-x-px transform-gpu items-center justify-start gap-2 overflow-hidden px-2 text-sm font-normal text-sidebar-foreground ring-sidebar-ring outline-hidden motion-colors focus-visible:ring-2 active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 ${note.id === selectedNoteId ? 'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground' : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground'}`}
+                                  type="button"
+                                  variant="ghost"
+                                  onClick={() => onSelectNote(note)}
+                                >
+                                  <ContentIcon
+                                    aria-hidden="true"
+                                    className="size-[18px] shrink-0"
+                                    data-icon="inline-start"
+                                  />
+                                  <span className="truncate">{note.title}</span>
+                                </Button>
+                              </ContextMenuTrigger>
+                              {renderTreeContextMenu('note', note)}
+                            </ContextMenu>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </li>
               );
             })}
-        </ul>
-      </div>
 
-      <Dropdown
-        isOpen={Boolean(treeContextMenu)}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            closeTreeContextMenu();
-          }
-        }}
-      >
-        <Button
-          aria-label="File tree context menu"
-          className="absolute z-50 size-px opacity-0"
-          isIconOnly
-          style={{
-            left: treeContextMenu?.x ?? 0,
-            top: treeContextMenu?.y ?? 0,
+            {status === 'ready' &&
+              unassignedNotes.map((note) => {
+                const ContentIcon = getContentFormatIcon(note.contentType);
+
+                return (
+                  <li key={note.id} className="relative">
+                    <ContextMenu>
+                      <ContextMenuTrigger className="contents">
+                        <ProjectTreeButton
+                          icon={ContentIcon}
+                          isActive={note.id === selectedNoteId}
+                          isSidebarOpen={isSidebarOpen}
+                          label={note.title}
+                          onClick={() => onSelectNote(note)}
+                        />
+                      </ContextMenuTrigger>
+                      {renderTreeContextMenu('note', note)}
+                    </ContextMenu>
+                  </li>
+                );
+              })}
+          </ul>
+        </div>
+
+        <Dialog
+          open={Boolean(renameTarget)}
+          onOpenChange={(open) => {
+            if (!open && !isTreeActionPending) {
+              setRenameTarget(null);
+              setRenameFieldError('');
+              setTreeActionError('');
+            }
           }}
-          type="button"
-          variant="ghost"
         >
-          <span className="sr-only">File tree context menu</span>
-        </Button>
-        <Dropdown.Popover className="w-44" placement="bottom start">
-          <Dropdown.Menu aria-label="File tree actions" onAction={handleTreeContextMenuAction}>
-            <Dropdown.Item id="open" textValue="Open">
-              <Label>Open</Label>
-            </Dropdown.Item>
-            {treeContextMenu?.type === 'project' && (
-              <Dropdown.Item id="new-note" textValue="New note">
-                <HugeiconsIcon icon={NoteAddIcon} aria-hidden="true" className="size-4" />
-                <Label>New note</Label>
-              </Dropdown.Item>
-            )}
-            <Dropdown.Item id="rename" textValue="Rename">
-              <HugeiconsIcon icon={Edit02Icon} aria-hidden="true" className="size-4" />
-              <Label>Rename</Label>
-            </Dropdown.Item>
-            <Dropdown.Item
-              id="delete"
-              className="hover:bg-danger-soft-hover data-[hovered=true]:bg-danger-soft-hover data-[pressed=true]:bg-danger-soft-hover"
-              textValue="Delete"
-              variant="danger"
-            >
-              <HugeiconsIcon
-                icon={Delete02Icon}
-                aria-hidden="true"
-                className="size-4 text-danger"
-              />
-              <Label>Delete</Label>
-            </Dropdown.Item>
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
+          <DialogContent
+            aria-label={renameTarget?.type === 'project' ? 'Rename project' : 'Rename note'}
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {renameTarget?.type === 'project' ? 'Rename project' : 'Rename note'}
+              </DialogTitle>
+            </DialogHeader>
 
-      <Modal
-        isOpen={Boolean(renameTarget)}
-        onOpenChange={(isOpen) => !isOpen && setRenameTarget(null)}
-      >
-        <Modal.Backdrop>
-          <Modal.Container size="sm">
-            <Modal.Dialog
-              aria-label={renameTarget?.type === 'project' ? 'Rename project' : 'Rename note'}
-            >
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Heading>
-                  {renameTarget?.type === 'project' ? 'Rename project' : 'Rename note'}
-                </Modal.Heading>
-              </Modal.Header>
-
-              <Form validationBehavior="native" onSubmit={handleRenameSubmit}>
-                <Modal.Body className="flex flex-col gap-3">
-                  <TextField
-                    fullWidth
-                    isDisabled={isTreeActionPending}
-                    isRequired
+            <form className="flex flex-col gap-4" onSubmit={handleRenameSubmit}>
+              <FieldGroup>
+                <Field data-invalid={Boolean(renameFieldError)}>
+                  <FieldLabel htmlFor="sidebar-tree-rename">
+                    {renameTarget?.type === 'project' ? 'Name' : 'Title'}
+                  </FieldLabel>
+                  <Input
+                    id="sidebar-tree-rename"
+                    aria-describedby={renameFieldError ? 'sidebar-tree-rename-error' : undefined}
+                    aria-invalid={Boolean(renameFieldError)}
+                    disabled={isTreeActionPending}
                     name="sidebar-tree-rename"
-                    validate={(value) =>
-                      value.trim()
-                        ? null
-                        : renameTarget?.type === 'project'
-                          ? 'Project name is required'
-                          : 'Note title is required'
-                    }
+                    required
                     value={renameValue}
-                    onChange={setRenameValue}
-                  >
-                    <Label>{renameTarget?.type === 'project' ? 'Name' : 'Title'}</Label>
-                    <Input variant="secondary" />
-                    <FieldError />
-                  </TextField>
+                    onChange={(event) => {
+                      setRenameValue(event.target.value);
+                      setRenameFieldError('');
+                    }}
+                  />
+                  <FieldError id="sidebar-tree-rename-error">{renameFieldError}</FieldError>
+                </Field>
+              </FieldGroup>
 
-                  <AppApiErrorMessage>{treeActionError}</AppApiErrorMessage>
-                </Modal.Body>
-                <Modal.Footer>
-                  <Button
-                    isDisabled={isTreeActionPending}
-                    isPending={isTreeActionPending}
-                    type="submit"
-                  >
-                    {isTreeActionPending ? 'Renaming...' : 'Rename'}
-                  </Button>
-                </Modal.Footer>
-              </Form>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+              <AppApiErrorMessage>{treeActionError}</AppApiErrorMessage>
 
-      <Modal
-        isOpen={Boolean(deleteTarget)}
-        onOpenChange={(isOpen) => !isOpen && setDeleteTarget(null)}
-      >
-        <Modal.Backdrop>
-          <Modal.Container size="sm">
-            <Modal.Dialog
-              aria-label={deleteTarget?.type === 'project' ? 'Delete project' : 'Delete note'}
-            >
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Heading>
-                  {deleteTarget?.type === 'project' ? 'Delete project' : 'Delete note'}
-                </Modal.Heading>
-                <p className="text-sm text-muted-foreground text-pretty">
-                  {deleteTarget?.type === 'project'
-                    ? `Delete ${deleteTarget.item.name}? This project contains ${deleteProjectNoteCount} note${deleteProjectNoteCount === 1 ? '' : 's'}.`
-                    : `Delete ${deleteTarget?.item.title}?`}
-                </p>
-              </Modal.Header>
+              <DialogFooter>
+                <Button disabled={isTreeActionPending} type="submit">
+                  {isTreeActionPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
+                  {isTreeActionPending ? 'Renaming...' : 'Rename'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
-              <Form validationBehavior="native" onSubmit={handleDeleteSubmit}>
-                <Modal.Body className="flex flex-col gap-3">
-                  {deleteTarget?.type === 'project' && deleteProjectNoteCount > 0 && (
-                    <Checkbox isSelected={deleteProjectNotes} onChange={setDeleteProjectNotes}>
-                      <Checkbox.Control>
-                        <Checkbox.Indicator />
-                      </Checkbox.Control>
-                      <Label>Also delete notes in this project</Label>
-                    </Checkbox>
-                  )}
+        <Dialog
+          open={Boolean(deleteTarget)}
+          onOpenChange={(open) => {
+            if (!open && !isTreeActionPending) {
+              setDeleteTarget(null);
+              setDeleteProjectNotes(false);
+              setTreeActionError('');
+            }
+          }}
+        >
+          <DialogContent
+            aria-label={deleteTarget?.type === 'project' ? 'Delete project' : 'Delete note'}
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {deleteTarget?.type === 'project' ? 'Delete project' : 'Delete note'}
+              </DialogTitle>
+              <DialogDescription>
+                {deleteTarget?.type === 'project'
+                  ? `Delete ${deleteTarget.item.name}? This project contains ${deleteProjectNoteCount} note${deleteProjectNoteCount === 1 ? '' : 's'}.`
+                  : deleteTarget
+                    ? `Delete ${deleteTarget.item.title}?`
+                    : ''}
+              </DialogDescription>
+            </DialogHeader>
 
-                  <AppApiErrorMessage>{treeActionError}</AppApiErrorMessage>
-                </Modal.Body>
-                <Modal.Footer>
-                  <Button
-                    isDisabled={isTreeActionPending}
-                    isPending={isTreeActionPending}
-                    type="submit"
-                    variant="danger"
-                  >
-                    {isTreeActionPending ? 'Deleting...' : 'Delete'}
-                  </Button>
-                </Modal.Footer>
-              </Form>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+            <form className="flex flex-col gap-4" onSubmit={handleDeleteSubmit}>
+              {deleteTarget?.type === 'project' && deleteProjectNoteCount > 0 && (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="delete-project-notes"
+                    checked={deleteProjectNotes}
+                    disabled={isTreeActionPending}
+                    onCheckedChange={setDeleteProjectNotes}
+                  />
+                  <FieldLabel htmlFor="delete-project-notes">
+                    Also delete notes in this project
+                  </FieldLabel>
+                </Field>
+              )}
 
-      <Modal isOpen={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
-        <Modal.Backdrop>
-          <Modal.Container size="sm">
-            <Modal.Dialog aria-label="Create project">
-              <Modal.CloseTrigger />
-              <Modal.Header className="gap-0.5 pb-5">
-                <Modal.Heading>Create project</Modal.Heading>
-                <p className="text-sm text-muted-foreground">
-                  Add a project to the current workspace.
-                </p>
-              </Modal.Header>
+              <AppApiErrorMessage>{treeActionError}</AppApiErrorMessage>
 
-              <Form validationBehavior="native" onSubmit={handleCreateProject}>
-                <Modal.Body className="flex flex-col gap-3">
-                  <TextField
-                    fullWidth
-                    isDisabled={!currentWorkspace || isCreatingProject}
-                    isRequired
+              <DialogFooter>
+                <Button disabled={isTreeActionPending} type="submit" variant="destructive">
+                  {isTreeActionPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
+                  {isTreeActionPending ? 'Deleting...' : 'Delete'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={isProjectDialogOpen}
+          onOpenChange={(open) => {
+            if (!isCreatingProject) {
+              setIsProjectDialogOpen(open);
+            }
+          }}
+        >
+          <DialogContent aria-label="Create project">
+            <DialogHeader>
+              <DialogTitle>Create project</DialogTitle>
+              <DialogDescription>Add a project to the current workspace.</DialogDescription>
+            </DialogHeader>
+
+            <form className="flex flex-col gap-4" onSubmit={handleCreateProject}>
+              <FieldGroup>
+                <Field data-invalid={Boolean(projectNameError)}>
+                  <FieldLabel htmlFor="sidebar-project-name">Project name</FieldLabel>
+                  <Input
+                    id="sidebar-project-name"
+                    aria-describedby={projectNameError ? 'sidebar-project-name-error' : undefined}
+                    aria-invalid={Boolean(projectNameError)}
+                    disabled={!currentWorkspace || isCreatingProject}
                     name="sidebar-project-name"
-                    validate={(value) => (value.trim() ? null : 'Project name is required')}
+                    placeholder="Project name"
+                    required
                     value={projectName}
-                    onChange={setProjectName}
-                  >
-                    <Label>Project name</Label>
-                    <Input placeholder="Project name" variant="secondary" />
-                    <FieldError />
-                  </TextField>
+                    onChange={(event) => {
+                      setProjectName(event.target.value);
+                      setProjectNameError('');
+                    }}
+                  />
+                  <FieldError id="sidebar-project-name-error">{projectNameError}</FieldError>
+                </Field>
 
-                  <TextField
-                    fullWidth
-                    isDisabled={!currentWorkspace || isCreatingProject}
+                <Field>
+                  <FieldLabel htmlFor="sidebar-project-description">Description</FieldLabel>
+                  <Input
+                    id="sidebar-project-description"
+                    disabled={!currentWorkspace || isCreatingProject}
                     name="sidebar-project-description"
+                    placeholder="Description"
                     value={projectDescription}
-                    onChange={setProjectDescription}
-                  >
-                    <Label>Description</Label>
-                    <Input placeholder="Description" variant="secondary" />
-                  </TextField>
+                    onChange={(event) => setProjectDescription(event.target.value)}
+                  />
+                </Field>
+              </FieldGroup>
 
-                  <AppApiErrorMessage>{projectCreateError}</AppApiErrorMessage>
-                </Modal.Body>
+              <AppApiErrorMessage>{projectCreateError}</AppApiErrorMessage>
 
-                <Modal.Footer>
-                  <Button
-                    isDisabled={!currentWorkspace || isCreatingProject}
-                    isPending={isCreatingProject}
-                    type="submit"
-                  >
-                    {isCreatingProject ? 'Creating...' : 'Create project'}
-                  </Button>
-                </Modal.Footer>
-              </Form>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+              <DialogFooter>
+                <Button disabled={!currentWorkspace || isCreatingProject} type="submit">
+                  {isCreatingProject && <Spinner aria-hidden="true" data-icon="inline-start" />}
+                  {isCreatingProject ? 'Creating...' : 'Create project'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
-      <Modal isOpen={isContentDialogOpen} onOpenChange={setIsContentDialogOpen}>
-        <Modal.Backdrop>
-          <Modal.Container size="sm">
-            <Modal.Dialog aria-label="Create content">
-              <Modal.CloseTrigger />
-              <Modal.Header className="gap-0.5 pb-5">
-                <Modal.Heading>Create content</Modal.Heading>
-                <p className="text-sm text-muted-foreground">
-                  Add a note now, with room for integrations later.
-                </p>
-              </Modal.Header>
+        <Dialog
+          open={isContentDialogOpen}
+          onOpenChange={(open) => {
+            if (!isCreatingContent) {
+              setIsContentDialogOpen(open);
+            }
+          }}
+        >
+          <DialogContent aria-label="Create content">
+            <DialogHeader>
+              <DialogTitle>Create content</DialogTitle>
+              <DialogDescription>
+                Add a note now, with room for integrations later.
+              </DialogDescription>
+            </DialogHeader>
 
-              <Form validationBehavior="native" onSubmit={handleCreateContent}>
-                <Modal.Body className="flex flex-col gap-3">
+            <form className="flex flex-col gap-4" onSubmit={handleCreateContent}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="sidebar-content-type">Content type</FieldLabel>
                   <Select
-                    fullWidth
-                    disabledKeys={['github', 'website', 'leetcode']}
-                    selectedKey={contentType}
-                    variant="secondary"
-                    onSelectionChange={(key) => setContentType(String(key ?? 'note'))}
+                    items={contentTypeOptions}
+                    value={contentType}
+                    onValueChange={(value) => setContentType(String(value ?? 'note'))}
                   >
-                    <Label>Content type</Label>
-                    <Select.Trigger>
-                      <Select.Value />
-                      <Select.Indicator />
-                    </Select.Trigger>
-                    <Select.Popover>
-                      <ListBox>
-                        <ListBox.Item id="note" textValue="Note">
-                          Note
-                          <ListBox.ItemIndicator />
-                        </ListBox.Item>
-                        <ListBox.Item id="github" textValue="GitHub integration">
-                          GitHub integration
-                          <ListBox.ItemIndicator />
-                        </ListBox.Item>
-                        <ListBox.Item id="website" textValue="Website">
-                          Website
-                          <ListBox.ItemIndicator />
-                        </ListBox.Item>
-                        <ListBox.Item id="leetcode" textValue="LeetCode">
-                          LeetCode
-                          <ListBox.ItemIndicator />
-                        </ListBox.Item>
-                      </ListBox>
-                    </Select.Popover>
-                  </Select>
-
-                  <Select
-                    fullWidth
-                    selectedKey={contentProjectId}
-                    variant="secondary"
-                    onSelectionChange={(key) => setContentProjectId(String(key ?? 'none'))}
-                  >
-                    <Label>Project</Label>
-                    <Select.Trigger>
-                      <Select.Value />
-                      <Select.Indicator />
-                    </Select.Trigger>
-                    <Select.Popover>
-                      <ListBox>
-                        <ListBox.Item id="none" textValue="No project">
-                          No project
-                          <ListBox.ItemIndicator />
-                        </ListBox.Item>
-                        {workspaceProjects.map((project) => (
-                          <ListBox.Item key={project.id} id={project.id} textValue={project.name}>
-                            {project.name}
-                            <ListBox.ItemIndicator />
-                          </ListBox.Item>
-                        ))}
-                      </ListBox>
-                    </Select.Popover>
-                  </Select>
-
-                  <TextField
-                    fullWidth
-                    isDisabled={!currentWorkspace || isCreatingContent}
-                    isRequired
-                    name="sidebar-note-title"
-                    validate={(value) => (value.trim() ? null : 'Note title is required')}
-                    value={noteTitle}
-                    onChange={setNoteTitle}
-                  >
-                    <Label>Note title</Label>
-                    <Input placeholder="Note title" variant="secondary" />
-                    <FieldError />
-                  </TextField>
-
-                  <Select
-                    fullWidth
-                    selectedKey={noteType}
-                    variant="secondary"
-                    onSelectionChange={(key) => setNoteType(String(key ?? 'general'))}
-                  >
-                    <Label>Note type</Label>
-                    <Select.Trigger>
-                      <Select.Value />
-                      <Select.Indicator />
-                    </Select.Trigger>
-                    <Select.Popover>
-                      <ListBox>
-                        {noteTypeOptions.map((option) => (
-                          <ListBox.Item
+                    <SelectTrigger id="sidebar-content-type" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {contentTypeOptions.map((option) => (
+                          <SelectItem
                             key={option.value}
-                            id={option.value}
-                            textValue={option.label}
+                            disabled={option.disabled}
+                            value={option.value}
                           >
                             {option.label}
-                            <ListBox.ItemIndicator />
-                          </ListBox.Item>
+                          </SelectItem>
                         ))}
-                      </ListBox>
-                    </Select.Popover>
+                      </SelectGroup>
+                    </SelectContent>
                   </Select>
+                </Field>
 
-                  <TextField
-                    fullWidth
-                    isDisabled={!currentWorkspace || isCreatingContent}
+                <Field>
+                  <FieldLabel htmlFor="sidebar-content-project">Project</FieldLabel>
+                  <Select
+                    items={projectOptions}
+                    value={contentProjectId}
+                    onValueChange={(value) => setContentProjectId(String(value ?? 'none'))}
+                  >
+                    <SelectTrigger id="sidebar-content-project" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {projectOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <Field data-invalid={Boolean(noteTitleError)}>
+                  <FieldLabel htmlFor="sidebar-note-title">Note title</FieldLabel>
+                  <Input
+                    id="sidebar-note-title"
+                    aria-describedby={noteTitleError ? 'sidebar-note-title-error' : undefined}
+                    aria-invalid={Boolean(noteTitleError)}
+                    disabled={!currentWorkspace || isCreatingContent}
+                    name="sidebar-note-title"
+                    placeholder="Note title"
+                    required
+                    value={noteTitle}
+                    onChange={(event) => {
+                      setNoteTitle(event.target.value);
+                      setNoteTitleError('');
+                    }}
+                  />
+                  <FieldError id="sidebar-note-title-error">{noteTitleError}</FieldError>
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor="sidebar-note-type">Note type</FieldLabel>
+                  <Select
+                    items={noteTypeOptions}
+                    value={noteType}
+                    onValueChange={(value) => setNoteType(String(value ?? 'general'))}
+                  >
+                    <SelectTrigger id="sidebar-note-type" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {noteTypeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor="sidebar-note-content">Content</FieldLabel>
+                  <Textarea
+                    id="sidebar-note-content"
+                    className="min-h-28 resize-y"
+                    disabled={!currentWorkspace || isCreatingContent}
                     name="sidebar-note-content"
+                    placeholder="Write a note..."
                     value={noteContent}
-                    onChange={setNoteContent}
-                  >
-                    <Label>Content</Label>
-                    <TextArea
-                      fullWidth
-                      className="min-h-28 resize-y"
-                      placeholder="Write a note..."
-                      variant="secondary"
-                    />
-                  </TextField>
+                    onChange={(event) => setNoteContent(event.target.value)}
+                  />
+                </Field>
+              </FieldGroup>
 
-                  <AppApiErrorMessage>{contentCreateError}</AppApiErrorMessage>
-                </Modal.Body>
+              <AppApiErrorMessage>{contentCreateError}</AppApiErrorMessage>
 
-                <Modal.Footer>
-                  <Button
-                    isDisabled={!currentWorkspace || isCreatingContent}
-                    isPending={isCreatingContent}
-                    type="submit"
-                  >
-                    {isCreatingContent ? 'Creating...' : 'Create content'}
-                  </Button>
-                </Modal.Footer>
-              </Form>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
-    </section>
+              <DialogFooter>
+                <Button disabled={!currentWorkspace || isCreatingContent} type="submit">
+                  {isCreatingContent && <Spinner aria-hidden="true" data-icon="inline-start" />}
+                  {isCreatingContent ? 'Creating...' : 'Create content'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </section>
+    </TooltipProvider>
   );
 }
 
-function ProjectTreeButton({ icon: Icon, isActive, isSidebarOpen, label, onClick, onContextMenu }) {
+function ProjectTreeButton({ icon: Icon, isActive, isSidebarOpen, label, onClick }) {
   const button = (
     <Button
-      className={`app-no-drag flex h-8 w-full transform-gpu items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[background-color,color,width,height,padding,scale] duration-[250ms] ease-[var(--ease-smooth)] data-[focus-visible=true]:ring-2 active:scale-[0.96] data-[pressed=true]:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-[pressed=true]:scale-100 ${!isSidebarOpen ? 'size-8 justify-center p-2' : 'justify-start'} ${isActive ? 'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground data-[pressed=true]:bg-accent-soft-hover data-[pressed=true]:text-accent-soft-foreground' : 'font-normal hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[pressed=true]:bg-sidebar-accent data-[pressed=true]:text-sidebar-accent-foreground'}`}
+      aria-label={label}
+      className={`app-no-drag flex h-8 w-full transform-gpu items-center gap-2 overflow-hidden p-2 text-left text-sm ring-sidebar-ring outline-hidden motion-colors-layout focus-visible:ring-2 active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 ${!isSidebarOpen ? 'size-8 justify-center p-2' : 'justify-start'} ${isActive ? 'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground' : 'font-normal hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground'}`}
       type="button"
       variant="ghost"
-      onContextMenu={onContextMenu}
-      onPress={onClick}
+      onClick={onClick}
     >
-      {Array.isArray(Icon) ? (
-        <HugeiconsIcon icon={Icon} aria-hidden="true" className="size-[18px] shrink-0" />
-      ) : (
-        <Icon aria-hidden="true" className="size-[18px] shrink-0" />
-      )}
+      <Icon aria-hidden="true" className="size-[18px] shrink-0" data-icon="inline-start" />
       <span className={`truncate ${!isSidebarOpen ? 'sr-only' : ''}`}>{label}</span>
     </Button>
   );
@@ -930,9 +919,9 @@ function ProjectTreeButton({ icon: Icon, isActive, isSidebarOpen, label, onClick
   }
 
   return (
-    <Tooltip delay={0}>
-      {button}
-      <Tooltip.Content placement="right">{label}</Tooltip.Content>
+    <Tooltip>
+      <TooltipTrigger render={button} />
+      <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
   );
 }

@@ -157,16 +157,16 @@ generic SaaS
 
 ## 6.1 Core Palette
 
-| Role | Name | Hex | Usage |
-|---|---|---:|---|
-| Primary Accent | Jade Green | `#00A86B` | Focus, active states, progress, key brand moments |
-| Accent Hover | Soft Jade | `#34C38F` | Hover, selected surfaces, subtle highlights |
-| Dark Base | Ink Black | `#111827` | Main text, dark UI, logo dark tone |
-| Dark Surface | Deep Navy | `#0B1220` | App chrome, dark mode background |
-| Soft Background | Warm Ivory | `#F7F4ED` | Light mode background, brand surfaces |
-| Text | Soft Charcoal | `#2B2F36` | Primary text in light mode |
-| Border | Stone Gray | `#9CA3AF` | Borders, inactive UI, metadata |
-| Light Border | Mist Gray | `#E5E7EB` | Dividers, subtle UI boundaries |
+| Role            | Name          |       Hex | Usage                                             |
+| --------------- | ------------- | --------: | ------------------------------------------------- |
+| Primary Accent  | Jade Green    | `#00A86B` | Focus, active states, progress, key brand moments |
+| Accent Hover    | Soft Jade     | `#34C38F` | Hover, selected surfaces, subtle highlights       |
+| Dark Base       | Ink Black     | `#111827` | Main text, dark UI, logo dark tone                |
+| Dark Surface    | Deep Navy     | `#0B1220` | App chrome, dark mode background                  |
+| Soft Background | Warm Ivory    | `#F7F4ED` | Light mode background, brand surfaces             |
+| Text            | Soft Charcoal | `#2B2F36` | Primary text in light mode                        |
+| Border          | Stone Gray    | `#9CA3AF` | Borders, inactive UI, metadata                    |
+| Light Border    | Mist Gray     | `#E5E7EB` | Dividers, subtle UI boundaries                    |
 
 ## 6.2 Color Usage Ratio
 
@@ -220,15 +220,15 @@ Avoid using Jade Green for:
 
 ```css
 :root {
-  --color-bg: #F7F4ED;
-  --color-surface: #FFFFFF;
-  --color-surface-muted: #F2EFE8;
-  --color-text: #2B2F36;
-  --color-text-muted: #6B7280;
-  --color-border: #E5E7EB;
-  --color-border-strong: #9CA3AF;
-  --color-accent: #00A86B;
-  --color-accent-hover: #34C38F;
+  --color-bg: #f7f4ed;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f2efe8;
+  --color-text: #2b2f36;
+  --color-text-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-border-strong: #9ca3af;
+  --color-accent: #00a86b;
+  --color-accent-hover: #34c38f;
   --color-focus: rgba(0, 168, 107, 0.28);
 }
 ```
@@ -237,15 +237,15 @@ Avoid using Jade Green for:
 
 ```css
 .dark {
-  --color-bg: #0B1220;
+  --color-bg: #0b1220;
   --color-surface: #111827;
-  --color-surface-muted: #1F2937;
-  --color-text: #E5E7EB;
-  --color-text-muted: #9CA3AF;
-  --color-border: #1F2937;
+  --color-surface-muted: #1f2937;
+  --color-text: #e5e7eb;
+  --color-text-muted: #9ca3af;
+  --color-border: #1f2937;
   --color-border-strong: #374151;
-  --color-accent: #00A86B;
-  --color-accent-hover: #34C38F;
+  --color-accent: #00a86b;
+  --color-accent-hover: #34c38f;
   --color-focus: rgba(0, 168, 107, 0.35);
 }
 ```
@@ -266,10 +266,10 @@ The typography should communicate:
 
 ## 7.2 Recommended Font Stack
 
-| Usage | Typeface |
-|---|---|
-| Brand / Headings | Funnel Sans Variable |
-| UI Body | Funnel Sans Variable |
+| Usage                     | Typeface                                   |
+| ------------------------- | ------------------------------------------ |
+| Brand / Headings          | Funnel Sans Variable                       |
+| UI Body                   | Funnel Sans Variable                       |
 | Code / Technical surfaces | System monospace now, JetBrains Mono later |
 
 ## 7.3 Brand Typeface
@@ -390,23 +390,32 @@ clear borders
 
 This helps Dao feel like a serious tool rather than a marketing template.
 
+The renderer sets a `14px` root font size (`html { font-size: 14px }`), so the whole rem-based type and spacing system lands at native desktop density instead of web-page scale.
+
 ## 8.4 Radius
 
-Recommended radius scale:
+All visible rounded geometry is plain CSS radius through the shared token scale. An earlier smooth-corner (clip-path) approach was removed because clipping broke element borders and focus rings; CSS radii never clip borders, rings, or scrollbars.
+
+Token scale (defined as `--radius-*` in `apps/web/src/index.css`, exposed as Tailwind `rounded-*` utilities and via the `corner` prop API in `apps/web/src/lib/corners.jsx`):
 
 ```css
---radius-xs: 4px;
---radius-sm: 6px;
---radius-md: 8px;
---radius-lg: 12px;
---radius-xl: 16px;
+xs: 4px
+sm: 6px
+md: 8px
+lg: 10px
+xl: 14px
+2xl–4xl: 18px–26px (rare, large brand surfaces only)
+pill / circle: full rounding
 ```
 
 Use:
 
-- `4px–8px` for controls
-- `8px–12px` for panels
-- `16px` only for app icon / large brand surfaces
+- `4px–8px` for controls (`xs`–`md`)
+- `10px` for panels, cards, menus, and the command palette (`lg`)
+- `14px` only for dialog-scale surfaces (`xl`)
+- `16px+` only for app icon / large brand surfaces
+
+Keep nested surfaces concentric: outer radius = inner radius + padding. The menu system follows `10px` container + `4px` padding + `6px` items.
 
 Avoid overly large rounded corners in the main application UI.
 
@@ -421,7 +430,7 @@ Prefer:
 - subtle elevation
 - background layering
 
-Recommended shadow:
+Recommended shadow (implemented as `--shadow-popover` / `--shadow-dialog` in `apps/web/src/index.css`, with dark-mode variants using deeper black instead of tinted blue):
 
 ```css
 --shadow-popover: 0 12px 32px rgba(15, 23, 42, 0.12);
@@ -435,28 +444,28 @@ Avoid heavy card shadows.
 Dao uses:
 
 ```txt
-HeroUI + Tailwind CSS + custom Dao design system
+shadcn + Base UI + Tailwind CSS + custom Dao design system
 ```
 
-HeroUI provides accessible React components built on React Aria and Tailwind CSS v4. Dao should use HeroUI as the interactive primitive layer and keep Dao-specific product composition in the application code.
+shadcn owns the local component source, while Base UI (`@base-ui/react`) provides the accessible interactive primitives. The configured component preset is `b1D0eTD6`, stored as the Base variant `base-mira`. Dao-specific product composition stays in application and feature code.
 
-Dao should use HeroUI directly in migrated product code. Do not recreate shadcn-style wrapper APIs, icon gateways, or mapping layers around HeroUI just to hide the library.
+Product code should consume the local shadcn components under `apps/web/src/components/ui`. Do not import Base primitives directly into feature code unless a missing shadcn primitive genuinely requires it.
 
-Business pages and feature components may import HeroUI components directly. Shared Dao-specific components are appropriate only when they represent real product composition, not when they merely proxy a HeroUI primitive.
+Visible rounded geometry uses the shared CSS radius token scale: Tailwind `rounded-*` utilities backed by the Dao `--radius-*` theme tokens, or the `corner` prop on `CornerSurface` / corner-aware primitives from `apps/web/src/lib/corners.jsx`. Do not use arbitrary pixel radii (`rounded-[10px]`), inline `borderRadius`, or one-off radius values for renderer surfaces. Apply radius to the actual Base UI or DOM element rather than adding structural wrappers around menus, dialogs, or form controls.
 
-When a screen needs a semantic or interactive primitive, prefer the appropriate HeroUI component and adapt it with local composition and styling. Do not hand-roll controls when HeroUI provides a maintained accessible primitive.
+Keep nested surfaces concentric: outer radius = inner radius + padding.
 
-HeroUI should be treated as the component contract and accessibility baseline. Dao should still keep its own visual identity: neutral-first surfaces, restrained jade accent, compact developer-tool density, and calm product voice.
+Base UI is the component behavior and accessibility baseline. Dao still owns its visual identity: neutral-first surfaces, the existing jade accent, Funnel Sans typography, compact developer-tool density, and a calm product voice.
 
-During the migration from the previous shadcn-style component layer, old local components may remain temporarily only as compatibility wrappers. New UI work should move toward HeroUI-backed primitives.
+Use Tabler Icons for application iconography. Mark icons inside shadcn controls with `data-icon="inline-start"` or `data-icon="inline-end"` when position affects spacing.
 
-Current migration status:
+Current component rules:
 
-- the app shell, titlebar, sidebar, workspace switcher, project tree, project contents surface, task panel, settings panel, onboarding, and command palette shell are moving through HeroUI
-- the command palette keeps `cmdk` for mature command interaction while using HeroUI modal, keyboard hint, overlay, and color styling
-- the note editor and some old local `components/ui/*` files still need migration cleanup
-- new migrated surfaces should use HeroUI semantic tokens such as `surface`, `field`, `focus`, `separator`, `muted`, `danger`, and `accent-soft`
-- avoid old shadcn-era token names in new work, including `popover`, `input`, `ring`, `destructive`, and `muted-foreground`
+- use shadcn semantic tokens such as `background`, `card`, `popover`, `input`, `ring`, `muted`, `destructive`, and `accent`
+- keep the existing `accent-soft` compatibility token for Dao's restrained selected states
+- keep `cmdk` as the command palette interaction engine through the shadcn `Command` component
+- compose Base UI triggers with `render`; never introduce Radix-style `asChild`
+- put menu items inside their required groups, give dialogs titles, and provide item collections to Base UI selects
 
 ## 9.1 Component Extraction Rule
 
@@ -544,7 +553,7 @@ Visual rules:
 - dark mode should feel premium
 - selected item uses subtle jade highlight
 - metadata uses muted text
-- keyboard hints use HeroUI `Kbd`
+- keyboard hints use the shadcn `Kbd` component
 - command behavior uses `cmdk`; do not replace it with hand-rolled keyboard selection logic unless there is a clear product reason
 
 ## 10. Motion
@@ -560,13 +569,22 @@ directional
 useful
 ```
 
-Recommended durations:
+Recommended durations (implemented as tokens in `apps/web/src/index.css`):
 
 ```css
 --motion-fast: 120ms;
 --motion-base: 180ms;
 --motion-slow: 240ms;
+--ease-smooth: cubic-bezier(0.32, 0.72, 0, 1);
 ```
+
+Motion rules:
+
+- high-frequency feedback (hover color, press scale) runs at `--motion-fast`
+- layout motion (sidebar collapse) runs at `--motion-slow`; colors never wait for layout — use the shared `motion-colors` / `motion-colors-layout` utilities instead of ad-hoc `transition-[...]` lists
+- press feedback is `scale(0.96)` everywhere; never `translate-y` sinks
+- overlay enter/exit animations (dialog, menu, popover, select, tooltip) run at `--motion-fast` and must include `motion-reduce:animate-none`
+- never use `transition-all`; list exact properties
 
 Use motion for:
 
@@ -596,7 +614,7 @@ Icon style should be:
 Recommended icon library:
 
 ```txt
-hugeicons
+Tabler Icons
 ```
 
 Icon style:
@@ -699,8 +717,9 @@ Social preview should include:
 - use red-and-gold festival colors
 - make everything green
 - copy default component-library style
-- copy default HeroUI examples without adapting them to Dao's product density and tone
-- create wrapper or mapping layers that merely hide HeroUI or hugeicons without adding product behavior
+- copy default shadcn examples without adapting them to Dao's product density and tone
+- bypass the local shadcn layer with ad-hoc Base UI wrappers without a product reason
+- use arbitrary pixel radii or inline radius styles instead of the shared corner token scale
 - build a generic SaaS dashboard
 - use heavy gradients
 - overuse shadows
@@ -744,12 +763,13 @@ Dao’s design is successful when:
 Dao should use:
 
 ```txt
-HeroUI + Tailwind CSS
+shadcn + Base UI + Tailwind CSS
+Shared CSS radius tokens for visible rounded geometry
 Custom Dao UI layer
 Jade Green #00A86B as primary accent
 Neutral-first interface
 Funnel Sans Variable for the current app UI
-hugeicons
+Tabler Icons
 Geometric English and Chinese logo system
 ```
 

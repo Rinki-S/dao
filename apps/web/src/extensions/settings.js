@@ -1,13 +1,4 @@
-import { createElement } from 'react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import Settings01Icon from '@hugeicons/core-free-icons/Settings01Icon';
-
-function SettingsIcon(props) {
-  return createElement(HugeiconsIcon, {
-    icon: Settings01Icon,
-    ...props,
-  });
-}
+import { IconSettings } from '@tabler/icons-react';
 
 export const settingsExtension = {
   id: 'settings',
@@ -26,7 +17,7 @@ export const settingsExtension = {
         id: 'settings',
         label: 'Settings',
         href: '#settings',
-        icon: SettingsIcon,
+        icon: IconSettings,
         order: 90,
       },
     ],

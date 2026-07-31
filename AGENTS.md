@@ -35,8 +35,9 @@ Important choices:
 - SQLite is the first local database.
 - Zod validates runtime data at system boundaries.
 - JSDoc documents object shapes in JavaScript.
-- HeroUI is the current React component foundation.
-- hugeicons is the current icon library.
+- shadcn components backed by Base UI are the current React component foundation.
+- Tabler Icons is the current icon library.
+- Visible rounded geometry uses the shared CSS radius token scale (`rounded-*` utilities from the Dao `--radius-*` theme); do not use arbitrary pixel radii or inline `borderRadius` in renderer UI.
 - `cmdk` remains the command palette interaction core.
 - Cloud sync is deferred.
 - AI Agent features are deferred until core data exists.
@@ -191,7 +192,7 @@ dao/
 Use modern ESM syntax:
 
 ```js
-import { something } from './something.js'
+import { something } from "./something.js";
 ```
 
 Use Prettier for JavaScript and JSX formatting.
@@ -640,7 +641,7 @@ thoughtful
 The current highest priority is:
 
 ```txt
-Finish the HeroUI product-shell migration and note editor loop.
+Finish the shadcn Base UI product-shell migration and note editor loop.
 ```
 
 The first technical milestone is complete:
@@ -655,9 +656,11 @@ React displays that workspace.
 
 Current immediate work should focus on:
 
-- completing the remaining HeroUI migration
-- removing unused shadcn-era compatibility files only after import checks
-- keeping `cmdk` for command palette behavior while using HeroUI for styling and overlay shell
+- completing the shadcn preset `b1D0eTD6` migration with Base UI primitives
+- keeping the existing jade accent and Funnel Sans typography
+- using the shared CSS radius token scale for all visible rounded geometry
+- keeping `cmdk` for command palette behavior through the shadcn command shell
+- removing HeroUI, hugeicons, and Radix dependencies only after import checks
 - preserving filesystem-backed workspace, project, and markdown note behavior
 - improving the note editor without introducing AI features yet
 

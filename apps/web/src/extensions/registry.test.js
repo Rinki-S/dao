@@ -8,7 +8,7 @@ import {
   getRegisteredSurfaces,
   registeredExtensions,
 } from './registry.js';
-import { ExtensionListSchema } from './schemas.js';
+import { ExtensionListSchema, isReactComponentType } from './schemas.js';
 
 describe('extension registry', () => {
   it('matches the built-in extension schema', () => {
@@ -41,7 +41,7 @@ describe('extension registry', () => {
     const sidebarItems = getRegisteredSidebarItems();
 
     expect(sidebarItems.map((item) => item.id)).toEqual(['tasks', 'settings']);
-    expect(sidebarItems.every((item) => typeof item.icon === 'function')).toBe(true);
+    expect(sidebarItems.every((item) => isReactComponentType(item.icon))).toBe(true);
   });
 
   it('registers surfaces by order', () => {
@@ -54,11 +54,11 @@ describe('extension registry', () => {
     const contentFormats = getRegisteredContentFormats();
 
     expect(contentFormats.map((contentFormat) => contentFormat.format)).toEqual(['markdown']);
-    expect(contentFormats.every((contentFormat) => typeof contentFormat.icon === 'function')).toBe(
+    expect(contentFormats.every((contentFormat) => isReactComponentType(contentFormat.icon))).toBe(
       true,
     );
     expect(getContentFormatIcon('markdown')).toBe(contentFormats[0].icon);
-    expect(typeof getContentFormatIcon('unknown-format')).toBe('function');
+    expect(isReactComponentType(getContentFormatIcon('unknown-format'))).toBe(true);
   });
 
   it('ignores extensions without command capabilities', () => {

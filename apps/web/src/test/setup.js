@@ -3,6 +3,13 @@ import { vi } from 'vitest';
 
 Element.prototype.scrollIntoView = vi.fn();
 
+Object.defineProperty(Element.prototype, 'getAnimations', {
+  configurable: true,
+  value() {
+    return [];
+  },
+});
+
 class ResizeObserverMock {
   observe() {}
 

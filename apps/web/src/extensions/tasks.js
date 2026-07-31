@@ -1,13 +1,4 @@
-import { createElement } from 'react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import TaskDone01Icon from '@hugeicons/core-free-icons/TaskDone01Icon';
-
-function TasksIcon(props) {
-  return createElement(HugeiconsIcon, {
-    icon: TaskDone01Icon,
-    ...props,
-  });
-}
+import { IconChecklist } from '@tabler/icons-react';
 
 export const tasksExtension = {
   id: 'tasks',
@@ -26,7 +17,7 @@ export const tasksExtension = {
         id: 'tasks',
         label: 'Tasks',
         href: '#tasks',
-        icon: TasksIcon,
+        icon: IconChecklist,
         order: 40,
       },
     ],

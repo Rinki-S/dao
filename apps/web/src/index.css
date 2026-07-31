@@ -1,99 +1,226 @@
 @import 'tailwindcss';
-@import '@heroui/styles';
 @import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 @import '@fontsource-variable/funnel-sans';
 
 @custom-variant dark (&:is(.dark *));
 
-/*
- * HeroUI Theme Customization
- * Add this to your global.css after importing @heroui/styles
- * Only includes variables users need to customize
- * @see https://heroui.com/docs/react/getting-started/theming
- */
+:root {
+  --ease-smooth: cubic-bezier(0.32, 0.72, 0, 1);
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 240ms;
+}
+
+/* High-frequency feedback (hover, press) uses --motion-fast; layout motion
+   (sidebar collapse) uses --motion-slow. Colors never wait for layout. */
+@utility motion-colors {
+  transition-property: background-color, color, scale;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-smooth);
+}
+
+@utility motion-colors-layout {
+  transition-property: background-color, color, scale, transform, width, height, padding;
+  transition-duration:
+    var(--motion-fast), var(--motion-fast), var(--motion-fast), var(--motion-fast),
+    var(--motion-slow), var(--motion-slow), var(--motion-slow);
+  transition-timing-function: var(--ease-smooth);
+}
+
+@theme {
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+  --radius-3xl: 22px;
+  --radius-4xl: 26px;
+}
+
+@theme inline {
+  --font-heading: 'Funnel Sans Variable', sans-serif;
+  --font-sans: 'Funnel Sans Variable', sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-foreground: var(--accent-soft-foreground);
+  --color-accent-soft-hover: var(--accent-soft-hover);
+  --color-danger: var(--destructive);
+  --color-danger-foreground: var(--destructive-foreground);
+  --color-default: var(--default);
+  --color-default-foreground: var(--default-foreground);
+  --color-field: var(--field-background);
+  --color-field-background: var(--field-background);
+  --color-field-border: var(--field-border);
+  --color-field-foreground: var(--field-foreground);
+  --color-field-placeholder: var(--field-placeholder);
+  --color-focus: var(--ring);
+  --color-overlay: var(--popover);
+  --color-overlay-foreground: var(--popover-foreground);
+  --color-scrollbar: var(--scrollbar);
+  --color-segment: var(--segment);
+  --color-segment-foreground: var(--segment-foreground);
+  --color-separator: var(--separator);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-surface: var(--card);
+  --color-surface-foreground: var(--card-foreground);
+  --color-surface-secondary: var(--secondary);
+  --color-surface-secondary-foreground: var(--secondary-foreground);
+  --color-surface-tertiary: var(--muted);
+  --color-surface-tertiary-foreground: var(--muted-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+}
 
 :root,
 .light,
 .default,
 [data-theme='light'],
 [data-theme='default'] {
-  /* Theme Colors (Light Mode) */
-  --accent: oklch(64.48% 0.1488 158.77);
-  --accent-foreground: oklch(99.11% 0 0);
+  color-scheme: light;
+  --dao-accent: oklch(64.48% 0.1488 158.77);
+  --dao-accent-foreground: oklch(99.11% 0 0);
   --background: oklch(97.02% 0.0013 158.77);
-  --border: oklch(90% 0.0013 158.77);
-  --danger: oklch(65.32% 0.2334 14.33);
-  --danger-foreground: oklch(99.11% 0 0);
-  --default: oklch(94% 0.0013 158.77);
-  --default-foreground: oklch(21.03% 0.0059 158.77);
-  --field-background: oklch(100% 0.0006 158.77);
-  --field-border: transparent;
-  --field-foreground: oklch(21.03% 0.0013 158.77);
-  --field-placeholder: oklch(55.17% 0.0026 158.77);
-  --focus: oklch(64.48% 0.1488 158.77);
   --foreground: oklch(21.03% 0.0013 158.77);
-  --muted: oklch(55.17% 0.0026 158.77);
-  --overlay: oklch(100% 0.0004 158.77);
-  --overlay-foreground: oklch(21.03% 0.0013 158.77);
+  --card: oklch(100% 0.0006 158.77);
+  --card-foreground: oklch(21.03% 0.0013 158.77);
+  --popover: oklch(100% 0.0004 158.77);
+  --popover-foreground: oklch(21.03% 0.0013 158.77);
+  --primary: var(--dao-accent);
+  --primary-foreground: var(--dao-accent-foreground);
+  --secondary: oklch(95.24% 0.001 158.77);
+  --secondary-foreground: oklch(21.03% 0.0013 158.77);
+  --muted: oklch(94% 0.0013 158.77);
+  --muted-foreground: oklch(55.17% 0.0026 158.77);
+  --accent: var(--dao-accent);
+  --accent-foreground: var(--dao-accent-foreground);
+  --accent-soft: color-mix(in oklab, var(--dao-accent) 11%, var(--background));
+  --accent-soft-foreground: oklch(34% 0.075 158.77);
+  --accent-soft-hover: color-mix(in oklab, var(--dao-accent) 17%, var(--background));
+  --destructive: oklch(65.32% 0.2334 14.33);
+  --destructive-foreground: oklch(99.11% 0 0);
+  --border: oklch(90% 0.0013 158.77);
+  --input: oklch(90% 0.0013 158.77);
+  --ring: var(--dao-accent);
+  --chart-1: var(--dao-accent);
+  --chart-2: oklch(73.29% 0.194 139.4);
+  --chart-3: oklch(78.19% 0.1589 60.92);
+  --chart-4: oklch(60% 0.11 210);
+  --chart-5: oklch(55% 0.12 310);
+  --sidebar: oklch(97.02% 0.0013 158.77);
+  --sidebar-foreground: oklch(21.03% 0.0013 158.77);
+  --sidebar-primary: var(--dao-accent);
+  --sidebar-primary-foreground: var(--dao-accent-foreground);
+  --sidebar-accent: var(--accent-soft);
+  --sidebar-accent-foreground: var(--accent-soft-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+  --default: var(--muted);
+  --default-foreground: var(--foreground);
+  --field-background: var(--card);
+  --field-border: transparent;
+  --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted-foreground);
   --scrollbar: oklch(87.1% 0.0013 158.77);
-  --segment: oklch(100% 0.0013 158.77);
-  --segment-foreground: oklch(21.03% 0.0013 158.77);
+  --segment: var(--card);
+  --segment-foreground: var(--foreground);
   --separator: oklch(92% 0.0013 158.77);
   --success: oklch(73.29% 0.194 139.4);
   --success-foreground: oklch(21.03% 0.0059 139.4);
-  --surface: oklch(100% 0.0006 158.77);
-  --surface-foreground: oklch(21.03% 0.0013 158.77);
-  --surface-secondary: oklch(95.24% 0.001 158.77);
-  --surface-secondary-foreground: oklch(21.03% 0.0013 158.77);
-  --surface-tertiary: oklch(93.73% 0.001 158.77);
-  --surface-tertiary-foreground: oklch(21.03% 0.0013 158.77);
   --warning: oklch(78.19% 0.1589 60.92);
   --warning-foreground: oklch(21.03% 0.0059 60.92);
-
-  /* Border Radius */
-  --radius: 0.5rem;
-  --field-radius: 0.75rem;
-
-  /* Font Family */
-  /* Make sure to load Funnel Sans font in your app */
-  --font-sans: 'Funnel Sans Variable', sans-serif;
+  --shadow-popover: 0 12px 32px rgba(15, 23, 42, 0.12);
+  --shadow-dialog: 0 20px 60px rgba(15, 23, 42, 0.22);
 }
 
 .dark,
 [data-theme='dark'] {
   color-scheme: dark;
-  /* Theme Colors (Dark Mode) */
-  --accent: oklch(64.48% 0.1488 158.77);
-  --accent-foreground: oklch(99.11% 0 0);
+  --dao-accent: oklch(64.48% 0.1488 158.77);
+  --dao-accent-foreground: oklch(99.11% 0 0);
   --background: oklch(12% 0.0013 158.77);
-  --border: oklch(28% 0.0013 158.77);
-  --danger: oklch(59.4% 0.1972 13.22);
-  --danger-foreground: oklch(99.11% 0 0);
-  --default: oklch(27.4% 0.0013 158.77);
-  --default-foreground: oklch(99.11% 0 0);
-  --field-background: oklch(21.03% 0.0026 158.77);
-  --field-border: transparent;
-  --field-foreground: oklch(99.11% 0.0013 158.77);
-  --field-placeholder: oklch(70.5% 0.0026 158.77);
-  --focus: oklch(64.48% 0.1488 158.77);
   --foreground: oklch(99.11% 0.0013 158.77);
-  --muted: oklch(70.5% 0.0026 158.77);
-  --overlay: oklch(21.03% 0.0026 158.77);
-  --overlay-foreground: oklch(99.11% 0.0013 158.77);
-  --scrollbar: oklch(70.5% 0.0013 158.77);
+  --card: oklch(21.03% 0.0026 158.77);
+  --card-foreground: oklch(99.11% 0.0013 158.77);
+  --popover: oklch(21.03% 0.0026 158.77);
+  --popover-foreground: oklch(99.11% 0.0013 158.77);
+  --primary: var(--dao-accent);
+  --primary-foreground: var(--dao-accent-foreground);
+  --secondary: oklch(25.7% 0.0019 158.77);
+  --secondary-foreground: oklch(99.11% 0.0013 158.77);
+  --muted: oklch(27.4% 0.0013 158.77);
+  --muted-foreground: oklch(70.5% 0.0026 158.77);
+  --accent: var(--dao-accent);
+  --accent-foreground: var(--dao-accent-foreground);
+  --accent-soft: color-mix(in oklab, var(--dao-accent) 18%, var(--background));
+  --accent-soft-foreground: oklch(91% 0.045 158.77);
+  --accent-soft-hover: color-mix(in oklab, var(--dao-accent) 25%, var(--background));
+  --destructive: oklch(59.4% 0.1972 13.22);
+  --destructive-foreground: oklch(99.11% 0 0);
+  --border: oklch(28% 0.0013 158.77);
+  --input: oklch(39.64% 0.0013 158.77);
+  --ring: var(--dao-accent);
+  --chart-1: var(--dao-accent);
+  --chart-2: oklch(73.29% 0.194 139.4);
+  --chart-3: oklch(82.03% 0.1392 64.93);
+  --chart-4: oklch(67% 0.11 210);
+  --chart-5: oklch(66% 0.12 310);
+  --sidebar: oklch(16% 0.0013 158.77);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--dao-accent);
+  --sidebar-primary-foreground: var(--dao-accent-foreground);
+  --sidebar-accent: var(--accent-soft);
+  --sidebar-accent-foreground: var(--accent-soft-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+  --default: var(--muted);
+  --default-foreground: var(--foreground);
+  --field-background: var(--card);
+  --field-border: transparent;
+  --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted-foreground);
+  --scrollbar: oklch(45% 0.0013 158.77);
   --segment: oklch(39.64% 0.0013 158.77);
-  --segment-foreground: oklch(99.11% 0.0013 158.77);
+  --segment-foreground: var(--foreground);
   --separator: oklch(25% 0.0013 158.77);
   --success: oklch(73.29% 0.194 139.4);
   --success-foreground: oklch(21.03% 0.0059 139.4);
-  --surface: oklch(21.03% 0.0026 158.77);
-  --surface-foreground: oklch(99.11% 0.0013 158.77);
-  --surface-secondary: oklch(25.7% 0.0019 158.77);
-  --surface-secondary-foreground: oklch(99.11% 0.0013 158.77);
-  --surface-tertiary: oklch(27.21% 0.0019 158.77);
-  --surface-tertiary-foreground: oklch(99.11% 0.0013 158.77);
   --warning: oklch(82.03% 0.1392 64.93);
-  --warning-foreground: oklch(21.03% 0.0059 64.93);
+  --warning-foreground: oklch(21.03% 0.0059 60.92);
+  --shadow-popover: 0 12px 32px rgb(0 0 0 / 0.5);
+  --shadow-dialog: 0 20px 60px rgb(0 0 0 / 0.6);
 }
 
 body {
@@ -134,27 +261,35 @@ body {
 
 .app-tabbar-scroll::-webkit-scrollbar-thumb {
   background: var(--scrollbar);
-  border-radius: 999px;
 }
 
 .app-tabbar-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
+  background: var(--muted-foreground);
 }
 
 @layer base {
-  body {
-    @apply font-sans bg-background text-foreground;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-    font-size: 18px;
-    line-height: 145%;
+  * {
+    @apply border-border outline-ring/50;
   }
+
   html {
     @apply font-sans;
+    /* Native desktop density: the whole rem system scales from here. */
+    font-size: 14px;
   }
+
+  body {
+    @apply bg-background font-sans text-foreground;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-size: 1rem;
+    line-height: 145%;
+  }
+
   :where(h1, h2, h3, h4, h5, h6, [data-slot='card-title']) {
     text-wrap: balance;
   }
+
   :where(p, li, [data-slot='card-description']) {
     text-wrap: pretty;
   }

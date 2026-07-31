@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import Folder01Icon from '@hugeicons/core-free-icons/Folder01Icon';
-import { Chip, Skeleton, Surface, Table } from '@heroui/react';
+import { IconFolder } from '@tabler/icons-react';
+import { Badge } from '@/components/ui/badge.jsx';
+import { Card, CardContent } from '@/components/ui/card.jsx';
+import { Skeleton } from '@/components/ui/skeleton.jsx';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table.jsx';
 import { getContentFormatIcon } from '@/extensions/registry.js';
 import { subscribeToActivityChanged } from '@/features/activities/events.js';
 import { listNotes } from '@/features/notes/api.js';
@@ -23,10 +32,12 @@ function formatUpdatedAt(value) {
 
 function ProjectContentsNotice({ title, description }) {
   return (
-    <Surface className="max-w-3xl rounded-xl border border-border p-6" variant="default">
-      <h2 className="font-heading text-lg font-semibold text-foreground text-balance">{title}</h2>
-      <p className="mt-1 text-sm text-muted-foreground text-pretty">{description}</p>
-    </Surface>
+    <Card className="max-w-3xl gap-0 py-0">
+      <CardContent className="p-6">
+        <h2 className="font-heading text-lg font-semibold text-foreground text-balance">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground text-pretty">{description}</p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -125,29 +136,29 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
     return (
       <div className="space-y-4 p-6">
         <div className="space-y-2">
-          <Skeleton className="h-4 w-48 rounded" />
-          <Skeleton className="h-3 w-32 rounded" />
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-3 w-32" />
         </div>
         <div className="space-y-3">
           <div className="flex gap-4 border-b border-border pb-2">
-            <Skeleton className="h-4 w-32 rounded" />
-            <Skeleton className="h-4 w-24 rounded" />
-            <Skeleton className="h-4 w-40 rounded" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-40" />
           </div>
           <div className="flex gap-4">
-            <Skeleton className="h-4 w-36 rounded" />
-            <Skeleton className="h-4 w-20 rounded" />
-            <Skeleton className="h-4 w-44 rounded" />
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-44" />
           </div>
           <div className="flex gap-4">
-            <Skeleton className="h-4 w-28 rounded" />
-            <Skeleton className="h-4 w-28 rounded" />
-            <Skeleton className="h-4 w-36 rounded" />
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-36" />
           </div>
           <div className="flex gap-4">
-            <Skeleton className="h-4 w-40 rounded" />
-            <Skeleton className="h-4 w-16 rounded" />
-            <Skeleton className="h-4 w-48 rounded" />
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-4 w-48" />
           </div>
         </div>
       </div>
@@ -171,10 +182,10 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
     <section className="flex flex-col gap-5">
       <div className="flex flex-col gap-2 pl-2">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <HugeiconsIcon
-            icon={Folder01Icon}
+          <IconFolder
             aria-hidden="true"
             className="size-[18px] shrink-0 translate-y-px"
+            data-icon="inline-start"
           />
           <span>{currentWorkspace.name}</span>
         </div>
@@ -189,61 +200,51 @@ export function ProjectContentsPanel({ currentWorkspace, selectedProjectId }) {
       </div>
 
       <div>
-        <Table>
-          <Table.ScrollContainer className="w-full overflow-x-auto">
-            <Table.Content aria-label="Project contents" className="w-full min-w-full">
-              <Table.Header>
-                <Table.Column isRowHeader>Name</Table.Column>
-                <Table.Column>Type</Table.Column>
-                <Table.Column>Source</Table.Column>
-                <Table.Column>Updated</Table.Column>
-                <Table.Column>Format</Table.Column>
-              </Table.Header>
-              <Table.Body>
-                {contentRows.length === 0 && (
-                  <Table.Row id="empty-project-contents">
-                    <Table.Cell colSpan={5} className="h-24 px-8 text-center text-muted-foreground">
-                      Add project content from the sidebar to start building this workspace.
-                    </Table.Cell>
-                  </Table.Row>
-                )}
+        <Table aria-label="Project contents" className="min-w-full">
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col">Name</TableHead>
+              <TableHead scope="col">Type</TableHead>
+              <TableHead scope="col">Source</TableHead>
+              <TableHead scope="col">Updated</TableHead>
+              <TableHead scope="col">Format</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {contentRows.length === 0 && (
+              <TableRow id="empty-project-contents">
+                <TableCell colSpan={5} className="h-24 px-8 text-center text-muted-foreground">
+                  Add project content from the sidebar to start building this workspace.
+                </TableCell>
+              </TableRow>
+            )}
 
-                {contentRows.map((row) => {
-                  const ContentIcon = getContentFormatIcon(row.format);
+            {contentRows.map((row) => {
+              const ContentIcon = getContentFormatIcon(row.format);
 
-                  return (
-                    <Table.Row id={row.id} key={row.id}>
-                      <Table.Cell className="max-w-sm">
-                        <div className="flex min-w-0 items-center gap-4">
-                          <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
-                          <div className="min-w-0">
-                            <div className="truncate font-medium text-foreground">{row.name}</div>
-                            <div className="truncate text-xs text-muted-foreground">
-                              {row.summary}
-                            </div>
-                          </div>
-                        </div>
-                      </Table.Cell>
-                      <Table.Cell>{row.type}</Table.Cell>
-                      <Table.Cell>
-                        <Chip size="sm" variant="soft">
-                          {row.source}
-                        </Chip>
-                      </Table.Cell>
-                      <Table.Cell className="tabular-nums">
-                        {formatUpdatedAt(row.updatedAt)}
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Chip size="sm" variant="secondary">
-                          {row.format}
-                        </Chip>
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table.Content>
-          </Table.ScrollContainer>
+              return (
+                <TableRow id={row.id} key={row.id}>
+                  <TableCell className="max-w-sm">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <ContentIcon aria-hidden="true" className="size-[18px] shrink-0" />
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-foreground">{row.name}</div>
+                        <div className="truncate text-xs text-muted-foreground">{row.summary}</div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{row.type}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{row.source}</Badge>
+                  </TableCell>
+                  <TableCell className="tabular-nums">{formatUpdatedAt(row.updatedAt)}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{row.format}</Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
         </Table>
       </div>
     </section>

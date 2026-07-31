@@ -1,7 +1,17 @@
-import { Button, Dropdown } from '@heroui/react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import ArrowDown01Icon from '@hugeicons/core-free-icons/ArrowDown01Icon';
+import { IconChevronDown } from '@tabler/icons-react';
 import { useEditorState } from '@tiptap/react';
+import { useState } from 'react';
+
+import { Button } from '@/components/ui/button.jsx';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu.jsx';
 
 const BLOCK_TYPES = [
   { id: 'paragraph', label: 'Paragraph', shortLabel: 'Text', shortcut: 'Mod+Alt+0' },
@@ -30,13 +40,12 @@ function getActiveTextStyleId(editor) {
   return editor.isActive('paragraph') ? 'paragraph' : null;
 }
 
-export function MarkdownBlockTypeControl({ editor, isDisabled = false }) {
+export function MarkdownBlockTypeControl({ disabled = false, editor }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const activeTextStyleId = useEditorState({
     editor,
     selector: ({ editor: currentEditor }) =>
-      currentEditor && !currentEditor.isDestroyed
-        ? getActiveTextStyleId(currentEditor)
-        : null,
+      currentEditor && !currentEditor.isDestroyed ? getActiveTextStyleId(currentEditor) : null,
   });
   const activeTextStyle = BLOCK_TYPES.find((blockType) => blockType.id === activeTextStyleId);
 
@@ -58,38 +67,49 @@ export function MarkdownBlockTypeControl({ editor, isDisabled = false }) {
   };
 
   return (
-    <Dropdown>
-      <Button
-        aria-label={`Text style: ${activeTextStyle?.label ?? 'Other block'}`}
-        className="dao-markdown-toolbar__block-type"
-        isDisabled={isDisabled}
-        size="sm"
-        type="button"
-        variant="ghost"
+    <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            aria-label={`Text style: ${activeTextStyle?.label ?? 'Other block'}`}
+            className="dao-markdown-toolbar__block-type"
+            disabled={disabled}
+            size="sm"
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              if (!isMenuOpen) {
+                setIsMenuOpen(true);
+              }
+            }}
+          />
+        }
       >
         <span className="dao-markdown-toolbar__block-type-label">
           {activeTextStyle?.shortLabel ?? 'Style'}
         </span>
-        <HugeiconsIcon aria-hidden="true" className="size-3.5" icon={ArrowDown01Icon} />
-      </Button>
-      <Dropdown.Popover className="w-52" placement="bottom start">
-        <Dropdown.Menu
-          aria-label="Text style"
-          selectedKeys={activeTextStyle ? new Set([activeTextStyle.id]) : new Set()}
-          selectionMode="single"
-          onAction={handleBlockTypeAction}
-        >
-          {BLOCK_TYPES.map((blockType) => (
-            <Dropdown.Item id={blockType.id} key={blockType.id} textValue={blockType.label}>
-              <Dropdown.ItemIndicator />
-              <span className="dao-markdown-block-option__label">{blockType.label}</span>
-              <kbd aria-hidden="true" className="dao-markdown-block-option__shortcut">
-                {blockType.shortcut}
-              </kbd>
-            </Dropdown.Item>
-          ))}
-        </Dropdown.Menu>
-      </Dropdown.Popover>
-    </Dropdown>
+        <IconChevronDown aria-hidden="true" className="size-3.5" data-icon="inline-end" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-52">
+        <DropdownMenuGroup>
+          <DropdownMenuRadioGroup
+            value={activeTextStyle?.id ?? ''}
+            onValueChange={handleBlockTypeAction}
+          >
+            {BLOCK_TYPES.map((blockType) => (
+              <DropdownMenuRadioItem closeOnClick key={blockType.id} value={blockType.id}>
+                <span className="dao-markdown-block-option__label">{blockType.label}</span>
+                <DropdownMenuShortcut
+                  aria-hidden="true"
+                  className="dao-markdown-block-option__shortcut"
+                >
+                  {blockType.shortcut}
+                </DropdownMenuShortcut>
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

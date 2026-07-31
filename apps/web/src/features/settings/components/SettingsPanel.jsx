@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Surface } from '@heroui/react';
+import { Button } from '@/components/ui/button.jsx';
+import { Card } from '@/components/ui/card.jsx';
 import { waitForAllPendingNoteSaves } from '@/features/notes/note-save-queue.js';
 
 export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
@@ -39,7 +40,7 @@ export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
           Storage
         </h2>
 
-        <Surface className="overflow-hidden rounded-xl border border-border" variant="default">
+        <Card className="gap-0 py-0">
           <div className="grid min-h-16 grid-cols-[minmax(0,1fr)_minmax(12rem,45%)] items-center gap-4 px-4 py-3">
             <div className="min-w-0">
               <h3 className="text-sm font-medium text-foreground">Working Directory</h3>
@@ -61,11 +62,11 @@ export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
                 Reselect the working directory and review workspace setup.
               </p>
             </div>
-            <Button type="button" variant="outline" onPress={onReplayOnboarding}>
+            <Button type="button" variant="outline" onClick={onReplayOnboarding}>
               Open
             </Button>
           </div>
-        </Surface>
+        </Card>
       </section>
 
       <section className="flex flex-col gap-2">
@@ -73,7 +74,7 @@ export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
           Debug
         </h2>
 
-        <Surface className="overflow-hidden rounded-xl border border-border" variant="default">
+        <Card className="gap-0 py-0">
           <div className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
             <div className="min-w-0">
               <h3 className="text-sm font-medium text-foreground">Restart Go Service</h3>
@@ -89,14 +90,14 @@ export function SettingsPanel({ currentWorkingDirectory, onReplayOnboarding }) {
             </div>
             <Button
               type="button"
-              variant="danger"
-              isDisabled={restartStatus === 'restarting'}
-              onPress={handleRestartLocalService}
+              variant="destructive"
+              disabled={restartStatus === 'restarting'}
+              onClick={handleRestartLocalService}
             >
               {restartStatus === 'restarting' ? 'Restarting...' : 'Restart'}
             </Button>
           </div>
-        </Surface>
+        </Card>
       </section>
     </section>
   );

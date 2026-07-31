@@ -1,9 +1,15 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Chip, Label, SearchField, Skeleton } from '@heroui/react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
-import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
+import { IconSearch, IconX } from '@tabler/icons-react';
+import { Badge } from '@/components/ui/badge.jsx';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group.jsx';
+import { Skeleton } from '@/components/ui/skeleton.jsx';
 import { searchAll } from '@/features/search/api.js';
+import { CornerSurface } from '@/lib/corners.jsx';
 import { gsap } from 'gsap';
 
 function prefersReducedMotion() {
@@ -28,33 +34,36 @@ export function AppSearchBar() {
     if (displayStatus === 'loading' || displayStatus === 'pending') {
       return (
         <div className="space-y-2 p-2" data-testid="search-loading-skeleton">
-          <div className="space-y-1 rounded-lg px-2 py-2">
-            <Skeleton className="h-4 w-3/4 rounded" />
-            <Skeleton className="h-3 w-1/2 rounded" />
+          <div className="space-y-1 px-2 py-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-3 w-1/2" />
           </div>
-          <div className="space-y-1 rounded-lg px-2 py-2">
-            <Skeleton className="h-4 w-2/3 rounded" />
-            <Skeleton className="h-3 w-2/5 rounded" />
+          <div className="space-y-1 px-2 py-2">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-3 w-2/5" />
           </div>
         </div>
       );
     }
 
     if (displayStatus === 'error') {
-      return <p className="px-3 py-2 text-sm text-danger">{error}</p>;
+      return <p className="px-3 py-2 text-sm text-destructive">{error}</p>;
     }
 
     if (displayStatus === 'ready' && results.length === 0) {
-      return <p className="px-3 py-2 text-sm text-muted">No results found.</p>;
+      return <p className="px-3 py-2 text-sm text-muted-foreground">No results found.</p>;
     }
 
     if (displayStatus === 'ready') {
       return (
         <ul ref={listRef} className="flex max-h-80 flex-col overflow-y-auto p-1">
           {results.map((result, index) => (
-            <li
+            <CornerSurface
+              as="li"
               key={`${result.entityType}:${result.entityId}`}
-              className={`rounded-lg px-2 py-2 hover:bg-surface-secondary ${
+              corner="md"
+              dataSlot="search-result"
+              className={`px-2 py-2 hover:bg-surface-secondary ${
                 index === selectedIndex ? 'bg-accent-soft' : ''
               }`}
             >
@@ -63,15 +72,13 @@ export function AppSearchBar() {
                   <strong className="block truncate text-sm font-medium text-foreground">
                     {result.title}
                   </strong>
-                  <span className="mt-1 line-clamp-2 block text-xs text-muted">
+                  <span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">
                     {result.snippet || 'No snippet'}
                   </span>
                 </div>
-                <Chip size="sm" variant="soft">
-                  {result.entityType}
-                </Chip>
+                <Badge variant="secondary">{result.entityType}</Badge>
               </div>
-            </li>
+            </CornerSurface>
           ))}
         </ul>
       );
@@ -201,7 +208,9 @@ export function AppSearchBar() {
     };
   }, [trimmedQuery]);
 
-  function handleQueryChange(nextQuery) {
+  function handleQueryChange(event) {
+    const nextQuery = event.target.value;
+
     if (nextQuery.trim() !== '') {
       setShouldRender(true);
     }
@@ -212,12 +221,12 @@ export function AppSearchBar() {
 
   return (
     <div ref={containerRef} className="app-no-drag relative w-full max-w-md">
-      <SearchField
-        className="w-full"
-        name="app-search"
-        variant="primary"
-        value={query}
-        onChange={handleQueryChange}
+      <label className="sr-only" htmlFor="app-search">
+        Search
+      </label>
+      <InputGroup
+        className="h-8 gap-1 border-border bg-transparent px-1 shadow-none"
+        data-slot="app-search"
         onKeyDown={(e) => {
           if (!isPanelVisible || displayStatus !== 'ready') return;
 
@@ -241,29 +250,45 @@ export function AppSearchBar() {
           }
         }}
       >
-        <Label className="sr-only">Search</Label>
-        <SearchField.Group className="h-8 gap-1 rounded-field border border-border px-2 shadow-none data-[focus-within=true]:border-ring data-[focus-within=true]:ring-3 data-[focus-within=true]:ring-ring/50">
-          <SearchField.SearchIcon className="m-0 text-muted-foreground">
-            <HugeiconsIcon icon={Search01Icon} className="size-[18px] shrink-0 translate-y-px" />
-          </SearchField.SearchIcon>
-          <SearchField.Input
-            className="h-auto min-w-0 flex-1 px-0 py-0"
-            data-command-target="search-query"
-            placeholder="Search"
-          />
-          <SearchField.ClearButton aria-label="Clear search" className="mr-0 size-6 min-w-0 p-0">
-            <HugeiconsIcon icon={Cancel01Icon} className="size-[18px] shrink-0 translate-y-px" />
-          </SearchField.ClearButton>
-        </SearchField.Group>
-      </SearchField>
+        <InputGroupAddon className="pl-1.5" align="inline-start">
+          <IconSearch aria-hidden="true" className="size-[18px]" data-icon="inline-start" />
+        </InputGroupAddon>
+        <InputGroupInput
+          id="app-search"
+          aria-label="Search"
+          className="h-auto min-w-0 px-0 py-0"
+          data-command-target="search-query"
+          name="app-search"
+          placeholder="Search"
+          type="search"
+          value={query}
+          onChange={handleQueryChange}
+        />
+        {query && (
+          <InputGroupAddon className="pr-0.5" align="inline-end">
+            <InputGroupButton
+              aria-label="Clear search"
+              size="icon-xs"
+              onClick={() => {
+                setQuery('');
+                setSelectedIndex(-1);
+              }}
+            >
+              <IconX aria-hidden="true" data-icon="inline-start" />
+            </InputGroupButton>
+          </InputGroupAddon>
+        )}
+      </InputGroup>
 
       {shouldRender && (
-        <div
+        <CornerSurface
           ref={panelRef}
-          className="absolute top-10 left-0 z-[100] w-full rounded-xl bg-overlay text-overlay-foreground shadow-md ring-1 ring-border"
+          corner="lg"
+          dataSlot="search-results"
+          className="absolute top-10 left-0 z-[100] w-full bg-overlay text-overlay-foreground shadow-(--shadow-popover) ring-1 ring-border"
         >
           {panelContent}
-        </div>
+        </CornerSurface>
       )}
     </div>
   );

@@ -1,41 +1,46 @@
-import { Button, Tooltip } from '@heroui/react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import CheckListIcon from '@hugeicons/core-free-icons/CheckListIcon';
-import CodeIcon from '@hugeicons/core-free-icons/CodeIcon';
-import CodeSquareIcon from '@hugeicons/core-free-icons/CodeSquareIcon';
-import LeftToRightBlockQuoteIcon from '@hugeicons/core-free-icons/LeftToRightBlockQuoteIcon';
-import LeftToRightListBulletIcon from '@hugeicons/core-free-icons/LeftToRightListBulletIcon';
-import LeftToRightListNumberIcon from '@hugeicons/core-free-icons/LeftToRightListNumberIcon';
-import Redo02Icon from '@hugeicons/core-free-icons/Redo02Icon';
-import TextBoldIcon from '@hugeicons/core-free-icons/TextBoldIcon';
-import TextItalicIcon from '@hugeicons/core-free-icons/TextItalicIcon';
-import TextStrikethroughIcon from '@hugeicons/core-free-icons/TextStrikethroughIcon';
-import Undo02Icon from '@hugeicons/core-free-icons/Undo02Icon';
+import {
+  IconArrowBackUp,
+  IconArrowForwardUp,
+  IconBlockquote,
+  IconBold,
+  IconCode,
+  IconCodeDots,
+  IconItalic,
+  IconList,
+  IconListCheck,
+  IconListNumbers,
+  IconStrikethrough,
+} from '@tabler/icons-react';
 import { useEditorState } from '@tiptap/react';
 
+import { Button } from '@/components/ui/button.jsx';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.jsx';
 import { MarkdownBlockTypeControl } from './MarkdownBlockTypeControl.jsx';
 import { MarkdownInsertControl } from './MarkdownInsertControl.jsx';
 import { MarkdownLinkControl } from './MarkdownLinkControl.jsx';
 
-function ToolbarButton({ editor, icon, label, isActive = false, isDisabled = false, onPress }) {
+function ToolbarButton({ disabled = false, editor, icon: Icon, isActive = false, label, onClick }) {
+  const button = (
+    <Button
+      aria-label={label}
+      aria-pressed={isActive || undefined}
+      className="dao-markdown-toolbar__button"
+      disabled={disabled}
+      size="icon-sm"
+      type="button"
+      variant={isActive ? 'secondary' : 'ghost'}
+      onClick={() => {
+        onClick(editor);
+      }}
+    >
+      <Icon aria-hidden="true" className="size-4" data-icon="inline-start" />
+    </Button>
+  );
+
   return (
-    <Tooltip delay={300}>
-      <Button
-        aria-label={label}
-        aria-pressed={isActive || undefined}
-        className="dao-markdown-toolbar__button"
-        isDisabled={isDisabled}
-        isIconOnly
-        size="sm"
-        type="button"
-        variant={isActive ? 'secondary' : 'ghost'}
-        onPress={() => {
-          onPress(editor);
-        }}
-      >
-        <HugeiconsIcon aria-hidden="true" className="size-4" icon={icon} />
-      </Button>
-      <Tooltip.Content>{label}</Tooltip.Content>
+    <Tooltip>
+      <TooltipTrigger delay={300} render={button} />
+      <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   );
 }
@@ -90,52 +95,52 @@ function ReadyMarkdownEditorToolbar({ editor }) {
         <div className="dao-markdown-toolbar__group">
           <ToolbarButton
             editor={editor}
-            icon={Undo02Icon}
-            isDisabled={!state.canUndo}
+            icon={IconArrowBackUp}
+            disabled={!state.canUndo}
             label="Undo"
-            onPress={(currentEditor) => currentEditor.chain().focus().undo().run()}
+            onClick={(currentEditor) => currentEditor.chain().focus().undo().run()}
           />
           <ToolbarButton
             editor={editor}
-            icon={Redo02Icon}
-            isDisabled={!state.canRedo}
+            icon={IconArrowForwardUp}
+            disabled={!state.canRedo}
             label="Redo"
-            onPress={(currentEditor) => currentEditor.chain().focus().redo().run()}
+            onClick={(currentEditor) => currentEditor.chain().focus().redo().run()}
           />
         </div>
         <ToolbarDivider />
         <div className="dao-markdown-toolbar__group">
-          <MarkdownBlockTypeControl editor={editor} isDisabled={state.isInTable} />
+          <MarkdownBlockTypeControl disabled={state.isInTable} editor={editor} />
         </div>
         <ToolbarDivider />
         <div className="dao-markdown-toolbar__group">
           <ToolbarButton
             editor={editor}
-            icon={TextBoldIcon}
+            icon={IconBold}
             isActive={state.isBold}
             label="Bold"
-            onPress={(currentEditor) => currentEditor.chain().focus().toggleBold().run()}
+            onClick={(currentEditor) => currentEditor.chain().focus().toggleBold().run()}
           />
           <ToolbarButton
             editor={editor}
-            icon={TextItalicIcon}
+            icon={IconItalic}
             isActive={state.isItalic}
             label="Italic"
-            onPress={(currentEditor) => currentEditor.chain().focus().toggleItalic().run()}
+            onClick={(currentEditor) => currentEditor.chain().focus().toggleItalic().run()}
           />
           <ToolbarButton
             editor={editor}
-            icon={TextStrikethroughIcon}
+            icon={IconStrikethrough}
             isActive={state.isStrike}
             label="Strikethrough"
-            onPress={(currentEditor) => currentEditor.chain().focus().toggleStrike().run()}
+            onClick={(currentEditor) => currentEditor.chain().focus().toggleStrike().run()}
           />
           <ToolbarButton
             editor={editor}
-            icon={CodeIcon}
+            icon={IconCode}
             isActive={state.isCode}
             label="Inline code"
-            onPress={(currentEditor) => currentEditor.chain().focus().toggleCode().run()}
+            onClick={(currentEditor) => currentEditor.chain().focus().toggleCode().run()}
           />
           <MarkdownLinkControl editor={editor} isActive={state.isLink} />
         </div>
@@ -143,48 +148,48 @@ function ReadyMarkdownEditorToolbar({ editor }) {
         <div className="dao-markdown-toolbar__group">
           <ToolbarButton
             editor={editor}
-            icon={LeftToRightListBulletIcon}
+            icon={IconList}
             isActive={state.isBulletList}
-            isDisabled={state.isInTable}
+            disabled={state.isInTable}
             label="Bullet list"
-            onPress={(currentEditor) => currentEditor.chain().focus().toggleBulletList().run()}
+            onClick={(currentEditor) => currentEditor.chain().focus().toggleBulletList().run()}
           />
           <ToolbarButton
             editor={editor}
-            icon={LeftToRightListNumberIcon}
+            icon={IconListNumbers}
             isActive={state.isOrderedList}
-            isDisabled={state.isInTable}
+            disabled={state.isInTable}
             label="Ordered list"
-            onPress={(currentEditor) => currentEditor.chain().focus().toggleOrderedList().run()}
+            onClick={(currentEditor) => currentEditor.chain().focus().toggleOrderedList().run()}
           />
           <ToolbarButton
             editor={editor}
-            icon={CheckListIcon}
+            icon={IconListCheck}
             isActive={state.isTaskList}
-            isDisabled={state.isInTable}
+            disabled={state.isInTable}
             label="Task list"
-            onPress={(currentEditor) => currentEditor.chain().focus().toggleTaskList().run()}
+            onClick={(currentEditor) => currentEditor.chain().focus().toggleTaskList().run()}
           />
           <ToolbarButton
             editor={editor}
-            icon={LeftToRightBlockQuoteIcon}
+            icon={IconBlockquote}
             isActive={state.isBlockquote}
-            isDisabled={state.isInTable}
+            disabled={state.isInTable}
             label="Blockquote"
-            onPress={(currentEditor) => currentEditor.chain().focus().toggleBlockquote().run()}
+            onClick={(currentEditor) => currentEditor.chain().focus().toggleBlockquote().run()}
           />
           <ToolbarButton
             editor={editor}
-            icon={CodeSquareIcon}
+            icon={IconCodeDots}
             isActive={state.isCodeBlock}
-            isDisabled={state.isInTable}
+            disabled={state.isInTable}
             label="Code block"
-            onPress={(currentEditor) => currentEditor.chain().focus().toggleCodeBlock().run()}
+            onClick={(currentEditor) => currentEditor.chain().focus().toggleCodeBlock().run()}
           />
         </div>
         <ToolbarDivider />
         <div className="dao-markdown-toolbar__group">
-          <MarkdownInsertControl editor={editor} isDisabled={state.isInTable} />
+          <MarkdownInsertControl disabled={state.isInTable} editor={editor} />
         </div>
       </div>
     </div>

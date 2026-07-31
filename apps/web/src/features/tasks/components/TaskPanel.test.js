@@ -28,7 +28,7 @@ vi.mock('../../activities/events.js', () => ({
 
 const taskPanelPath = path.resolve(import.meta.dirname, 'TaskPanel.jsx');
 
-describe('TaskPanel table migration boundary', () => {
+describe('TaskPanel shadcn Base UI migration boundary', () => {
   beforeEach(() => {
     listProjects.mockResolvedValue([projectFixture()]);
     listTasks.mockResolvedValue([taskFixture()]);
@@ -38,59 +38,65 @@ describe('TaskPanel table migration boundary', () => {
     vi.clearAllMocks();
   });
 
-  it('uses HeroUI for table rows and compact labels instead of shadcn table and badge', () => {
+  it('uses shadcn Base UI and Tabler without legacy component libraries', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
-    expect(source).toContain("from '@heroui/react'");
-    expect(source).toContain('Chip');
-    expect(source).toContain('Table');
-    expect(source).not.toContain("import { Badge } from '@/components/ui/badge'");
-    expect(source).not.toContain('import { Table, TableBody, TableCell, TableRow }');
+    expect(source).toContain("from '@tabler/icons-react'");
+    expect(source).toContain("from '@/components/ui/badge'");
+    expect(source).toContain("from '@/components/ui/table'");
+    expect(source).toContain('<Badge');
+    expect(source).toContain('<Table');
+    const forbiddenLegacyTokens = [
+      '@hero' + 'ui',
+      'huge' + 'icons',
+      'ra' + 'dix-ui',
+      '@ra' + 'dix-ui',
+      'is' + 'Disabled',
+      'is' + 'Pending',
+      'is' + 'IconOnly',
+      'on' + 'Press',
+      'full' + 'Width',
+      'validation' + 'Behavior',
+    ];
+
+    for (const token of forbiddenLegacyTokens) {
+      expect(source).not.toContain(token);
+    }
+
+    expect(source).not.toMatch(new RegExp(`\\b${'as' + 'Child'}\\b`));
   });
 
-  it('uses HeroUI for the quick add form instead of shadcn form controls', () => {
+  it('composes Base form, menu, select, dialog, and checkbox primitives correctly', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
-    expect(source).toContain('Dropdown');
-    expect(source).toContain('Checkbox');
-    expect(source).toContain('FieldError');
-    expect(source).toContain('Form');
-    expect(source).toContain('InputGroup');
-    expect(source).toContain('Popover');
-    expect(source).toContain('TextArea');
-    expect(source).toContain('TextField');
-    expect(source).toContain('<Checkbox.Control');
-    expect(source).toContain('<Checkbox.Indicator');
-    expect(source).not.toContain('@/components/ui/dropdown-menu');
-    expect(source).not.toContain('@/components/ui/field');
-    expect(source).not.toContain('@/components/ui/input-group');
-    expect(source).not.toContain('@/components/ui/popover');
-    expect(source).not.toContain('@/components/ui/textarea');
-    expect(source).not.toContain('@/components/ui/button');
-    expect(source).not.toContain('@/components/ui/checkbox');
-    expect(source).not.toContain('@/components/ui/input');
-    expect(source).not.toContain('LegacyButton');
-    expect(source).not.toContain('LegacyInput');
-    expect(source).not.toContain('onCheckedChange');
+    expect(source).toContain('<FieldGroup');
+    expect(source).toContain('<Field ');
+    expect(source).toContain('<InputGroupInput');
+    expect(source).toContain('<InputGroupAddon');
+    expect(source).toContain('<InputGroupButton');
+    expect(source).toContain('items={priorityOptions}');
+    expect(source).toContain('<SelectGroup>');
+    expect(source).toContain('<DialogTitle>Edit task</DialogTitle>');
+    expect(source).toContain('<AlertDialogTitle>Delete task</AlertDialogTitle>');
+    expect(source).toContain('<ContextMenuGroup>');
+    expect(source).toContain('checked={checkboxState === true}');
+    expect(source).toContain("indeterminate={checkboxState === 'indeterminate'}");
+    expect(source).toContain('onCheckedChange');
+    expect(source).not.toMatch(/<InputGroup\.(?:Input|Suffix)|<Dropdown\.|<Modal\./);
   });
 
-  it('uses HeroUI ScrollShadow for the task list overflow affordance', () => {
+  it('uses shadcn surfaces without consumer rounded utilities', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
-    expect(source).toContain('ScrollShadow');
-    expect(source).toContain('<ScrollShadow');
-    expect(source).toContain('orientation="vertical"');
-    expect(source).toContain('size={20}');
-    expect(source).not.toContain('data-testid="task-scroll-shadow"');
-    expect(source).not.toContain('hasTaskScrollOffset');
-    expect(source).not.toContain('handleTaskListScroll');
-    expect(source).not.toContain('transition-opacity duration-150 ease-out');
-    expect(source).not.toContain('className="flex shrink-0 flex-col gap-3 px-8 py-4 border-b"');
-    expect(source).toContain('className="flex shrink-0 flex-col gap-3 px-8 py-4"');
-    expect(source).toContain('className="h-full min-h-0"');
+    expect(source).toContain('<Empty');
+    expect(source).toContain('<EmptyMedia variant="icon">');
+    expect(source).toContain('<ScrollArea className="h-full min-h-0">');
+    expect(source).toContain('<Skeleton');
+    expect(source).not.toMatch(/\brounded(?:-\[[^\]]+\]|-[a-z0-9-]+)?\b/);
+    expect(source).not.toMatch(/borderRadius|border-radius/);
   });
 
-  it('keeps task details inside the parent task row instead of adding sibling table rows', () => {
+  it('keeps task details inside the parent task row', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
     expect(source).toContain('data-slot="task-row-layout"');
@@ -101,7 +107,7 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).not.toContain('id={`${childTask.id}-description`}');
   });
 
-  it('animates task row expansion with GSAP instead of CSS transitions', () => {
+  it('animates task row expansion with GSAP', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
     expect(source).toContain("import { gsap } from 'gsap'");
@@ -111,52 +117,33 @@ describe('TaskPanel table migration boundary', () => {
     expect(source).toContain('gsap.set');
     expect(source).toContain("overwrite: 'auto'");
     expect(source).toContain('autoAlpha');
-    expect(source).toContain('height');
     expect(source).toContain('prefers-reduced-motion: reduce');
-    expect(source).not.toContain('grid-template-rows');
-    expect(source.match(/transition-\[grid-template-rows\] duration-150 ease-out/g)).toBeNull();
-    expect(source.match(/transition-\[grid-template-rows\] duration-200 ease-out/g)).toBeNull();
     expect(source).toContain('dataSlot="task-child-form"');
-    expect(source).toContain('hasChildren &&');
     expect(source).toContain('data-slot="task-details-trigger"');
     expect(source).toContain('transition-[background-color,scale] duration-150 ease-out');
     expect(source).toContain('transform-gpu');
     expect(source).toContain('active:scale-[0.96]');
-    expect(source).toContain('data-[pressed=true]:scale-[0.96]');
-    expect(source).not.toContain('scale-[0.99]');
-    expect(source).not.toContain('transition-[opacity,transform] duration-150 ease-out');
-    expect(source).not.toContain("'translate-y-0 opacity-100'");
-    expect(source).not.toContain("'-translate-y-1 opacity-0'");
-    expect(source).not.toContain('taskDetailExitDurationMs');
-    expect(source).not.toContain('renderedTaskDetailIds');
-    expect(source).not.toContain('scale-y-');
+    expect(source).toContain('data-pressed:scale-[0.96]');
+    expect(source).not.toContain('grid-template-rows');
     expect(source).not.toContain('transition-all');
   });
 
-  it('keeps the child todo input visually flat while the child form animates independently', () => {
+  it('keeps the child todo input flat while its disclosure animates independently', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
-    expect(source).toContain('dataSlot="task-child-form"');
     expect(source).toContain('visibleChildTaskParentId');
     expect(source).toContain('setVisibleChildTaskParentId');
     expect(source).toContain('window.requestAnimationFrame');
     expect(source).toContain('window.cancelAnimationFrame');
-    expect(source).toContain('px-0.5 py-0.5');
-    expect(source).toContain('overflow-visible');
+    expect(source).toContain('contentClassName="px-0.5 py-0.5"');
     expect(source).toContain('className="h-8 min-h-8 shadow-none"');
-    expect(source).not.toContain(
-      "'grid overflow-hidden transition-[grid-template-rows] duration-150 ease-out'",
-    );
   });
 
-  it('keeps the quick add input group full width while the add button stays fixed', () => {
+  it('keeps the quick add input group fluid and the add button fixed', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
-    expect(source).toContain('className="flex w-full flex-col gap-3"');
-    expect(source).toContain('className="w-full min-w-0"');
-    expect(source).toContain('fullWidth');
     expect(source).toContain('className="flex w-full min-w-0 flex-col gap-2 sm:flex-row"');
-    expect(source).toContain('<InputGroup className="w-full min-w-0 flex-1" fullWidth>');
+    expect(source).toContain('<InputGroup className="w-full min-w-0 flex-1">');
     expect(source).toContain('className="h-9 shrink-0"');
   });
 
@@ -165,45 +152,41 @@ describe('TaskPanel table migration boundary', () => {
 
     expect(source).toContain('className="flex shrink-0 flex-col gap-3 px-8 py-4"');
     expect(source).toMatch(
-      /\{status === 'ready' && parentTasks\.length > 0 && \(\s+<div className="px-8">\s+<Table className="border-b" variant="secondary">/,
+      /\{status === 'ready' && parentTasks\.length > 0 && \(\s+<div className="px-8">\s+<Table aria-label="Tasks" className="border-b">/,
     );
   });
 
-  it('uses the task title area as the details trigger instead of caret and note menu buttons', async () => {
+  it('uses the task title area as the details trigger', async () => {
     const user = userEvent.setup();
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
     render(createElement(TaskPanel, { currentWorkspace }));
 
     const trigger = await screen.findByRole('button', {
-      name: 'Expand details for Review HeroUI migration',
+      name: 'Expand details for Review component migration',
     });
 
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('button', { name: /Expand Review HeroUI migration/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Expand Review component migration/ })).toBeNull();
     expect(
-      screen.queryByRole('button', { name: /Show notes for Review HeroUI migration/ }),
+      screen.queryByRole('button', { name: /Show notes for Review component migration/ }),
     ).toBeNull();
-    expect(source).not.toContain('ArrowRight01Icon');
-    expect(source).not.toContain('MoreHorizontalIcon');
+    expect(source).not.toContain('IconChevronRight');
+    expect(source).not.toContain('IconDots');
 
     await user.click(trigger);
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('keeps task context menu icon colors aligned with their labels', () => {
+  it('groups task context actions and marks delete as destructive', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
+    expect(source).toContain('<ContextMenuGroup>');
+    expect(source).toContain('<IconEdit aria-hidden="true" />');
+    expect(source).toContain('<IconTrash aria-hidden="true" />');
     expect(source).toContain(
-      '<HugeiconsIcon icon={Edit02Icon} aria-hidden="true" className="size-4" />',
-    );
-    expect(source).toContain('className="hover:bg-danger-soft-hover');
-    expect(source).toMatch(
-      /<HugeiconsIcon\s+icon=\{Delete02Icon\}\s+aria-hidden="true"\s+className="size-4 text-danger"\s+\/>/,
-    );
-    expect(source).not.toContain(
-      'icon={Edit02Icon} aria-hidden="true" className="size-4 text-muted"',
+      '<ContextMenuItem variant="destructive" onClick={() => openDeleteTaskDialog(task)}>',
     );
   });
 
@@ -221,7 +204,7 @@ describe('TaskPanel table migration boundary', () => {
     expect(addButton).toBeEnabled();
   });
 
-  it('keeps the quick add accessory controls visible and visually subdued', async () => {
+  it('keeps the quick add accessory controls accessible through Base triggers', async () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
     render(createElement(TaskPanel, { currentWorkspace }));
@@ -231,31 +214,28 @@ describe('TaskPanel table migration boundary', () => {
     expect(screen.getByRole('button', { name: 'Select project' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Select priority' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Edit description' })).toBeVisible();
-    expect(source).toContain('[--button-fg:var(--field-placeholder)]');
-    expect(source).toContain('hover:[--button-fg:var(--field-foreground)]');
-    expect(source).not.toContain('--muted-foreground');
+    expect(source).toContain('<DropdownMenuTrigger');
+    expect(source).toContain('<PopoverTrigger');
+    expect(source).toContain('render={');
   });
 
-  it('separates task API errors from field validation errors and empty overlay triggers', () => {
+  it('separates API errors from form controls and composes loading spinners', () => {
     const source = fs.readFileSync(taskPanelPath, 'utf8');
 
     expect(source).toContain('function TaskApiErrorMessage');
     expect(source).toContain('role="alert"');
-    expect(source).toContain('FieldError');
-    expect(source).toContain('Task title is required');
     expect(source).toContain('{quickAddError || taskActionError}');
     expect(source).toContain('{childTaskError}');
     expect(source).toContain('{editTaskError}');
     expect(source).toContain('{deleteTaskError}');
-    expect(source).not.toContain('<Popover.Trigger>');
-    expect(source).not.toContain('<Dropdown.Trigger');
+    expect(source).toContain('<Spinner data-icon="inline-start" />');
   });
 
-  it('renders task rows through the HeroUI task table', async () => {
+  it('renders task rows through the semantic shadcn table', async () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
-    expect(await screen.findByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
-    expect(screen.getByText('Review HeroUI migration')).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.getByText('Review component migration')).toBeInTheDocument();
     expect(screen.getByText('/Dao Project')).toBeInTheDocument();
     expect(screen.getByText('High')).toBeInTheDocument();
   });

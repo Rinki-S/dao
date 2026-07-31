@@ -1,8 +1,16 @@
-import { Button, FieldError, Input, Label, Popover, TextField } from '@heroui/react';
-import { useState } from 'react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import Link01Icon from '@hugeicons/core-free-icons/Link01Icon';
+import { IconLink } from '@tabler/icons-react';
+import { useId, useState } from 'react';
 
+import { Button } from '@/components/ui/button.jsx';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field.jsx';
+import { Input } from '@/components/ui/input.jsx';
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@/components/ui/popover.jsx';
 import {
   escapeMarkdownDestination,
   getMarkdownLinkDestinationError,
@@ -10,6 +18,8 @@ import {
 } from './markdown-toolbar-values.js';
 
 export function MarkdownLinkControl({ editor, isActive }) {
+  const hrefId = useId();
+  const titleId = useId();
   const [href, setHref] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [linkCommandError, setLinkCommandError] = useState('');
@@ -59,62 +69,78 @@ export function MarkdownLinkControl({ editor, isActive }) {
     setIsOpen(false);
   };
 
+  const trigger = (
+    <Button
+      aria-label={isActive ? 'Edit link' : 'Add link'}
+      aria-pressed={isActive || undefined}
+      className="dao-markdown-toolbar__button"
+      size="icon-sm"
+      type="button"
+      variant={isActive ? 'secondary' : 'ghost'}
+    >
+      <IconLink aria-hidden="true" className="size-4" data-icon="inline-start" />
+    </Button>
+  );
+
   return (
-    <Popover isOpen={isOpen} onOpenChange={handleOpenChange}>
-      <Button
-        aria-label={isActive ? 'Edit link' : 'Add link'}
-        aria-pressed={isActive || undefined}
-        className="dao-markdown-toolbar__button"
-        isIconOnly
-        size="sm"
-        type="button"
-        variant={isActive ? 'secondary' : 'ghost'}
-      >
-        <HugeiconsIcon aria-hidden="true" className="size-4" icon={Link01Icon} />
-      </Button>
-      <Popover.Content className="dao-markdown-link-popover__content" placement="bottom">
-        <Popover.Dialog className="dao-markdown-link-popover">
-          <form className="dao-markdown-link-popover__form" onSubmit={applyLink}>
-            <TextField
-              fullWidth
-              isInvalid={Boolean(hrefError)}
-              value={href}
-              onChange={(value) => {
-                setHref(value);
-                setLinkCommandError('');
-              }}
-            >
-              <Label>Link URL</Label>
-              <Input autoFocus placeholder="https://example.com" variant="secondary" />
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
+      <PopoverTrigger render={trigger} />
+      <PopoverContent className="dao-markdown-link-popover__content">
+        <PopoverHeader className="sr-only">
+          <PopoverTitle>{isActive ? 'Edit Markdown link' : 'Add Markdown link'}</PopoverTitle>
+        </PopoverHeader>
+        <form className="dao-markdown-link-popover__form" onSubmit={applyLink}>
+          <FieldGroup className="gap-3">
+            <Field data-invalid={Boolean(hrefError)}>
+              <FieldLabel htmlFor={hrefId}>Link URL</FieldLabel>
+              <Input
+                autoFocus
+                aria-invalid={Boolean(hrefError) || undefined}
+                id={hrefId}
+                placeholder="https://example.com"
+                value={href}
+                onChange={(event) => {
+                  setHref(event.target.value);
+                  setLinkCommandError('');
+                }}
+              />
               <FieldError>{hrefError}</FieldError>
-            </TextField>
-            <TextField fullWidth isInvalid={Boolean(titleError)} value={title} onChange={setTitle}>
-              <Label>Title</Label>
-              <Input placeholder="Optional title" variant="secondary" />
+            </Field>
+            <Field data-invalid={Boolean(titleError)}>
+              <FieldLabel htmlFor={titleId}>Title</FieldLabel>
+              <Input
+                aria-invalid={Boolean(titleError) || undefined}
+                id={titleId}
+                placeholder="Optional title"
+                value={title}
+                onChange={(event) => {
+                  setTitle(event.target.value);
+                }}
+              />
               <FieldError>{titleError}</FieldError>
-            </TextField>
-            <div className="dao-markdown-link-popover__actions">
-              {isActive && (
-                <Button size="sm" type="button" variant="ghost" onPress={removeLink}>
-                  Remove
-                </Button>
-              )}
-              <Button size="sm" type="button" variant="ghost" onPress={() => setIsOpen(false)}>
-                Cancel
+            </Field>
+          </FieldGroup>
+          <div className="dao-markdown-link-popover__actions">
+            {isActive && (
+              <Button size="sm" type="button" variant="ghost" onClick={removeLink}>
+                Remove
               </Button>
-              <Button
-                isDisabled={
-                  href.trim() === '' || Boolean(destinationError || titleError || linkCommandError)
-                }
-                size="sm"
-                type="submit"
-              >
-                Apply
-              </Button>
-            </div>
-          </form>
-        </Popover.Dialog>
-      </Popover.Content>
+            )}
+            <Button size="sm" type="button" variant="ghost" onClick={() => setIsOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                href.trim() === '' || Boolean(destinationError || titleError || linkCommandError)
+              }
+              size="sm"
+              type="submit"
+            >
+              Apply
+            </Button>
+          </div>
+        </form>
+      </PopoverContent>
     </Popover>
   );
 }

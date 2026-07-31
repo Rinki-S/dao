@@ -1,8 +1,20 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { MarkdownEditorToolbar } from './MarkdownEditorToolbar.jsx';
+
+const editorDirectory = import.meta.dirname;
+const toolbarSourceFiles = [
+  'MarkdownEditorToolbar.jsx',
+  'MarkdownBlockTypeControl.jsx',
+  'MarkdownInsertControl.jsx',
+  'MarkdownLinkControl.jsx',
+  'markdown-editor.css',
+];
 
 vi.mock('@tiptap/react', async () => {
   const actual = await vi.importActual('@tiptap/react');
@@ -65,6 +77,49 @@ function createEditor({ activeTypes = [], headingLevel = null, linkAttributes = 
 
   return { capabilityChain, commandChain, editor };
 }
+
+describe('MarkdownEditorToolbar shadcn Base UI migration boundary', () => {
+  it('uses Base composition, Tabler icons, and shadcn fields without legacy APIs', () => {
+    const sources = toolbarSourceFiles.map((fileName) => ({
+      fileName,
+      source: fs.readFileSync(path.join(editorDirectory, fileName), 'utf8'),
+    }));
+    const combinedSource = sources.map(({ source }) => source).join('\n');
+
+    expect(combinedSource).toContain("from '@tabler/icons-react'");
+    expect(combinedSource).toContain('@/components/ui/dropdown-menu.jsx');
+    expect(combinedSource).toContain('@/components/ui/dialog.jsx');
+    expect(combinedSource).toContain('@/components/ui/popover.jsx');
+    expect(combinedSource).toContain('<DropdownMenuGroup>');
+    expect(combinedSource).toContain('<DialogTitle>Insert image reference</DialogTitle>');
+    expect(combinedSource).toContain('<PopoverTitle>');
+    expect(combinedSource).toContain('<FieldGroup');
+    expect(combinedSource).toContain('render={');
+
+    const forbiddenLegacyTokens = [
+      '@hero' + 'ui',
+      'huge' + 'icons',
+      'ra' + 'dix-ui',
+      '@ra' + 'dix-ui',
+      'as' + 'Child',
+      'is' + 'Disabled',
+      'is' + 'IconOnly',
+      'on' + 'Press',
+      'full' + 'Width',
+      'validation' + 'Behavior',
+    ];
+
+    for (const token of forbiddenLegacyTokens) {
+      expect(combinedSource).not.toContain(token);
+    }
+
+    for (const { fileName, source } of sources) {
+      expect(source, fileName).not.toMatch(
+        /\brounded(?:-\[[^\]]+\]|-[a-z0-9-]+)?\b|borderRadius|border-radius/,
+      );
+    }
+  });
+});
 
 describe('MarkdownEditorToolbar', () => {
   it('lists Paragraph and every Markdown heading level with the active level selected', async () => {
@@ -241,7 +296,9 @@ describe('MarkdownEditorToolbar', () => {
     await user.keyboard('{Escape}');
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: 'Insert image reference' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('dialog', { name: 'Insert image reference' }),
+      ).not.toBeInTheDocument();
       expect(insertMenuButton).toHaveFocus();
     });
 

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import FileNotFoundIcon from '@hugeicons/core-free-icons/FileNotFoundIcon';
+import { IconFileOff } from '@tabler/icons-react';
 import { AppSidebar } from '@/components/app/AppSidebar.jsx';
 import { AppTabBar } from '@/components/app/AppTabBar.jsx';
 import { AppTitleBar } from '@/components/app/AppTitleBar.jsx';
@@ -425,11 +424,7 @@ function App() {
               {!activeTab ? (
                 <div className="flex min-h-0 flex-1 items-center justify-center px-8 py-7 text-center">
                   <div className="flex max-w-sm flex-col items-center">
-                    <HugeiconsIcon
-                      icon={FileNotFoundIcon}
-                      aria-hidden="true"
-                      className="mb-4 size-8 text-muted"
-                    />
+                    <IconFileOff aria-hidden="true" className="mb-4 size-8 text-muted-foreground" />
                     <h1 className="font-heading text-lg font-semibold text-muted-foreground">
                       No page open
                     </h1>

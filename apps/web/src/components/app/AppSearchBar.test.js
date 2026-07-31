@@ -14,19 +14,21 @@ vi.mock('@/features/search/api.js', () => ({
 
 const appSearchBarPath = path.resolve(import.meta.dirname, 'AppSearchBar.jsx');
 
-describe('AppSearchBar HeroUI migration boundary', () => {
+describe('AppSearchBar shadcn Base UI boundary', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
-  it('uses HeroUI search and result label primitives directly', () => {
+  it('uses shadcn input and result primitives backed by Base UI', () => {
     const source = fs.readFileSync(appSearchBarPath, 'utf8');
 
-    expect(source).toContain("from '@heroui/react'");
-    expect(source).toContain('SearchField');
-    expect(source).toContain('Chip');
-    expect(source).not.toContain('@/components/ui/');
+    expect(source).toContain('@/components/ui/input-group.jsx');
+    expect(source).toContain('@/components/ui/badge.jsx');
+    expect(source).toContain('@/components/ui/skeleton.jsx');
+    expect(source).toContain('@/lib/corners.jsx');
+    expect(source).not.toContain('@heroui');
+    expect(source).not.toMatch(/rounded-|border-radius|borderRadius/);
   });
 
   it('keeps the app search command focus target on the input', () => {

@@ -1,5 +1,17 @@
 import { z } from 'zod';
 
+export function isReactComponentType(value) {
+  return (
+    typeof value === 'function' ||
+    (typeof value === 'object' &&
+      value !== null &&
+      typeof value.$$typeof === 'symbol' &&
+      typeof value.render === 'function')
+  );
+}
+
+const ReactComponentTypeSchema = z.custom(isReactComponentType);
+
 const CommandCapabilitySchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -15,7 +27,7 @@ const SidebarItemCapabilitySchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
   href: z.string().min(1),
-  icon: z.custom((value) => typeof value === 'function').optional(),
+  icon: ReactComponentTypeSchema.optional(),
   order: z.number(),
 });
 
@@ -29,7 +41,7 @@ const SurfaceCapabilitySchema = z.object({
 const ContentFormatCapabilitySchema = z.object({
   format: z.string().min(1),
   label: z.string().min(1),
-  icon: z.custom((value) => typeof value === 'function'),
+  icon: ReactComponentTypeSchema,
 });
 
 export const ExtensionSchema = z.object({

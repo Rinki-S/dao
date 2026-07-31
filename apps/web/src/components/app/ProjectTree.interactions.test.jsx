@@ -30,6 +30,10 @@ vi.mock('@/features/activities/events.js', () => ({
   subscribeToActivityChanged: vi.fn(() => vi.fn()),
 }));
 
+vi.mock('@/extensions/registry.js', () => ({
+  getContentFormatIcon: vi.fn(() => 'svg'),
+}));
+
 const currentWorkspace = {
   id: 'workspace-1',
   name: 'Personal',

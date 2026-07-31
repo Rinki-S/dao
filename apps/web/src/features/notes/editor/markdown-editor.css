@@ -70,9 +70,9 @@
 }
 
 .dao-markdown-toolbar__block-type:hover,
-.dao-markdown-toolbar__block-type[data-open],
+.dao-markdown-toolbar__block-type[aria-expanded='true'],
 .dao-markdown-toolbar__insert:hover,
-.dao-markdown-toolbar__insert[data-open] {
+.dao-markdown-toolbar__insert[aria-expanded='true'] {
   color: var(--foreground);
 }
 
@@ -247,7 +247,6 @@
 .dao-markdown-editor__prose :not(pre) > code {
   padding: 0.1rem 0.32rem;
   border: 1px solid var(--separator);
-  border-radius: 4px;
   background: var(--surface-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.88em;
@@ -257,7 +256,6 @@
   overflow-x: auto;
   padding: 1rem;
   border: 1px solid var(--separator);
-  border-radius: 6px;
   background: var(--surface-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.875rem;
@@ -311,7 +309,6 @@
 .dao-markdown-editor__prose img {
   max-width: 100%;
   height: auto;
-  border-radius: 8px;
 }
 
 .dao-markdown-editor__prose p.is-editor-empty:first-child::before {

@@ -1,6 +1,5 @@
 import { useId } from 'react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import FileCodeIcon from '@hugeicons/core-free-icons/FileCodeIcon';
+import { IconFileCode } from '@tabler/icons-react';
 import { EditorContent, useEditor } from '@tiptap/react';
 
 import { getMarkdownCompatibility } from './markdown-compatibility.js';
@@ -16,7 +15,7 @@ function MarkdownSourceFallback({ ariaLabel, initialMarkdown, onMarkdownChange, 
     <div className="dao-markdown-editor dao-markdown-editor--source">
       <div className="dao-markdown-source-header" role="note">
         <div className="dao-markdown-source-header__message">
-          <HugeiconsIcon aria-hidden="true" className="size-4 shrink-0" icon={FileCodeIcon} />
+          <IconFileCode aria-hidden="true" className="size-4 shrink-0" />
           <div className="dao-markdown-source-header__copy">
             <span className="dao-markdown-source-header__title">Source mode</span>
             <span id={descriptionId}>

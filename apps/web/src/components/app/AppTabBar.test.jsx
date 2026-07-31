@@ -49,12 +49,7 @@ describe('AppTabBar', () => {
     const onSelectTab = vi.fn();
 
     render(
-      <AppTabBar
-        tabs={tabs}
-        activeTabId="tasks"
-        onSelectTab={onSelectTab}
-        onCloseTab={vi.fn()}
-      />,
+      <AppTabBar tabs={tabs} activeTabId="tasks" onSelectTab={onSelectTab} onCloseTab={vi.fn()} />,
     );
 
     await user.click(screen.getByRole('tab', { name: /Dao Project/ }));

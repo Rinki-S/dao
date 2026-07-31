@@ -522,10 +522,11 @@ The command palette should stay global and keyboard-first.
 Implementation direction:
 
 - use `cmdk` for command search, selection, and keyboard interaction
-- use HeroUI for the modal shell, keyboard hint styling, overlay behavior, and semantic colors
+- use the shadcn `Command`, `Dialog`, and `Kbd` components backed by Base UI for the shell
 - center the palette above the app shell
 - keep the backdrop above the titlebar
-- use HeroUI surface, field, focus, muted, danger, separator, and accent-soft tokens instead of shadcn-era color names
+- use shadcn semantic colors while retaining Dao's jade `accent-soft` selected state
+- use Lisse for the palette, input, item, and keyboard-hint corner geometry
 
 ### Dashboard
 
@@ -763,7 +764,7 @@ Dao should demonstrate:
 The immediate goal is:
 
 ```txt
-Finish the HeroUI product-shell migration and note editor loop.
+Finish the shadcn Base UI product-shell migration and note editor loop.
 ```
 
 The current meaningful demo should prove:

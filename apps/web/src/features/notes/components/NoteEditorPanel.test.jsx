@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getNote, updateNote, updateNoteContent } from '../api.js';
@@ -8,6 +11,9 @@ import {
 } from '@/features/notes/note-save-queue.js';
 import { listWorkspaces } from '@/features/workspaces/api.js';
 import { NoteEditorPanel } from './NoteEditorPanel.jsx';
+
+const noteEditorPanelPath = path.resolve(import.meta.dirname, 'NoteEditorPanel.jsx');
+const noteEditorPanelStylesPath = path.resolve(import.meta.dirname, 'note-editor-panel.css');
 
 vi.mock('../api.js', () => ({
   getNote: vi.fn(),
@@ -90,6 +96,31 @@ describe('NoteEditorPanel', () => {
   afterEach(async () => {
     await resetNoteSaveQueueForTests();
     vi.clearAllMocks();
+  });
+
+  it('uses shadcn, Tabler, and shared corners without legacy component or radius APIs', () => {
+    const source = fs.readFileSync(noteEditorPanelPath, 'utf8');
+    const styles = fs.readFileSync(noteEditorPanelStylesPath, 'utf8');
+    const combinedSource = `${source}\n${styles}`;
+
+    expect(source).toContain("from '@/components/ui/skeleton.jsx'");
+    expect(source).toContain("from '@tabler/icons-react'");
+    expect(source).toContain("from '@/lib/corners.jsx'");
+    expect(source).toContain('dataSlot="note-save-status-dot"');
+
+    for (const token of [
+      '@hero' + 'ui',
+      'huge' + 'icons',
+      'ra' + 'dix-ui',
+      '@ra' + 'dix-ui',
+      'as' + 'Child',
+    ]) {
+      expect(combinedSource).not.toContain(token);
+    }
+
+    expect(combinedSource).not.toMatch(
+      /\brounded(?:-\[[^\]]+\]|-[a-z0-9-]+)?\b|borderRadius|border-radius/,
+    );
   });
 
   it('loads markdown content for the selected note', async () => {

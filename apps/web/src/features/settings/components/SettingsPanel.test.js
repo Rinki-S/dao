@@ -13,7 +13,7 @@ vi.mock('@/features/notes/note-save-queue.js', () => ({
 
 const settingsPanelPath = path.resolve(import.meta.dirname, 'SettingsPanel.jsx');
 
-describe('SettingsPanel HeroUI migration boundary', () => {
+describe('SettingsPanel shadcn Base UI boundary', () => {
   beforeEach(() => {
     waitForAllPendingNoteSaves.mockResolvedValue();
     Object.defineProperty(window, 'dao', {
@@ -30,20 +30,19 @@ describe('SettingsPanel HeroUI migration boundary', () => {
     delete window.dao;
   });
 
-  it('uses HeroUI directly instead of the legacy shadcn ui layer', () => {
+  it('uses shadcn components backed by Base UI', () => {
     const source = fs.readFileSync(settingsPanelPath, 'utf8');
 
-    expect(source).toContain("from '@heroui/react'");
-    expect(source).not.toContain('@/components/ui/');
+    expect(source).toContain('@/components/ui/button.jsx');
+    expect(source).toContain('@/components/ui/card.jsx');
+    expect(source).not.toContain('@heroui');
   });
 
-  it('configures rounded settings surfaces explicitly', () => {
+  it('delegates settings surface geometry to the shared card component', () => {
     const source = fs.readFileSync(settingsPanelPath, 'utf8');
-    const roundedDefaultSurfaces =
-      source.match(/<Surface[\s\S]*?className="[^"]*rounded-xl[^"]*"[\s\S]*?variant="default"/g) ??
-      [];
 
-    expect(roundedDefaultSurfaces).toHaveLength(2);
+    expect(source.match(/<Card\b/g)).toHaveLength(2);
+    expect(source).not.toMatch(/rounded-|border-radius|borderRadius/);
   });
 
   it('drains pending note saves before restarting the Go service', async () => {

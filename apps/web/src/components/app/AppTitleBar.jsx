@@ -1,6 +1,5 @@
-import { Button } from '@heroui/react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import ViewSidebarLeftIcon from '@hugeicons/core-free-icons/ViewSidebarLeftIcon';
+import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react';
+import { Button } from '@/components/ui/button.jsx';
 import { AppSearchBar } from './AppSearchBar.jsx';
 
 export function AppTitleBar({ isSidebarOpen, onToggleSidebar }) {
@@ -11,16 +10,24 @@ export function AppTitleBar({ isSidebarOpen, onToggleSidebar }) {
         <Button
           aria-label={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           className="app-no-drag size-8 text-muted-foreground"
-          isIconOnly
-          size="sm"
+          size="icon-lg"
           type="button"
           variant="ghost"
-          onPress={onToggleSidebar}
+          onClick={onToggleSidebar}
         >
-          <HugeiconsIcon
-            icon={ViewSidebarLeftIcon}
-            className="size-[18px] shrink-0 translate-y-px"
-          />
+          {isSidebarOpen ? (
+            <IconLayoutSidebarLeftCollapse
+              aria-hidden="true"
+              className="size-[18px] shrink-0 translate-y-px"
+              data-icon="inline-start"
+            />
+          ) : (
+            <IconLayoutSidebarLeftExpand
+              aria-hidden="true"
+              className="size-[18px] shrink-0 translate-y-px"
+              data-icon="inline-start"
+            />
+          )}
         </Button>
         <div className="min-w-0 truncate text-xs font-medium text-muted-foreground">Dao</div>
       </div>

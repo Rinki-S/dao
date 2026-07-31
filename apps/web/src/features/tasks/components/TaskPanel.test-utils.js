@@ -1,3 +1,10 @@
+if (typeof Element !== 'undefined' && !Element.prototype.getAnimations) {
+  Object.defineProperty(Element.prototype, 'getAnimations', {
+    configurable: true,
+    value: () => [],
+  });
+}
+
 export const currentWorkspace = {
   id: 'workspace-1',
   name: 'Personal',
@@ -35,7 +42,7 @@ export function taskFixture(overrides = {}) {
     workspaceId: 'workspace-1',
     projectId: 'project-1',
     parentId: null,
-    title: 'Review HeroUI migration',
+    title: 'Review component migration',
     description: 'Check the row trigger behavior.',
     status: 'todo',
     priority: 'high',

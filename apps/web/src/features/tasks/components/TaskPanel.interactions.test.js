@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { listProjects } from '../../projects/api.js';
@@ -37,7 +37,7 @@ describe('TaskPanel interactions', () => {
     vi.clearAllMocks();
   });
 
-  it('creates a task from the HeroUI quick add form', async () => {
+  it('creates a task from the shadcn quick add form', async () => {
     const user = userEvent.setup();
     render(createElement(TaskPanel, { currentWorkspace }));
 
@@ -51,6 +51,40 @@ describe('TaskPanel interactions', () => {
       title: 'Write migration notes',
       description: '',
       priority: 'medium',
+      dueDate: null,
+    });
+  });
+
+  it('creates a task with Base menu selections and a popover description', async () => {
+    const user = userEvent.setup();
+    render(createElement(TaskPanel, { currentWorkspace }));
+
+    const titleInput = await screen.findByPlaceholderText('Add a task...');
+
+    await user.click(screen.getByRole('button', { name: 'Select project' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Dao Project' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('menuitemradio', { name: 'Dao Project' })).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Select priority' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'High' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('menuitemradio', { name: 'High' })).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Edit description' }));
+    await user.type(await screen.findByPlaceholderText('Add details...'), 'Details');
+
+    await user.type(titleInput, 'Ship Base migration');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(createTask).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      projectId: 'project-1',
+      title: 'Ship Base migration',
+      description: 'Details',
+      priority: 'high',
       dueDate: null,
     });
   });
@@ -69,8 +103,8 @@ describe('TaskPanel interactions', () => {
       expect(createTask).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByText('Unable to create task')).toBeInTheDocument();
-    expect(screen.getByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
-    expect(screen.getByText('Review HeroUI migration')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.getByText('Review component migration')).toBeInTheDocument();
     expect(titleInput).toHaveValue('Write failure notes');
     expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled();
     expect(listTasks).toHaveBeenCalledTimes(1);
@@ -90,11 +124,14 @@ describe('TaskPanel interactions', () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
     const addChildButton = await screen.findByRole('button', {
-      name: 'Add child todo to Review HeroUI migration',
+      name: 'Add child todo to Review component migration',
     });
 
     await user.click(addChildButton);
-    await user.type(await screen.findByLabelText('Child todo for Review HeroUI migration'), 'Ship');
+    await user.type(
+      await screen.findByLabelText('Child todo for Review component migration'),
+      'Ship',
+    );
     await user.click(screen.getAllByRole('button', { name: 'Add' }).at(-1));
 
     await waitFor(() => {
@@ -102,21 +139,23 @@ describe('TaskPanel interactions', () => {
     });
 
     expect(screen.queryByText('Loading tasks...')).not.toBeInTheDocument();
-    expect(screen.getByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Tasks' })).toBeInTheDocument();
 
-    resolveTaskReload([
-      taskFixture({
-        status: 'doing',
-        version: 2,
-      }),
-      taskFixture({
-        id: 'task-2',
-        parentId: 'task-1',
-        title: 'Ship',
-        description: '',
-        status: 'todo',
-      }),
-    ]);
+    await act(async () => {
+      resolveTaskReload([
+        taskFixture({
+          status: 'doing',
+          version: 2,
+        }),
+        taskFixture({
+          id: 'task-2',
+          parentId: 'task-1',
+          title: 'Ship',
+          description: '',
+          status: 'todo',
+        }),
+      ]);
+    });
   });
 
   it('keeps the child todo form open when creating a child todo fails', async () => {
@@ -126,11 +165,11 @@ describe('TaskPanel interactions', () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
     const addChildButton = await screen.findByRole('button', {
-      name: 'Add child todo to Review HeroUI migration',
+      name: 'Add child todo to Review component migration',
     });
 
     await user.click(addChildButton);
-    const childInput = await screen.findByLabelText('Child todo for Review HeroUI migration');
+    const childInput = await screen.findByLabelText('Child todo for Review component migration');
     await user.type(childInput, 'ShipChildTodo');
     await user.click(screen.getAllByRole('button', { name: 'Add' }).at(-1));
 
@@ -138,11 +177,11 @@ describe('TaskPanel interactions', () => {
       expect(createTask).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByText('Unable to create child todo')).toBeInTheDocument();
-    expect(screen.getByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
-    expect(screen.getByText('Review HeroUI migration')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.getByText('Review component migration')).toBeInTheDocument();
     expect(childInput).toHaveValue('ShipChildTodo');
     expect(
-      screen.getByRole('button', { name: 'Add child todo to Review HeroUI migration' }),
+      screen.getByRole('button', { name: 'Add child todo to Review component migration' }),
     ).toBeEnabled();
     expect(listTasks).toHaveBeenCalledTimes(1);
   });
@@ -154,7 +193,7 @@ describe('TaskPanel interactions', () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
     await user.click(
-      await screen.findByRole('checkbox', { name: 'Toggle Review HeroUI migration' }),
+      await screen.findByRole('checkbox', { name: 'Toggle Review component migration' }),
     );
 
     await waitFor(() => {
@@ -169,7 +208,7 @@ describe('TaskPanel interactions', () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
     const checkbox = await screen.findByRole('checkbox', {
-      name: 'Toggle Review HeroUI migration',
+      name: 'Toggle Review component migration',
     });
 
     await user.click(checkbox);
@@ -178,8 +217,8 @@ describe('TaskPanel interactions', () => {
       expect(updateTaskStatus).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByText('Unable to update task status')).toBeInTheDocument();
-    expect(screen.getByRole('grid', { name: 'Tasks' })).toBeInTheDocument();
-    expect(screen.getByText('Review HeroUI migration')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.getByText('Review component migration')).toBeInTheDocument();
     expect(checkbox).toBeEnabled();
     expect(checkbox).not.toBeChecked();
     expect(listTasks).toHaveBeenCalledTimes(1);
@@ -204,7 +243,9 @@ describe('TaskPanel interactions', () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
     await user.click(
-      await screen.findByRole('button', { name: 'Expand details for Review HeroUI migration' }),
+      await screen.findByRole('button', {
+        name: 'Expand details for Review component migration',
+      }),
     );
     await user.click(await screen.findByRole('checkbox', { name: 'Toggle Check child checkbox' }));
 
@@ -239,7 +280,7 @@ describe('TaskPanel interactions', () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
     const parentCheckbox = await screen.findByRole('checkbox', {
-      name: 'Toggle Review HeroUI migration',
+      name: 'Toggle Review component migration',
     });
 
     expect(parentCheckbox).toBePartiallyChecked();
@@ -266,7 +307,7 @@ describe('TaskPanel interactions', () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
     const trigger = await screen.findByRole('button', {
-      name: 'Expand details for Review HeroUI migration',
+      name: 'Expand details for Review component migration',
     });
 
     fireEvent.contextMenu(trigger, { clientX: 120, clientY: 160 });
@@ -279,12 +320,14 @@ describe('TaskPanel interactions', () => {
     await user.type(titleInput, 'Updated task');
     await user.clear(screen.getByLabelText('Description'));
     await user.type(screen.getByLabelText('Description'), 'Updated description');
+    await user.click(screen.getByRole('combobox', { name: 'Priority' }));
+    await user.click(await screen.findByRole('option', { name: 'Low' }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(updateTask).toHaveBeenCalledWith('task-1', {
       title: 'Updated task',
       description: 'Updated description',
-      priority: 'high',
+      priority: 'low',
       dueDate: null,
       projectId: 'project-1',
     });
@@ -295,7 +338,7 @@ describe('TaskPanel interactions', () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
     const trigger = await screen.findByRole('button', {
-      name: 'Expand details for Review HeroUI migration',
+      name: 'Expand details for Review component migration',
     });
 
     fireEvent.contextMenu(trigger, { clientX: 120, clientY: 160 });
@@ -321,7 +364,7 @@ describe('TaskPanel interactions', () => {
 
     const reopenedDialog = await screen.findByRole('dialog', { name: 'Edit task' });
     expect(within(reopenedDialog).getByLabelText('Title')).toHaveValue(
-      'Review HeroUI migration',
+      'Review component migration',
     );
     expect(within(reopenedDialog).getByLabelText('Description')).toHaveValue(
       'Check the row trigger behavior.',
@@ -335,7 +378,7 @@ describe('TaskPanel interactions', () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
     const trigger = await screen.findByRole('button', {
-      name: 'Expand details for Review HeroUI migration',
+      name: 'Expand details for Review component migration',
     });
 
     fireEvent.contextMenu(trigger, { clientX: 120, clientY: 160 });
@@ -383,16 +426,16 @@ describe('TaskPanel interactions', () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
     const trigger = await screen.findByRole('button', {
-      name: 'Expand details for Review HeroUI migration',
+      name: 'Expand details for Review component migration',
     });
 
     fireEvent.contextMenu(trigger, { clientX: 120, clientY: 160 });
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
 
     expect(deleteTask).not.toHaveBeenCalled();
-    const deleteDialog = await screen.findByRole('dialog', { name: 'Delete task' });
+    const deleteDialog = await screen.findByRole('alertdialog', { name: 'Delete task' });
     expect(deleteDialog).toBeInTheDocument();
-    expect(within(deleteDialog).getByText('Review HeroUI migration')).toBeInTheDocument();
+    expect(within(deleteDialog).getByText('Review component migration')).toBeInTheDocument();
     expect(within(deleteDialog).getByText(/and 2 child todos/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
@@ -418,19 +461,19 @@ describe('TaskPanel interactions', () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
     const parentTrigger = await screen.findByRole('button', {
-      name: 'Expand details for Review HeroUI migration',
+      name: 'Expand details for Review component migration',
     });
 
     fireEvent.contextMenu(parentTrigger, { clientX: 120, clientY: 160 });
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
 
-    const parentDeleteDialog = await screen.findByRole('dialog', { name: 'Delete task' });
-    expect(within(parentDeleteDialog).getByText('Review HeroUI migration')).toBeInTheDocument();
+    const parentDeleteDialog = await screen.findByRole('alertdialog', { name: 'Delete task' });
+    expect(within(parentDeleteDialog).getByText('Review component migration')).toBeInTheDocument();
 
     await user.click(within(parentDeleteDialog).getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: 'Delete task' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('alertdialog', { name: 'Delete task' })).not.toBeInTheDocument();
     });
     expect(deleteTask).not.toHaveBeenCalled();
 
@@ -440,14 +483,14 @@ describe('TaskPanel interactions', () => {
     fireEvent.contextMenu(childTitle, { clientX: 140, clientY: 220 });
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
 
-    const childDeleteDialog = await screen.findByRole('dialog', { name: 'Delete task' });
+    const childDeleteDialog = await screen.findByRole('alertdialog', { name: 'Delete task' });
     expect(within(childDeleteDialog).getByText('Check stale delete state')).toBeInTheDocument();
-    expect(within(childDeleteDialog).queryByText('Review HeroUI migration')).toBeNull();
+    expect(within(childDeleteDialog).queryByText('Review component migration')).toBeNull();
 
     await user.click(within(childDeleteDialog).getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: 'Delete task' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('alertdialog', { name: 'Delete task' })).not.toBeInTheDocument();
     });
     expect(deleteTask).not.toHaveBeenCalled();
   });
@@ -459,22 +502,22 @@ describe('TaskPanel interactions', () => {
     render(createElement(TaskPanel, { currentWorkspace }));
 
     const trigger = await screen.findByRole('button', {
-      name: 'Expand details for Review HeroUI migration',
+      name: 'Expand details for Review component migration',
     });
 
     fireEvent.contextMenu(trigger, { clientX: 120, clientY: 160 });
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
 
-    const deleteDialog = await screen.findByRole('dialog', { name: 'Delete task' });
+    const deleteDialog = await screen.findByRole('alertdialog', { name: 'Delete task' });
     await user.click(within(deleteDialog).getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
       expect(deleteTask).toHaveBeenCalledTimes(1);
     });
     expect(await within(deleteDialog).findByText('Unable to delete task')).toBeInTheDocument();
-    expect(screen.getByRole('dialog', { name: 'Delete task' })).toBeInTheDocument();
-    expect(screen.getByRole('grid', { hidden: true, name: 'Tasks' })).toBeInTheDocument();
-    expect(screen.getAllByText('Review HeroUI migration').length).toBeGreaterThan(0);
+    expect(screen.getByRole('alertdialog', { name: 'Delete task' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { hidden: true, name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.getAllByText('Review component migration').length).toBeGreaterThan(0);
     expect(listTasks).toHaveBeenCalledTimes(1);
   });
 });

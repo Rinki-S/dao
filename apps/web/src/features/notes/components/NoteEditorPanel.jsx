@@ -1,8 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Skeleton } from '@heroui/react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import FileEmpty01Icon from '@hugeicons/core-free-icons/FileEmpty01Icon';
+import { IconFileOff } from '@tabler/icons-react';
 
+import { Skeleton } from '@/components/ui/skeleton.jsx';
 import { notifyActivityChanged } from '@/features/activities/events.js';
 import {
   clearPendingNoteDraft,
@@ -15,6 +14,7 @@ import {
 } from '@/features/notes/note-save-queue.js';
 import { listProjects } from '@/features/projects/api.js';
 import { listWorkspaces } from '@/features/workspaces/api.js';
+import { CornerSurface } from '@/lib/corners.jsx';
 import { getNote, updateNote, updateNoteContent } from '../api.js';
 import './note-editor-panel.css';
 
@@ -42,21 +42,22 @@ function NoteEditorState({ title, description, tone = 'muted' }) {
   return (
     <section aria-label={title} className="dao-note-editor-state">
       <div className="flex max-w-sm flex-col items-center">
-        <HugeiconsIcon
-          icon={FileEmpty01Icon}
+        <IconFileOff
           aria-hidden="true"
-          className={tone === 'danger' ? 'mb-4 size-8 text-danger' : 'mb-4 size-8 text-muted'}
+          className={
+            tone === 'danger' ? 'mb-4 size-8 text-destructive' : 'mb-4 size-8 text-muted-foreground'
+          }
         />
         <h1
           className={
             tone === 'danger'
-              ? 'font-heading text-lg font-semibold text-danger'
-              : 'font-heading text-lg font-semibold text-muted'
+              ? 'font-heading text-lg font-semibold text-destructive'
+              : 'font-heading text-lg font-semibold text-muted-foreground'
           }
         >
           {title}
         </h1>
-        <p className="mt-2 text-sm text-muted text-pretty">{description}</p>
+        <p className="mt-2 text-sm text-muted-foreground text-pretty">{description}</p>
       </div>
     </section>
   );
@@ -71,15 +72,15 @@ function MarkdownEditorLoadingState() {
       role="status"
     >
       <div className="dao-note-editor-loading__toolbar">
-        <Skeleton className="h-7 w-72 max-w-full rounded-md" />
+        <Skeleton className="h-7 w-72 max-w-full" />
       </div>
       <div className="dao-note-editor-loading__body space-y-3">
-        <Skeleton className="h-4 w-full rounded" />
-        <Skeleton className="h-4 w-5/6 rounded" />
-        <Skeleton className="h-4 w-3/4 rounded" />
-        <Skeleton className="mt-7 h-5 w-2/5 rounded" />
-        <Skeleton className="h-4 w-full rounded" />
-        <Skeleton className="h-4 w-4/5 rounded" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-5/6" />
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="mt-7 h-5 w-2/5" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-4/5" />
       </div>
     </div>
   );
@@ -506,21 +507,21 @@ export function NoteEditorPanel({ noteId }) {
       <section aria-busy="true" aria-label="Loading note" className="dao-note-editor" role="status">
         <div className="dao-note-document-header">
           <div className="dao-note-document-meta">
-            <Skeleton className="h-3 w-48 rounded" />
-            <Skeleton className="h-3 w-14 rounded" />
+            <Skeleton className="h-3 w-48" />
+            <Skeleton className="h-3 w-14" />
           </div>
-          <Skeleton className="mt-3 h-10 w-80 max-w-full rounded-md" />
+          <Skeleton className="mt-3 h-10 w-80 max-w-full" />
         </div>
         <div className="dao-note-editor-loading__toolbar">
-          <Skeleton className="h-7 w-72 max-w-full rounded-md" />
+          <Skeleton className="h-7 w-72 max-w-full" />
         </div>
         <div className="dao-note-loading-body space-y-3">
-          <Skeleton className="h-4 w-full rounded" />
-          <Skeleton className="h-4 w-5/6 rounded" />
-          <Skeleton className="h-4 w-4/5 rounded" />
-          <Skeleton className="mt-7 h-5 w-2/5 rounded" />
-          <Skeleton className="h-4 w-full rounded" />
-          <Skeleton className="h-4 w-3/4 rounded" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
+          <Skeleton className="h-4 w-4/5" />
+          <Skeleton className="mt-7 h-5 w-2/5" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
         </div>
       </section>
     );
@@ -596,7 +597,13 @@ export function NoteEditorPanel({ noteId }) {
               className={`dao-note-save-status dao-note-save-status--${saveStatus}`}
               role="status"
             >
-              <span aria-hidden="true" className="dao-note-save-status__dot" />
+              <CornerSurface
+                as="span"
+                aria-hidden="true"
+                className="dao-note-save-status__dot"
+                corner="circle"
+                dataSlot="note-save-status-dot"
+              />
               {saveStatusLabel}
             </span>
           )}

@@ -5,12 +5,16 @@ import { describe, expect, it } from 'vitest';
 
 const onboardingPath = path.resolve(import.meta.dirname, 'WorkingDirectoryOnboarding.jsx');
 
-describe('WorkingDirectoryOnboarding HeroUI migration boundary', () => {
-  it('uses HeroUI directly instead of the legacy shadcn ui layer', () => {
+describe('WorkingDirectoryOnboarding shadcn Base UI boundary', () => {
+  it('uses shadcn form primitives and CSS radius geometry without HeroUI', () => {
     const source = fs.readFileSync(onboardingPath, 'utf8');
 
-    expect(source).toContain("from '@heroui/react'");
-    expect(source).not.toContain('@/components/ui/');
+    expect(source).toContain('@/components/ui/field.jsx');
+    expect(source).toContain('@/components/ui/input.jsx');
+    expect(source).toContain('@/components/ui/button.jsx');
+    expect(source).toContain('@/lib/corners.jsx');
+    expect(source).not.toContain('@heroui');
+    expect(source).not.toMatch(/rounded-|border-radius|borderRadius/);
   });
 
   it('renders step progress and directional step transitions', () => {

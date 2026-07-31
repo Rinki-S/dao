@@ -5,21 +5,25 @@ import { describe, expect, it } from 'vitest';
 
 const workspaceSwitcherPath = path.resolve(import.meta.dirname, 'WorkspaceSwitcher.jsx');
 
-describe('WorkspaceSwitcher HeroUI migration boundary', () => {
-  it('uses HeroUI directly instead of the legacy shadcn ui layer', () => {
+describe('WorkspaceSwitcher shadcn Base UI boundary', () => {
+  it('uses shadcn Base UI primitives and CSS radius geometry without HeroUI', () => {
     const source = fs.readFileSync(workspaceSwitcherPath, 'utf8');
 
-    expect(source).toContain("from '@heroui/react'");
-    expect(source).not.toContain('@/components/ui/');
+    expect(source).toContain('@/components/ui/dropdown-menu.jsx');
+    expect(source).toContain('@/components/ui/dialog.jsx');
+    expect(source).toContain('@/components/ui/field.jsx');
+    expect(source).toContain('@/lib/corners.jsx');
+    expect(source).not.toContain('@heroui');
+    expect(source).not.toMatch(/rounded-|border-radius|borderRadius/);
   });
 
-  it('uses HeroUI dropdown, modal, and text field primitives', () => {
+  it('uses menu groups, a titled dialog, and native form fields', () => {
     const source = fs.readFileSync(workspaceSwitcherPath, 'utf8');
 
-    expect(source).toContain('Dropdown');
-    expect(source).toContain('Form');
-    expect(source).toContain('Modal');
-    expect(source).toContain('TextField');
+    expect(source).toContain('DropdownMenuGroup');
+    expect(source).toContain('DialogTitle');
+    expect(source).toContain('FieldGroup');
+    expect(source).toContain('<form');
   });
 
   it('separates workspace API errors from field validation errors', () => {
@@ -27,25 +31,23 @@ describe('WorkspaceSwitcher HeroUI migration boundary', () => {
 
     expect(source).toContain('FieldError');
     expect(source).toContain('AppApiErrorMessage');
-    expect(source).toContain('<AppApiErrorMessage>{createError}</AppApiErrorMessage>');
+    expect(source).toContain('<AppApiErrorMessage>{workspaceApiError}</AppApiErrorMessage>');
     expect(source).toContain('Workspace name is required');
   });
 
   it('keeps the workspace dropdown trigger tactile when pressed', () => {
     const source = fs.readFileSync(workspaceSwitcherPath, 'utf8');
 
-    expect(source).toContain(
-      'transition-[transform,scale,background-color,color,width,height,padding]',
-    );
-    expect(source).toContain('data-[pressed=true]:scale-[0.97]');
+    expect(source).toContain('motion-colors-layout');
+    expect(source).toContain('data-pressed:scale-[0.97]');
     expect(source).toContain('active:scale-[0.97]');
     expect(source).toContain('transform-gpu');
   });
 
-  it('uses React Aria focus-visible state for the workspace trigger ring', () => {
+  it('uses native focus-visible state for the Base UI trigger ring', () => {
     const source = fs.readFileSync(workspaceSwitcherPath, 'utf8');
 
-    expect(source).toContain('data-[focus-visible=true]:ring-2');
-    expect(source).not.toContain('focus-visible:ring-2');
+    expect(source).toContain('focus-visible:ring-2');
+    expect(source).not.toContain('data-[focus-visible=true]');
   });
 });

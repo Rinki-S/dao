@@ -123,7 +123,6 @@
 .dao-note-save-status__dot {
   width: 0.35rem;
   height: 0.35rem;
-  border-radius: 999px;
   background: color-mix(in oklab, var(--accent) 55%, var(--muted));
 }
 
