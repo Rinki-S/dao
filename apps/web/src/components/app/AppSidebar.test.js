@@ -28,8 +28,9 @@ describe('AppSidebar shadcn Base UI boundary', () => {
   it('keeps sidebar navigation selected and pressed states visually distinct', () => {
     const source = fs.readFileSync(appSidebarPath, 'utf8');
 
-    expect(source).toContain('active:scale-[0.96]');
-    expect(source).toContain('data-pressed:scale-[0.96]');
+    expect(source).toContain('active:bg-sidebar-accent');
+    expect(source).toContain('data-pressed:bg-sidebar-accent');
+    expect(source).not.toMatch(/active:scale|data-pressed:scale/);
     expect(source).toContain('bg-accent-soft');
     expect(source).toContain('bg-accent-soft-hover');
     expect(source).toContain('text-accent-soft-foreground');

@@ -32,7 +32,7 @@ function PopoverContent({
           ref={ref}
           data-slot="popover-content"
           className={cn(
-            'rounded-lg z-50 flex w-72 origin-(--transform-origin) flex-col gap-4 bg-popover p-2.5 text-xs text-popover-foreground shadow-(--shadow-popover) ring-1 ring-foreground/10 outline-hidden duration-(--motion-fast) data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 motion-reduce:animate-none',
+            'rounded-lg z-50 flex w-72 origin-(--transform-origin) flex-col gap-4 bg-popover p-2.5 text-xs text-popover-foreground shadow-(--shadow-popover) ring-1 ring-foreground/10 outline-hidden duration-(--motion-fast) data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 motion-reduce:animate-none',
             className,
           )}
           {...props}

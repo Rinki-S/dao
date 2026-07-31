@@ -39,9 +39,8 @@ describe('WorkspaceSwitcher shadcn Base UI boundary', () => {
     const source = fs.readFileSync(workspaceSwitcherPath, 'utf8');
 
     expect(source).toContain('motion-colors-layout');
-    expect(source).toContain('data-pressed:scale-[0.97]');
-    expect(source).toContain('active:scale-[0.97]');
-    expect(source).toContain('transform-gpu');
+    expect(source).toContain('data-pressed:bg-sidebar-accent');
+    expect(source).not.toMatch(/active:scale|data-pressed:scale/);
   });
 
   it('uses native focus-visible state for the Base UI trigger ring', () => {

@@ -19,10 +19,10 @@ function ExtensionIcon(props) {
 }
 
 const sidebarSurfaceButtonBase =
-  'app-no-drag flex h-8 w-full transform-gpu items-center justify-start gap-2 overflow-hidden p-2 text-left text-sm font-normal ring-sidebar-ring outline-hidden motion-colors-layout focus-visible:ring-2 active:scale-[0.96] data-pressed:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-pressed:scale-100';
+  'app-no-drag flex h-8 w-full items-center justify-start gap-2 overflow-hidden p-2 text-left text-sm font-normal ring-sidebar-ring outline-hidden motion-colors-layout focus-visible:ring-2 motion-reduce:transition-none';
 
 const sidebarIconButtonBase =
-  'app-no-drag size-8 min-w-0 transform-gpu p-0 motion-colors focus-visible:ring-2 active:scale-[0.96] data-pressed:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-pressed:scale-100';
+  'app-no-drag size-8 min-w-0 p-0 motion-colors focus-visible:ring-2 motion-reduce:transition-none';
 
 const activeSurfaceButtonClass =
   'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground data-pressed:bg-accent-soft-hover data-pressed:text-accent-soft-foreground';

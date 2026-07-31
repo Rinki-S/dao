@@ -120,10 +120,8 @@ describe('TaskPanel shadcn Base UI migration boundary', () => {
     expect(source).toContain('prefers-reduced-motion: reduce');
     expect(source).toContain('dataSlot="task-child-form"');
     expect(source).toContain('data-slot="task-details-trigger"');
-    expect(source).toContain('transition-[background-color,scale] duration-150 ease-out');
-    expect(source).toContain('transform-gpu');
-    expect(source).toContain('active:scale-[0.96]');
-    expect(source).toContain('data-pressed:scale-[0.96]');
+    expect(source).toContain('transition-[background-color] duration-150 ease-out');
+    expect(source).not.toMatch(/active:scale|data-pressed:scale/);
     expect(source).not.toContain('grid-template-rows');
     expect(source).not.toContain('transition-all');
   });

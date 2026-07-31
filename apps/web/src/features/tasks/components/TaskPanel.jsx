@@ -245,7 +245,7 @@ function GsapDisclosure({ children, className, contentClassName, dataSlot, isOpe
       <div
         ref={contentRef}
         className={cn(
-          'min-h-0 transform-gpu overflow-visible [will-change:transform,opacity]',
+          'min-h-0 overflow-visible [will-change:transform,opacity]',
           contentClassName,
         )}
       >
@@ -963,7 +963,7 @@ export function TaskPanel({ currentWorkspace }) {
                                     <Button
                                       aria-expanded={canShowTaskDetails ? isExpanded : undefined}
                                       aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${task.title}`}
-                                      className="min-w-0 flex-1 transform-gpu justify-start px-2 py-1.5 text-left transition-[background-color,scale] duration-150 ease-out active:scale-[0.96] data-pressed:scale-[0.96]"
+                                      className="min-w-0 flex-1 justify-start px-2 py-1.5 text-left transition-[background-color] duration-150 ease-out"
                                       data-slot="task-details-trigger"
                                       disabled={!canShowTaskDetails}
                                       type="button"

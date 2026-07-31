@@ -97,7 +97,7 @@ export function WorkspaceSwitcher({
           render={
             <Button
               aria-label="Switch workspace"
-              className={`app-no-drag h-12 w-full transform-gpu justify-start gap-2 overflow-hidden p-2 text-left font-heading text-sm ring-sidebar-ring motion-colors-layout hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:scale-[0.97] data-pressed:scale-[0.97] data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:data-pressed:scale-100 ${menuOpen ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''} ${!isSidebarOpen ? 'size-8 justify-center p-0' : ''}`}
+              className={`app-no-drag h-12 w-full transform-gpu justify-start gap-2 overflow-hidden p-2 text-left font-heading text-sm ring-sidebar-ring motion-colors-layout hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground data-pressed:bg-sidebar-accent data-pressed:text-sidebar-accent-foreground data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground motion-reduce:transition-none ${menuOpen ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''} ${!isSidebarOpen ? 'size-8 justify-center p-0' : ''}`}
               title={!isSidebarOpen ? (currentWorkspace?.name ?? 'Workspace') : undefined}
               type="button"
               variant="ghost"
@@ -126,7 +126,7 @@ export function WorkspaceSwitcher({
           </span>
           <IconChevronDown
             aria-hidden="true"
-            className={`size-[18px] shrink-0 translate-y-px transition-transform ${menuOpen ? 'rotate-180' : ''} ${!isSidebarOpen ? 'hidden' : ''}`}
+            className={`size-[18px] shrink-0 translate-y-px ${menuOpen ? 'rotate-180' : ''} ${!isSidebarOpen ? 'hidden' : ''}`}
             data-icon="inline-end"
           />
         </DropdownMenuTrigger>

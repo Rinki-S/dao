@@ -149,7 +149,7 @@ export function WorkingDirectoryOnboarding({
           data-step-transition
           className={
             stepDirection !== 'none'
-              ? 'animate-in fade-in-0 duration-150 ease-out data-[direction=backward]:slide-in-from-left-4 data-[direction=forward]:slide-in-from-right-4 motion-reduce:animate-none motion-reduce:transition-none'
+              ? 'animate-in fade-in-0 duration-150 ease-out motion-reduce:animate-none motion-reduce:transition-none'
               : undefined
           }
         >

@@ -578,12 +578,14 @@ Recommended durations (implemented as tokens in `apps/web/src/index.css`):
 --ease-smooth: cubic-bezier(0.32, 0.72, 0, 1);
 ```
 
-Motion rules:
+Motion rules (native desktop restraint — the interface should not feel like it is moving):
 
-- high-frequency feedback (hover color, press scale) runs at `--motion-fast`
-- layout motion (sidebar collapse) runs at `--motion-slow`; colors never wait for layout — use the shared `motion-colors` / `motion-colors-layout` utilities instead of ad-hoc `transition-[...]` lists
-- press feedback is `scale(0.96)` everywhere; never `translate-y` sinks
-- overlay enter/exit animations (dialog, menu, popover, select, tooltip) run at `--motion-fast` and must include `motion-reduce:animate-none`
+- menus, dropdowns, context menus, selects, popovers, and tooltips appear instantly: no zoom, no directional slide; a bare `fade-in` at most
+- hover feedback feels instant: color transitions run at 80ms via the shared `motion-colors` / `motion-colors-layout` utilities
+- press feedback is an instant color deepen (`active:` / `data-pressed:` color states); never scale or translate — scale-on-press is a mobile pattern
+- dialog-scale surfaces (dialog, alert dialog, command palette) may keep a brief fade + subtle zoom at `--motion-fast`
+- layout motion (sidebar collapse) runs at `--motion-slow`; colors never wait for layout
+- overlay animations must include `motion-reduce:animate-none`
 - never use `transition-all`; list exact properties
 
 Use motion for:

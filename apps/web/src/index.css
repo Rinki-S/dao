@@ -12,11 +12,11 @@
   --motion-slow: 240ms;
 }
 
-/* High-frequency feedback (hover, press) uses --motion-fast; layout motion
+/* High-frequency feedback (hover) feels instant at 80ms; layout motion
    (sidebar collapse) uses --motion-slow. Colors never wait for layout. */
 @utility motion-colors {
   transition-property: background-color, color, scale;
-  transition-duration: var(--motion-fast);
+  transition-duration: 80ms;
   transition-timing-function: var(--ease-smooth);
 }
 

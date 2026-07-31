@@ -442,7 +442,7 @@ export function ProjectTree({
           <div className="flex items-center gap-1">
             <Button
               aria-label="Create project"
-              className="app-no-drag size-7 transform-gpu p-0 motion-colors active:scale-[0.96] active:bg-sidebar-accent active:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100"
+              className="app-no-drag size-7 transform-gpu p-0 motion-colors active:bg-sidebar-accent active:text-sidebar-accent-foreground motion-reduce:transition-none"
               disabled={!currentWorkspace}
               size="icon"
               type="button"
@@ -457,7 +457,7 @@ export function ProjectTree({
             </Button>
             <Button
               aria-label="Create content"
-              className="app-no-drag size-7 transform-gpu p-0 motion-colors active:scale-[0.96] active:bg-sidebar-accent active:text-sidebar-accent-foreground motion-reduce:transition-none motion-reduce:active:scale-100"
+              className="app-no-drag size-7 transform-gpu p-0 motion-colors active:bg-sidebar-accent active:text-sidebar-accent-foreground motion-reduce:transition-none"
               disabled={!currentWorkspace}
               size="icon"
               type="button"
@@ -548,7 +548,7 @@ export function ProjectTree({
                             <ContextMenu>
                               <ContextMenuTrigger className="contents">
                                 <Button
-                                  className={`app-no-drag flex h-7 w-full min-w-0 -translate-x-px transform-gpu items-center justify-start gap-2 overflow-hidden px-2 text-sm font-normal text-sidebar-foreground ring-sidebar-ring outline-hidden motion-colors focus-visible:ring-2 active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 ${note.id === selectedNoteId ? 'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground' : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground'}`}
+                                  className={`app-no-drag flex h-7 w-full min-w-0 -translate-x-px transform-gpu items-center justify-start gap-2 overflow-hidden px-2 text-sm font-normal text-sidebar-foreground ring-sidebar-ring outline-hidden motion-colors focus-visible:ring-2 motion-reduce:transition-none ${note.id === selectedNoteId ? 'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground' : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground'}`}
                                   type="button"
                                   variant="ghost"
                                   onClick={() => onSelectNote(note)}
@@ -904,7 +904,7 @@ function ProjectTreeButton({ icon: Icon, isActive, isSidebarOpen, label, onClick
   const button = (
     <Button
       aria-label={label}
-      className={`app-no-drag flex h-8 w-full transform-gpu items-center gap-2 overflow-hidden p-2 text-left text-sm ring-sidebar-ring outline-hidden motion-colors-layout focus-visible:ring-2 active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 ${!isSidebarOpen ? 'size-8 justify-center p-2' : 'justify-start'} ${isActive ? 'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground' : 'font-normal hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground'}`}
+      className={`app-no-drag flex h-8 w-full transform-gpu items-center gap-2 overflow-hidden p-2 text-left text-sm ring-sidebar-ring outline-hidden motion-colors-layout focus-visible:ring-2 motion-reduce:transition-none ${!isSidebarOpen ? 'size-8 justify-center p-2' : 'justify-start'} ${isActive ? 'bg-accent-soft font-medium text-accent-soft-foreground hover:bg-accent-soft-hover hover:text-accent-soft-foreground active:bg-accent-soft-hover active:text-accent-soft-foreground' : 'font-normal hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground'}`}
       type="button"
       variant="ghost"
       onClick={onClick}

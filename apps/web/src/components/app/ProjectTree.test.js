@@ -66,8 +66,8 @@ describe('ProjectTree shadcn Base UI migration boundary', () => {
   it('keeps project tree actions tactile with native active states', () => {
     const source = fs.readFileSync(projectTreePath, 'utf8');
 
-    expect(source).toContain('active:scale-[0.96]');
     expect(source).toContain('active:bg-sidebar-accent');
+    expect(source).not.toMatch(/active:scale|data-pressed:scale/);
     expect(source).toContain('motion-colors');
     expect(source).toContain('motion-colors-layout');
   });
