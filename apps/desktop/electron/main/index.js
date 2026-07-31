@@ -28,7 +28,8 @@ function createWindow() {
         icon: appIconPath,
         backgroundColor: '#0B1220',
         titleBarStyle: 'hiddenInset',
-        trafficLightPosition: { x: 16, y: 16 },
+        // Titlebar is 42px tall; nudge traffic lights up until optically centered.
+        trafficLightPosition: { x: 16, y: 14 },
         webPreferences: {
             preload: path.join(__dirname, '../preload/index.cjs'),
             contextIsolation: true,

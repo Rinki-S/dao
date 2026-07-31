@@ -8,7 +8,7 @@ function Card({ className, size = 'default', ...props }) {
       corner="lg"
       data-size={size}
       className={cn(
-        'group/card flex flex-col gap-(--card-spacing) bg-card py-(--card-spacing) text-xs/relaxed text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)]',
+        'group/card flex flex-col gap-(--card-spacing) border border-foreground/10 bg-card py-(--card-spacing) text-xs/relaxed text-card-foreground [--card-spacing:--spacing(4)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)]',
         className,
       )}
       {...props}
