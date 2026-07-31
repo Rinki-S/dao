@@ -523,7 +523,8 @@ Notes:
 ## Foundation Migration: shadcn Base UI
 
 (Originally scoped with Lisse smooth corners; Lisse was later removed — see the direction note below.)
-Status: in progress
+
+Status: complete
 
 Branch:
 

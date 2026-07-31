@@ -147,3 +147,8 @@ apps/local-service/data/
 *.db
 *.db-shm
 *.db-wal
+
+# AI agent tooling (local)
+.agents/
+.claude/
+skills-lock.json
