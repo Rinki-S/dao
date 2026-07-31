@@ -374,6 +374,8 @@ Prefer:
 - clear hierarchy
 - keyboard-first interactions
 
+The window chrome uses the macOS system material: Electron runs with `vibrancy: 'sidebar'` and a transparent window background, and the titlebar and sidebar render without opaque backgrounds so the material shows through. Content surfaces keep their own opaque backgrounds. Vibrancy follows the system appearance automatically.
+
 ## 8.3 Density
 
 Dao should use medium-high information density.

@@ -26,7 +26,10 @@ function createWindow() {
         minWidth: 900,
         minHeight: 600,
         icon: appIconPath,
-        backgroundColor: '#0B1220',
+        backgroundColor: '#00000000',
+        // macOS system material (NSVisualEffectView) behind the window; the
+        // titlebar and sidebar render transparent so it shows through.
+        vibrancy: 'sidebar',
         titleBarStyle: 'hiddenInset',
         // Titlebar is 42px tall; nudge traffic lights up until optically centered.
         trafficLightPosition: { x: 16, y: 14 },

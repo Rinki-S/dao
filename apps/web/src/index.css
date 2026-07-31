@@ -279,7 +279,8 @@ body {
   }
 
   body {
-    @apply bg-background font-sans text-foreground;
+    @apply font-sans text-foreground;
+    background: transparent;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     font-size: 1rem;
