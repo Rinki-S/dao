@@ -10,18 +10,18 @@ describe('WorkspaceSwitcher shadcn Base UI boundary', () => {
     const source = fs.readFileSync(workspaceSwitcherPath, 'utf8');
 
     expect(source).toContain('@/components/ui/dropdown-menu.jsx');
-    expect(source).toContain('@/components/ui/dialog.jsx');
+    expect(source).toContain('@/components/ui/popover.jsx');
     expect(source).toContain('@/components/ui/field.jsx');
     expect(source).toContain('@/lib/corners.jsx');
     expect(source).not.toContain('@heroui');
     expect(source).not.toMatch(/rounded-|border-radius|borderRadius/);
   });
 
-  it('uses menu groups, a titled dialog, and native form fields', () => {
+  it('uses menu groups, a titled popover form, and native form fields', () => {
     const source = fs.readFileSync(workspaceSwitcherPath, 'utf8');
 
     expect(source).toContain('DropdownMenuGroup');
-    expect(source).toContain('DialogTitle');
+    expect(source).toContain('PopoverTitle');
     expect(source).toContain('FieldGroup');
     expect(source).toContain('<form');
   });

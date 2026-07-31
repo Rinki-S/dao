@@ -16,6 +16,7 @@ function PopoverContent({
   alignOffset = 0,
   side = 'bottom',
   sideOffset = 4,
+  anchor,
   ref,
   ...props
 }) {
@@ -24,6 +25,7 @@ function PopoverContent({
       <PopoverPrimitive.Positioner
         align={align}
         alignOffset={alignOffset}
+        anchor={anchor}
         side={side}
         sideOffset={sideOffset}
         className="isolate z-50"

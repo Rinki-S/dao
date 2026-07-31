@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   IconAlertCircle,
   IconChevronDown,
@@ -8,13 +8,12 @@ import {
 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button.jsx';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog.jsx';
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+} from '@/components/ui/popover.jsx';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,6 +47,7 @@ export function WorkspaceSwitcher({
   const [workspaceDescription, setWorkspaceDescription] = useState('');
   const [createError, setCreateError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const triggerRef = useRef(null);
   const workspaceNameError =
     workspaceName.trim() === '' && createError === 'Workspace name is required' ? createError : '';
   const workspaceApiError = workspaceNameError ? '' : createError;
@@ -96,6 +96,7 @@ export function WorkspaceSwitcher({
         <DropdownMenuTrigger
           render={
             <Button
+              ref={triggerRef}
               aria-label="Switch workspace"
               className={`app-no-drag h-12 w-full transform-gpu justify-start gap-2 overflow-hidden p-2 text-left font-heading text-sm ring-sidebar-ring motion-colors-layout hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground data-pressed:bg-sidebar-accent data-pressed:text-sidebar-accent-foreground data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground motion-reduce:transition-none ${menuOpen ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''} ${!isSidebarOpen ? 'size-8 justify-center p-0' : ''}`}
               title={!isSidebarOpen ? (currentWorkspace?.name ?? 'Workspace') : undefined}
@@ -170,14 +171,20 @@ export function WorkspaceSwitcher({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={createDialogOpen} onOpenChange={onCreateDialogOpenChange}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create workspace</DialogTitle>
-            <DialogDescription>
+      <Popover open={createDialogOpen} onOpenChange={onCreateDialogOpenChange}>
+        <PopoverContent
+          anchor={triggerRef}
+          align="start"
+          side="bottom"
+          sideOffset={6}
+          className="w-72"
+        >
+          <PopoverHeader>
+            <PopoverTitle>Create workspace</PopoverTitle>
+            <PopoverDescription>
               Add a top-level space for projects, tasks, and notes.
-            </DialogDescription>
-          </DialogHeader>
+            </PopoverDescription>
+          </PopoverHeader>
 
           <form className="flex flex-col gap-4" onSubmit={handleCreateWorkspace}>
             <FieldGroup>
@@ -213,15 +220,15 @@ export function WorkspaceSwitcher({
               <AppApiErrorMessage>{workspaceApiError}</AppApiErrorMessage>
             </FieldGroup>
 
-            <DialogFooter>
+            <div className="flex justify-end">
               <Button disabled={isCreating} type="submit">
                 {isCreating && <Spinner data-icon="inline-start" />}
                 {isCreating ? 'Creating...' : 'Create workspace'}
               </Button>
-            </DialogFooter>
+            </div>
           </form>
-        </DialogContent>
-      </Dialog>
+        </PopoverContent>
+      </Popover>
     </>
   );
 }

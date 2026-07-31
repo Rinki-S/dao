@@ -39,7 +39,7 @@ describe('WorkspaceSwitcher interactions', () => {
     vi.clearAllMocks();
   });
 
-  it('keeps the create workspace dialog open when creation fails', async () => {
+  it('keeps the create workspace popover open when creation fails', async () => {
     const user = userEvent.setup();
     const onCreateWorkspace = vi.fn().mockRejectedValue(new Error('Unable to create workspace'));
 
@@ -48,18 +48,18 @@ describe('WorkspaceSwitcher interactions', () => {
     await user.click(screen.getByRole('button', { name: 'Switch workspace' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Create workspace' }));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Create workspace' });
-    await user.type(within(dialog).getByLabelText('Workspace name'), 'New Workspace');
-    await user.click(within(dialog).getByRole('button', { name: 'Create workspace' }));
+    const popover = await screen.findByRole('dialog', { name: 'Create workspace' });
+    await user.type(within(popover).getByLabelText('Workspace name'), 'New Workspace');
+    await user.click(within(popover).getByRole('button', { name: 'Create workspace' }));
 
     await waitFor(() => {
       expect(onCreateWorkspace).toHaveBeenCalledTimes(1);
     });
 
-    expect(await within(dialog).findByText('Unable to create workspace')).toBeInTheDocument();
+    expect(await within(popover).findByText('Unable to create workspace')).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Create workspace' })).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Workspace name')).toHaveValue('New Workspace');
-    expect(within(dialog).getByRole('button', { name: 'Create workspace' })).toBeEnabled();
+    expect(within(popover).getByLabelText('Workspace name')).toHaveValue('New Workspace');
+    expect(within(popover).getByRole('button', { name: 'Create workspace' })).toBeEnabled();
   });
 
   it('clears stale create workspace errors when reopened from the workspace menu', async () => {
@@ -71,13 +71,13 @@ describe('WorkspaceSwitcher interactions', () => {
     await user.click(screen.getByRole('button', { name: 'Switch workspace' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Create workspace' }));
 
-    const firstDialog = await screen.findByRole('dialog', { name: 'Create workspace' });
-    await user.type(within(firstDialog).getByLabelText('Workspace name'), 'New Workspace');
-    await user.click(within(firstDialog).getByRole('button', { name: 'Create workspace' }));
+    const firstPopover = await screen.findByRole('dialog', { name: 'Create workspace' });
+    await user.type(within(firstPopover).getByLabelText('Workspace name'), 'New Workspace');
+    await user.click(within(firstPopover).getByRole('button', { name: 'Create workspace' }));
 
-    expect(await within(firstDialog).findByText('Unable to create workspace')).toBeInTheDocument();
+    expect(await within(firstPopover).findByText('Unable to create workspace')).toBeInTheDocument();
 
-    await user.click(within(firstDialog).getByRole('button', { name: 'Close' }));
+    await user.keyboard('{Escape}');
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Create workspace' })).not.toBeInTheDocument();
@@ -86,7 +86,7 @@ describe('WorkspaceSwitcher interactions', () => {
     await user.click(screen.getByRole('button', { name: 'Switch workspace' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Create workspace' }));
 
-    const reopenedDialog = await screen.findByRole('dialog', { name: 'Create workspace' });
-    expect(within(reopenedDialog).queryByText('Unable to create workspace')).toBeNull();
+    const reopenedPopover = await screen.findByRole('dialog', { name: 'Create workspace' });
+    expect(within(reopenedPopover).queryByText('Unable to create workspace')).toBeNull();
   });
 });
