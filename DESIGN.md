@@ -374,7 +374,23 @@ Prefer:
 - clear hierarchy
 - keyboard-first interactions
 
-The window chrome uses the macOS system material: Electron runs with `vibrancy: 'sidebar'` and a transparent window background, and the titlebar and sidebar render without opaque backgrounds so the material shows through. Content surfaces keep their own opaque backgrounds. Vibrancy follows the system appearance automatically.
+- The window chrome uses the macOS system material: Electron runs with `vibrancy: 'sidebar'` and a transparent window background, and the titlebar and sidebar render without opaque backgrounds so the material shows through. Content surfaces keep their own opaque backgrounds. Vibrancy follows the system appearance automatically.
+
+### Interaction Patterns
+
+Follow native macOS hierarchy for how forms and confirmations appear:
+
+- **Create flows are inline**: a new project or note row opens editable in
+  place (Finder-style), Enter commits with sensible defaults, Esc or blur
+  cancels. Creation never asks for metadata the editor can own later.
+- **Small forms use anchored popovers**: e.g. create-workspace is a popover
+  anchored to the switcher button, light-dismissed by Escape or an outside
+  click.
+- **Centered dialogs are reserved** for destructive confirmation (delete
+  with a clear consequence) and multi-field editing (edit task).
+- **Settings apply instantly**: no OK/Cancel pairs; actions take effect on
+  the triggering control.
+
 
 ## 8.3 Density
 
