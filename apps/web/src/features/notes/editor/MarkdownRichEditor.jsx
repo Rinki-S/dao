@@ -39,7 +39,13 @@ function MarkdownSourceFallback({ ariaLabel, initialMarkdown, onMarkdownChange, 
   );
 }
 
-function TiptapMarkdownEditor({ ariaLabel, initialMarkdown, onMarkdownChange }) {
+function TiptapMarkdownEditor({
+  ariaLabel,
+  initialMarkdown,
+  onMarkdownChange,
+  saveStatus,
+  saveStatusLabel,
+}) {
   const editor = useEditor({
     content: initialMarkdown,
     contentType: 'markdown',
@@ -60,7 +66,11 @@ function TiptapMarkdownEditor({ ariaLabel, initialMarkdown, onMarkdownChange }) 
 
   return (
     <div className="dao-markdown-editor dao-markdown-editor--rich">
-      <MarkdownEditorToolbar editor={editor} />
+      <MarkdownEditorToolbar
+        editor={editor}
+        saveStatus={saveStatus}
+        saveStatusLabel={saveStatusLabel}
+      />
       <EditorContent className="dao-markdown-editor__content" editor={editor} />
     </div>
   );
@@ -74,6 +84,8 @@ export function MarkdownRichEditor({
   initialMarkdown,
   onMarkdownChange,
   ariaLabel = 'Markdown note content',
+  saveStatus,
+  saveStatusLabel,
 }) {
   const compatibility = getMarkdownCompatibility(initialMarkdown);
 
@@ -93,6 +105,8 @@ export function MarkdownRichEditor({
       ariaLabel={ariaLabel}
       initialMarkdown={initialMarkdown}
       onMarkdownChange={onMarkdownChange}
+      saveStatus={saveStatus}
+      saveStatusLabel={saveStatusLabel}
     />
   );
 }

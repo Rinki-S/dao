@@ -2,15 +2,9 @@ import { IconLink } from '@tabler/icons-react';
 import { useId, useState } from 'react';
 
 import { Button } from '@/components/ui/button.jsx';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field.jsx';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field.jsx';
 import { Input } from '@/components/ui/input.jsx';
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover.jsx';
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover.jsx';
 import {
   escapeMarkdownDestination,
   getMarkdownLinkDestinationError,
@@ -85,12 +79,12 @@ export function MarkdownLinkControl({ editor, isActive }) {
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger render={trigger} />
-      <PopoverContent className="dao-markdown-link-popover__content">
-        <PopoverHeader className="sr-only">
-          <PopoverTitle>{isActive ? 'Edit Markdown link' : 'Add Markdown link'}</PopoverTitle>
-        </PopoverHeader>
+      <PopoverContent className="dao-corner dao-markdown-link-popover__content">
+        <PopoverTitle className="sr-only">
+          {isActive ? 'Edit Markdown link' : 'Add Markdown link'}
+        </PopoverTitle>
         <form className="dao-markdown-link-popover__form" onSubmit={applyLink}>
-          <FieldGroup className="gap-3">
+          <div className="grid gap-3">
             <Field data-invalid={Boolean(hrefError)}>
               <FieldLabel htmlFor={hrefId}>Link URL</FieldLabel>
               <Input
@@ -119,7 +113,7 @@ export function MarkdownLinkControl({ editor, isActive }) {
               />
               <FieldError>{titleError}</FieldError>
             </Field>
-          </FieldGroup>
+          </div>
           <div className="dao-markdown-link-popover__actions">
             {isActive && (
               <Button size="sm" type="button" variant="ghost" onClick={removeLink}>

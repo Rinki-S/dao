@@ -1,214 +1,175 @@
 import {
   IconArrowBackUp,
   IconArrowForwardUp,
-  IconBlockquote,
   IconBold,
+  IconCircleCheck,
   IconCode,
-  IconCodeDots,
   IconItalic,
   IconList,
   IconListCheck,
   IconListNumbers,
-  IconStrikethrough,
 } from '@tabler/icons-react';
 import { useEditorState } from '@tiptap/react';
-
 import { Button } from '@/components/ui/button.jsx';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.jsx';
+import { Toolbar, ToolbarGroup, ToolbarSeparator } from '@/components/ui/toolbar.jsx';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@/components/ui/tooltip.jsx';
 import { MarkdownBlockTypeControl } from './MarkdownBlockTypeControl.jsx';
-import { MarkdownInsertControl } from './MarkdownInsertControl.jsx';
 import { MarkdownLinkControl } from './MarkdownLinkControl.jsx';
 
-function ToolbarButton({ disabled = false, editor, icon: Icon, isActive = false, label, onClick }) {
+function EditorButton({ disabled = false, editor, icon: Icon, isActive = false, label, onClick }) {
   const button = (
     <Button
       aria-label={label}
       aria-pressed={isActive || undefined}
-      className="dao-markdown-toolbar__button"
+      className="dao-markdown-toolbar__button dao-corner"
       disabled={disabled}
       size="icon-sm"
       type="button"
       variant={isActive ? 'secondary' : 'ghost'}
-      onClick={() => {
-        onClick(editor);
-      }}
+      onClick={() => onClick(editor)}
     >
-      <Icon aria-hidden="true" className="size-4" data-icon="inline-start" />
+      <Icon aria-hidden="true" />
     </Button>
   );
-
   return (
     <Tooltip>
       <TooltipTrigger delay={300} render={button} />
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipPopup className="dao-corner">{label}</TooltipPopup>
     </Tooltip>
   );
 }
 
-function ToolbarDivider() {
-  return <span aria-hidden="true" className="dao-markdown-toolbar__divider" />;
-}
-
-function ReadyMarkdownEditorToolbar({ editor }) {
+function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
   const state = useEditorState({
     editor,
-    selector: ({ editor: currentEditor }) => {
-      if (!currentEditor || currentEditor.isDestroyed) {
+    selector: ({ editor: current }) => {
+      if (!current || current.isDestroyed || !current.view) {
         return {
           canRedo: false,
           canUndo: false,
-          isBlockquote: false,
           isBold: false,
           isBulletList: false,
           isCode: false,
-          isCodeBlock: false,
           isItalic: false,
           isInTable: false,
           isLink: false,
           isOrderedList: false,
-          isStrike: false,
           isTaskList: false,
         };
       }
-
       return {
-        canRedo: currentEditor.can().chain().redo().run(),
-        canUndo: currentEditor.can().chain().undo().run(),
-        isBlockquote: currentEditor.isActive('blockquote'),
-        isBold: currentEditor.isActive('bold'),
-        isBulletList: currentEditor.isActive('bulletList'),
-        isCode: currentEditor.isActive('code'),
-        isCodeBlock: currentEditor.isActive('codeBlock'),
-        isItalic: currentEditor.isActive('italic'),
-        isInTable: currentEditor.isActive('table'),
-        isLink: currentEditor.isActive('link'),
-        isOrderedList: currentEditor.isActive('orderedList'),
-        isStrike: currentEditor.isActive('strike'),
-        isTaskList: currentEditor.isActive('taskList'),
+        canRedo: current.can().chain().redo().run(),
+        canUndo: current.can().chain().undo().run(),
+        isBold: current.isActive('bold'),
+        isBulletList: current.isActive('bulletList'),
+        isCode: current.isActive('code'),
+        isItalic: current.isActive('italic'),
+        isInTable: current.isActive('table'),
+        isLink: current.isActive('link'),
+        isOrderedList: current.isActive('orderedList'),
+        isTaskList: current.isActive('taskList'),
       };
     },
   });
 
   return (
-    <div aria-label="Markdown formatting" className="dao-markdown-toolbar" role="toolbar">
-      <div className="dao-markdown-toolbar__inner">
-        <div className="dao-markdown-toolbar__group">
-          <ToolbarButton
-            editor={editor}
-            icon={IconArrowBackUp}
-            disabled={!state.canUndo}
-            label="Undo"
-            onClick={(currentEditor) => currentEditor.chain().focus().undo().run()}
-          />
-          <ToolbarButton
-            editor={editor}
-            icon={IconArrowForwardUp}
-            disabled={!state.canRedo}
-            label="Redo"
-            onClick={(currentEditor) => currentEditor.chain().focus().redo().run()}
-          />
-        </div>
-        <ToolbarDivider />
-        <div className="dao-markdown-toolbar__group">
+    <div className="dao-markdown-toolbar-shell">
+      <Toolbar aria-label="Markdown formatting" className="dao-markdown-toolbar dao-corner">
+        <ToolbarGroup>
           <MarkdownBlockTypeControl disabled={state.isInTable} editor={editor} />
-        </div>
-        <ToolbarDivider />
-        <div className="dao-markdown-toolbar__group">
-          <ToolbarButton
+        </ToolbarGroup>
+        <ToolbarSeparator />
+        <ToolbarGroup>
+          <EditorButton
             editor={editor}
             icon={IconBold}
             isActive={state.isBold}
             label="Bold"
-            onClick={(currentEditor) => currentEditor.chain().focus().toggleBold().run()}
+            onClick={(current) => current.chain().focus().toggleBold().run()}
           />
-          <ToolbarButton
+          <EditorButton
             editor={editor}
             icon={IconItalic}
             isActive={state.isItalic}
             label="Italic"
-            onClick={(currentEditor) => currentEditor.chain().focus().toggleItalic().run()}
+            onClick={(current) => current.chain().focus().toggleItalic().run()}
           />
-          <ToolbarButton
+        </ToolbarGroup>
+        <ToolbarSeparator />
+        <ToolbarGroup>
+          <EditorButton
+            disabled={state.isInTable}
             editor={editor}
-            icon={IconStrikethrough}
-            isActive={state.isStrike}
-            label="Strikethrough"
-            onClick={(currentEditor) => currentEditor.chain().focus().toggleStrike().run()}
+            icon={IconList}
+            isActive={state.isBulletList}
+            label="Bullet list"
+            onClick={(current) => current.chain().focus().toggleBulletList().run()}
           />
-          <ToolbarButton
+          <EditorButton
+            disabled={state.isInTable}
+            editor={editor}
+            icon={IconListNumbers}
+            isActive={state.isOrderedList}
+            label="Ordered list"
+            onClick={(current) => current.chain().focus().toggleOrderedList().run()}
+          />
+          <EditorButton
+            disabled={state.isInTable}
+            editor={editor}
+            icon={IconListCheck}
+            isActive={state.isTaskList}
+            label="Task list"
+            onClick={(current) => current.chain().focus().toggleTaskList().run()}
+          />
+          <EditorButton
             editor={editor}
             icon={IconCode}
             isActive={state.isCode}
             label="Inline code"
-            onClick={(currentEditor) => currentEditor.chain().focus().toggleCode().run()}
+            onClick={(current) => current.chain().focus().toggleCode().run()}
           />
           <MarkdownLinkControl editor={editor} isActive={state.isLink} />
-        </div>
-        <ToolbarDivider />
-        <div className="dao-markdown-toolbar__group">
-          <ToolbarButton
+        </ToolbarGroup>
+        <ToolbarSeparator />
+        <ToolbarGroup>
+          <EditorButton
+            disabled={!state.canUndo}
             editor={editor}
-            icon={IconList}
-            isActive={state.isBulletList}
-            disabled={state.isInTable}
-            label="Bullet list"
-            onClick={(currentEditor) => currentEditor.chain().focus().toggleBulletList().run()}
+            icon={IconArrowBackUp}
+            label="Undo"
+            onClick={(current) => current.chain().focus().undo().run()}
           />
-          <ToolbarButton
+          <EditorButton
+            disabled={!state.canRedo}
             editor={editor}
-            icon={IconListNumbers}
-            isActive={state.isOrderedList}
-            disabled={state.isInTable}
-            label="Ordered list"
-            onClick={(currentEditor) => currentEditor.chain().focus().toggleOrderedList().run()}
+            icon={IconArrowForwardUp}
+            label="Redo"
+            onClick={(current) => current.chain().focus().redo().run()}
           />
-          <ToolbarButton
-            editor={editor}
-            icon={IconListCheck}
-            isActive={state.isTaskList}
-            disabled={state.isInTable}
-            label="Task list"
-            onClick={(currentEditor) => currentEditor.chain().focus().toggleTaskList().run()}
-          />
-          <ToolbarButton
-            editor={editor}
-            icon={IconBlockquote}
-            isActive={state.isBlockquote}
-            disabled={state.isInTable}
-            label="Blockquote"
-            onClick={(currentEditor) => currentEditor.chain().focus().toggleBlockquote().run()}
-          />
-          <ToolbarButton
-            editor={editor}
-            icon={IconCodeDots}
-            isActive={state.isCodeBlock}
-            disabled={state.isInTable}
-            label="Code block"
-            onClick={(currentEditor) => currentEditor.chain().focus().toggleCodeBlock().run()}
-          />
-        </div>
-        <ToolbarDivider />
-        <div className="dao-markdown-toolbar__group">
-          <MarkdownInsertControl disabled={state.isInTable} editor={editor} />
-        </div>
-      </div>
+        </ToolbarGroup>
+      </Toolbar>
+      {saveStatusLabel ? (
+        <span
+          aria-live="polite"
+          className={`dao-note-save-status dao-note-save-status--${saveStatus}`}
+        >
+          <IconCircleCheck aria-hidden="true" />
+          {saveStatusLabel}
+        </span>
+      ) : null}
     </div>
   );
 }
 
-export function MarkdownEditorToolbar({ editor }) {
-  if (!editor) {
+export function MarkdownEditorToolbar({ editor, saveStatus, saveStatusLabel }) {
+  if (!editor)
     return (
       <div
         aria-busy="true"
         aria-label="Markdown formatting"
-        className="dao-markdown-toolbar"
+        className="dao-markdown-toolbar-shell"
         role="toolbar"
-      >
-        <div className="dao-markdown-toolbar__inner" />
-      </div>
+      />
     );
-  }
-
-  return <ReadyMarkdownEditorToolbar editor={editor} />;
+  return <ReadyToolbar editor={editor} saveStatus={saveStatus} saveStatusLabel={saveStatusLabel} />;
 }

@@ -12,9 +12,6 @@ import {
   setPendingNoteDraft,
   waitForNoteSaves,
 } from '@/features/notes/note-save-queue.js';
-import { listProjects } from '@/features/projects/api.js';
-import { listWorkspaces } from '@/features/workspaces/api.js';
-import { CornerSurface } from '@/lib/corners.jsx';
 import { getNote, updateNote, updateNoteContent } from '../api.js';
 import './note-editor-panel.css';
 
@@ -87,8 +84,6 @@ function MarkdownEditorLoadingState() {
 }
 
 export function NoteEditorPanel({ noteId }) {
-  const [workspaceName, setWorkspaceName] = useState('');
-  const [projectName, setProjectName] = useState('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [loadStatus, setLoadStatus] = useState('idle');
@@ -412,22 +407,6 @@ export function NoteEditorPanel({ noteId }) {
               ? 'Failed to save note'
               : '',
         );
-
-        const workspaces = await listWorkspaces();
-        if (!cancelled) {
-          const workspace = workspaces.find((w) => w.id === nextNote.workspaceId);
-          setWorkspaceName(workspace?.name ?? '');
-        }
-
-        if (nextNote.projectId) {
-          const projects = await listProjects();
-          if (!cancelled) {
-            const project = projects.find((p) => p.id === nextNote.projectId);
-            setProjectName(project?.name ?? '');
-          }
-        } else if (!cancelled) {
-          setProjectName('');
-        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load note');
@@ -505,13 +484,6 @@ export function NoteEditorPanel({ noteId }) {
   if (loadStatus === 'loading' || (loadStatus !== 'error' && loadedNoteId !== noteId)) {
     return (
       <section aria-busy="true" aria-label="Loading note" className="dao-note-editor" role="status">
-        <div className="dao-note-document-header">
-          <div className="dao-note-document-meta">
-            <Skeleton className="h-3 w-48" />
-            <Skeleton className="h-3 w-14" />
-          </div>
-          <Skeleton className="mt-3 h-10 w-80 max-w-full" />
-        </div>
         <div className="dao-note-editor-loading__toolbar">
           <Skeleton className="h-7 w-72 max-w-full" />
         </div>
@@ -535,81 +507,6 @@ export function NoteEditorPanel({ noteId }) {
 
   return (
     <section aria-label="Note editor" className="dao-note-editor">
-      <header className="dao-note-document-header">
-        <div className="dao-note-document-header__layout">
-          <div className="dao-note-document-copy">
-            <nav aria-label="Note location" className="dao-note-location">
-              <ol>
-                {workspaceName ? (
-                  <li className="dao-note-location__item">{workspaceName}</li>
-                ) : (
-                  <li className="dao-note-location__item">Notes</li>
-                )}
-                {workspaceName && projectName && (
-                  <li aria-hidden="true" className="dao-note-location__separator">
-                    /
-                  </li>
-                )}
-                {projectName && <li className="dao-note-location__item">{projectName}</li>}
-              </ol>
-            </nav>
-            <input
-              type="text"
-              aria-label="Note title"
-              className="dao-note-document-title"
-              value={title}
-              onChange={(event) => {
-                const nextTitle = event.target.value;
-                const normalizedTitle = nextTitle.trim();
-                latestTitleRef.current = nextTitle;
-
-                if (loadStatus === 'ready' && noteId && loadedNoteIdRef.current === noteId) {
-                  if (
-                    normalizedTitle === savedTitleRef.current &&
-                    !hasPendingFieldSave(noteId, 'title')
-                  ) {
-                    clearPendingNoteDraft(noteId, 'title');
-                    saveErrorsRef.current.title = null;
-                  } else {
-                    setPendingNoteDraft(noteId, 'title', normalizedTitle);
-
-                    if (normalizedTitle === '') {
-                      const validationError = new Error('Note title cannot be empty');
-                      markPendingNoteDraftFailed(noteId, 'title', normalizedTitle, validationError);
-                      saveErrorsRef.current.title = validationError;
-                    } else {
-                      saveErrorsRef.current.title = null;
-                    }
-                  }
-
-                  updateSavePresentation(noteId, noteGenerationRef.current);
-                }
-
-                setTitle(nextTitle);
-              }}
-              placeholder="Untitled"
-            />
-          </div>
-          {saveStatusLabel && (
-            <span
-              aria-atomic="true"
-              aria-live="polite"
-              className={`dao-note-save-status dao-note-save-status--${saveStatus}`}
-              role="status"
-            >
-              <CornerSurface
-                as="span"
-                aria-hidden="true"
-                className="dao-note-save-status__dot"
-                corner="circle"
-                dataSlot="note-save-status-dot"
-              />
-              {saveStatusLabel}
-            </span>
-          )}
-        </div>
-      </header>
-
       {error && saveStatus === 'failed' && (
         <p className="dao-note-save-error" role="alert">
           {error}
@@ -621,6 +518,8 @@ export function NoteEditorPanel({ noteId }) {
           key={noteId}
           ariaLabel="Markdown note content"
           initialMarkdown={content}
+          saveStatus={saveStatus}
+          saveStatusLabel={saveStatusLabel}
           onMarkdownChange={(nextMarkdown) => {
             if (loadedNoteIdRef.current !== noteId) {
               return;

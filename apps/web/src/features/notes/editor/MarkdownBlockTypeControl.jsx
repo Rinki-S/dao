@@ -4,14 +4,14 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button.jsx';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu.jsx';
+  Menu,
+  MenuGroup,
+  MenuPopup,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuShortcut,
+  MenuTrigger,
+} from '@/components/ui/menu.jsx';
 
 const BLOCK_TYPES = [
   { id: 'paragraph', label: 'Paragraph', shortLabel: 'Text', shortcut: 'Mod+Alt+0' },
@@ -67,8 +67,8 @@ export function MarkdownBlockTypeControl({ disabled = false, editor }) {
   };
 
   return (
-    <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-      <DropdownMenuTrigger
+    <Menu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+      <MenuTrigger
         render={
           <Button
             aria-label={`Text style: ${activeTextStyle?.label ?? 'Other block'}`}
@@ -89,27 +89,21 @@ export function MarkdownBlockTypeControl({ disabled = false, editor }) {
           {activeTextStyle?.shortLabel ?? 'Style'}
         </span>
         <IconChevronDown aria-hidden="true" className="size-3.5" data-icon="inline-end" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-52">
-        <DropdownMenuGroup>
-          <DropdownMenuRadioGroup
-            value={activeTextStyle?.id ?? ''}
-            onValueChange={handleBlockTypeAction}
-          >
+      </MenuTrigger>
+      <MenuPopup align="start" className="dao-corner w-52">
+        <MenuGroup>
+          <MenuRadioGroup value={activeTextStyle?.id ?? ''} onValueChange={handleBlockTypeAction}>
             {BLOCK_TYPES.map((blockType) => (
-              <DropdownMenuRadioItem closeOnClick key={blockType.id} value={blockType.id}>
+              <MenuRadioItem closeOnClick key={blockType.id} value={blockType.id}>
                 <span className="dao-markdown-block-option__label">{blockType.label}</span>
-                <DropdownMenuShortcut
-                  aria-hidden="true"
-                  className="dao-markdown-block-option__shortcut"
-                >
+                <MenuShortcut aria-hidden="true" className="dao-markdown-block-option__shortcut">
                   {blockType.shortcut}
-                </DropdownMenuShortcut>
-              </DropdownMenuRadioItem>
+                </MenuShortcut>
+              </MenuRadioItem>
             ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          </MenuRadioGroup>
+        </MenuGroup>
+      </MenuPopup>
+    </Menu>
   );
 }
