@@ -648,6 +648,41 @@ Architecture decision:
 
 - [`docs/adr/0001-tiptap-markdown-editor.md`](./adr/0001-tiptap-markdown-editor.md)
 
+## Milestone: Recent-first coss Workspace Shell
+
+Status: complete
+
+Branch:
+
+```txt
+feat/greenfield-coss-ui
+```
+
+Completed scope:
+
+- replace the previous titlebar, runtime tabs, project surface, dashboard assumptions, and legacy shell UI from zero
+- adopt coss + Base UI primitives through the `@coss` registry and keep Tabler Icons
+- add Electron `-electron-corner-smoothing: system-ui` alongside the shared radius scale
+- use an edge-to-edge macOS system-material sidebar without internal separators
+- expose Home, Tasks, disabled Chats, Search, and Activity as compact primary navigation
+- make Home restore the latest valid Recent instead of rendering a standalone dashboard
+- validate renderer-owned, workspace-scoped Recent state with Zod and prune missing entities
+- idempotently create and open a root `Welcome Note.md` after first working-directory setup
+- represent persisted projects only as folders in the unified workspace file tree
+- reveal project folders from Search without navigating to a project page
+- rebuild Tasks, Search, Activity, Settings, command palette, onboarding, note workspace, and Info/Activity inspector UI
+- keep the Tiptap-to-Markdown compatibility boundary and ordered autosave queue intact
+- remove `cmdk`, GSAP, Funnel Sans, legacy app shell components, legacy product surfaces, and their obsolete tests
+- preserve the Electron preload and Go/SQLite/API architecture boundaries
+
+Validation:
+
+- renderer formatting, lint, 104 tests, and production build pass
+- Go `test ./...` and `vet ./...` pass
+- browser and real Electron visual QA are recorded in project-root `design-qa.md`
+
+Chats remains a disabled placeholder until the AI Harness milestone.
+
 ## Later Milestone: AI Summary Loop
 
 Recommended branch:

@@ -35,10 +35,11 @@ Important choices:
 - SQLite is the first local database.
 - Zod validates runtime data at system boundaries.
 - JSDoc documents object shapes in JavaScript.
-- shadcn components backed by Base UI are the current React component foundation.
+- coss components backed by Base UI are the current React component foundation.
 - Tabler Icons is the current icon library.
 - Visible rounded geometry uses the shared CSS radius token scale (`rounded-*` utilities from the Dao `--radius-*` theme); do not use arbitrary pixel radii or inline `borderRadius` in renderer UI.
-- `cmdk` remains the command palette interaction core.
+- Visible rounded Electron surfaces must also use `-electron-corner-smoothing: system-ui`; remember that the property is experimental and not inherited.
+- coss `Command` owns command palette search, selection, and keyboard behavior. Do not add `cmdk` or Sonner.
 - Cloud sync is deferred.
 - AI Agent features are deferred until core data exists.
 
@@ -550,7 +551,6 @@ Use this lookup map:
 - Product scope and module priority: `docs/product-plan.md`
 - Product vision and principles: `docs/vision.md`
 - Architecture boundaries, data model, API contracts, search, tags, sync, security, and AI/vector strategy: `docs/architecture.md`
-- UI design, visual tone, density, colors, and component style: `DESIGN.md`
 - Current milestone state and next milestone direction: `docs/development-log.md`
 - Future AI summaries, retrieval, tool calling, agent workflows, permissions, validation, traces, and confirmation: `docs/ai-harness.md`
 - Package extraction, companion repositories, and open-source strategy: `docs/open-source-strategy.md`
@@ -560,8 +560,6 @@ Read `docs/ai-harness.md` before implementing any AI feature.
 Read `docs/open-source-strategy.md` before extracting a package, creating a companion repository, or adding public-package-oriented APIs.
 
 Read `docs/architecture.md` before changing data models, migrations, API contracts, local service boundaries, Electron/Go communication, search, sync, security, or AI/vector architecture.
-
-Read `DESIGN.md` before making significant UI styling, layout, or component-system changes.
 
 ## 15.2 Collaboration Rules
 
@@ -641,7 +639,7 @@ thoughtful
 The current highest priority is:
 
 ```txt
-Finish the shadcn Base UI product-shell migration and note editor loop.
+Finish the recent-first coss workspace shell and note editor loop.
 ```
 
 The first technical milestone is complete:
@@ -656,13 +654,13 @@ React displays that workspace.
 
 Current immediate work should focus on:
 
-- completing the shadcn preset `b1D0eTD6` migration with Base UI primitives
-- keeping the existing jade accent and Funnel Sans typography
-- using the shared CSS radius token scale for all visible rounded geometry
-- keeping `cmdk` for command palette behavior through the shadcn command shell
-- removing HeroUI, hugeicons, and Radix dependencies only after import checks
-- preserving filesystem-backed workspace, project, and markdown note behavior
-- improving the note editor without introducing AI features yet
+- maintaining coss primitives and Base UI composition through the `@coss` registry
+- preserving the calm macOS system-material sidebar and system typography
+- using the shared CSS radius scale plus Electron continuous corner smoothing
+- opening the latest valid Recent from Home and creating a root Welcome Note on first setup
+- representing projects only as folders in the unified workspace tree, never as a standalone page
+- preserving filesystem-backed workspace, project-folder, and Markdown note behavior
+- keeping Chats as a disabled future-AI affordance until the AI Harness milestone
 
 Do not prioritize AI, cloud sync, or extensions before this loop works.
 

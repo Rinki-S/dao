@@ -806,42 +806,37 @@ Future executable capabilities should be routed through dedicated layers such as
 
 ## 12.1 Frontend UI Foundation
 
-Dao's current React UI foundation is shadcn + Base UI + Tailwind CSS v4 + Lisse + Dao design tokens.
+Dao's current React UI foundation is coss + Base UI + Tailwind CSS v4 + Dao design tokens.
 
 Rules:
 
-- generate and maintain shadcn components from preset `b1D0eTD6` with the `base-mira` style
+- install and maintain primitives through the `@coss` registry declared in `apps/web/components.json`
 - use Base UI (`@base-ui/react`) as the maintained accessible primitive layer
-- consume local shadcn components from `apps/web/src/components/ui` in app and feature code
+- consume local coss components from `apps/web/src/components/ui` in app and feature code
 - keep Dao-specific product composition in app and feature components
-- use shadcn semantic tokens from `apps/web/src/index.css` while preserving Dao's existing jade accent and `accent-soft` selected state
-- keep Funnel Sans Variable for both headings and UI body copy
-- use Tabler Icons through direct imports; extension-owned durable content-format icons remain registry metadata
-- use Lisse (`@lisse/react`) for every visible rounded surface; renderer code must not use `rounded-*`, CSS `border-radius`, or inline `borderRadius`
-- apply Lisse refs to the actual DOM or Base UI primitive node so menus, dialogs, focus management, and portals keep their expected structure
+- use semantic tokens from `apps/web/src/index.css`; do not introduce one-off palette values in components
+- use the macOS system font stack for the native desktop tone and Tabler Icons for application iconography
+- use the shared `--radius-*` token scale for visible rounded geometry
+- apply `-electron-corner-smoothing: system-ui` to every visible rounded Electron control or overlay; it is experimental, not inherited, and has no effect in normal browsers
 - use Base UI `render` composition and never Radix-style `asChild`
+- use coss `toastManager`; do not add Sonner
 
 ### Command palette UI
 
-The command palette is intentionally hybrid:
-
-- `cmdk` owns command input behavior, search interaction, selection, and keyboard navigation
-- shadcn components backed by Base UI own the dialog shell, overlay, keyboard hints, semantic colors, and visual integration with the product shell
-- Lisse owns visible corner geometry
-
-The palette should be centered in the viewport and its backdrop must sit above the app titlebar. Its selected state should retain Dao's restrained jade `accent-soft` treatment.
+coss `Command` owns command input behavior, filtering, selection, and keyboard navigation. coss `Dialog` and `Kbd` own the overlay and shortcut presentation. The palette is centered above the shell and uses the same semantic tokens and continuous corner treatment as other overlays.
 
 ### Product shell layout
 
-The current product shell uses:
+The product shell is a recent-first three-column desktop workspace:
 
-- a fixed app titlebar
-- a resizable/collapsible sidebar
-- a project/note file tree inside the sidebar
-- fixed active-surface headers
-- scrollable content inside each active surface
+- translucent system-material sidebar with Home, Tasks, Chats, Search, Activity, Recents, and the unified file tree
+- opaque central editor or core feature surface
+- opaque Info/Activity inspector
+- no separate global top bar, bottom bar, runtime tab strip, Dashboard, or project detail page
 
-The sidebar intentionally shows Tasks and Settings as primary navigation while projects and notes are represented as a file tree. Dashboard, route capabilities, and standalone Notes browsing remain deferred.
+Home restores the latest valid renderer-owned Recent for the active workspace. Recents contain only openable entities such as notes and tasks; project records are folder aliases and are excluded. Renderer local storage is validated with Zod, scoped by workspace, pruned against durable API data, and treated as disposable UI state rather than a source of truth.
+
+On first working-directory setup, the renderer idempotently creates a root `Welcome Note.md` through the existing Note API, records it as the first Recent, and opens it. SQLite and Markdown files remain the durable source of truth.
 
 ### Go module interface
 
