@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:qa": "vite --config vite.qa.config.js",
     "build": "vite build",
     "lint": "eslint .",
     "test": "vitest run",
@@ -14,8 +15,6 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
-    "@fontsource-variable/funnel-sans": "^5.2.8",
-    "@gsap/react": "^2.1.2",
     "@tabler/icons-react": "^3.45.0",
     "@tailwindcss/vite": "^4.3.0",
     "@tiptap/extension-image": "3.27.4",
@@ -28,8 +27,6 @@
     "@tiptap/starter-kit": "3.27.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "cmdk": "^1.1.1",
-    "gsap": "^3.15.0",
     "marked": "17.0.6",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

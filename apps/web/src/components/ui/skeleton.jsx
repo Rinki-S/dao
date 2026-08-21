@@ -1,15 +1,11 @@
-import { CornerSurface } from '@/lib/corners';
 import { cn } from '@/lib/utils';
 
-function Skeleton({ className, ...props }) {
+export function Skeleton({ className, ...props }) {
   return (
-    <CornerSurface
-      dataSlot="skeleton"
-      corner="md"
-      className={cn('animate-pulse bg-muted motion-reduce:animate-none', className)}
+    <div
+      className={cn('animate-pulse rounded-sm bg-muted', className)}
+      data-slot="skeleton"
       {...props}
     />
   );
 }
-
-export { Skeleton };

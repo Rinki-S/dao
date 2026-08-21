@@ -1,29 +1,24 @@
-import { CornerSurface } from '@/lib/corners';
 import { cn } from '@/lib/utils';
 
-function Kbd({ className, ...props }) {
-  return (
-    <CornerSurface
-      as="kbd"
-      dataSlot="kbd"
-      corner="xs"
-      className={cn(
-        "pointer-events-none inline-flex h-5 w-fit min-w-5 items-center justify-center gap-1 bg-muted px-1 font-sans text-[0.625rem] font-medium text-muted-foreground select-none in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background dark:in-data-[slot=tooltip-content]:bg-background/10 [&_svg:not([class*='size-'])]:size-3",
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-function KbdGroup({ className, ...props }) {
+export function Kbd({ className, ...props }) {
   return (
     <kbd
-      data-slot="kbd-group"
-      className={cn('inline-flex items-center gap-1', className)}
+      className={cn(
+        "pointer-events-none inline-flex h-5 min-w-5 select-none items-center justify-center gap-1 rounded-sm bg-muted px-1 font-medium font-sans text-muted-foreground text-xs [&_svg:not([class*='size-'])]:size-3",
+        className,
+      )}
+      data-slot="kbd"
       {...props}
     />
   );
 }
 
-export { Kbd, KbdGroup };
+export function KbdGroup({ className, ...props }) {
+  return (
+    <kbd
+      className={cn('inline-flex items-center gap-1', className)}
+      data-slot="kbd-group"
+      {...props}
+    />
+  );
+}
