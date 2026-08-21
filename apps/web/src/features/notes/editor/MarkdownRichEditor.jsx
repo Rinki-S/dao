@@ -1,6 +1,8 @@
 import { useId } from 'react';
 import { IconFileCode } from '@tabler/icons-react';
 import { EditorContent, useEditor } from '@tiptap/react';
+import { Card, CardDescription, CardHeader, CardPanel, CardTitle } from '@/components/ui/card.jsx';
+import { Textarea } from '@/components/ui/textarea.jsx';
 
 import { getMarkdownCompatibility } from './markdown-compatibility.js';
 import { getDurableMarkdown } from './markdown-serialization.js';
@@ -12,29 +14,31 @@ function MarkdownSourceFallback({ ariaLabel, initialMarkdown, onMarkdownChange, 
   const descriptionId = useId();
 
   return (
-    <div className="dao-markdown-editor dao-markdown-editor--source">
-      <div className="dao-markdown-source-header" role="note">
-        <div className="dao-markdown-source-header__message">
-          <IconFileCode aria-hidden="true" className="size-4 shrink-0" />
-          <div className="dao-markdown-source-header__copy">
-            <span className="dao-markdown-source-header__title">Source mode</span>
-            <span id={descriptionId}>
-              Preserving {reasons.join(', ')} that rich-text editing may rewrite.
-            </span>
-          </div>
-        </div>
-      </div>
-      <textarea
-        aria-describedby={descriptionId}
-        aria-label={ariaLabel}
-        className="dao-markdown-source-textarea"
-        defaultValue={initialMarkdown}
-        onChange={(event) => {
-          onMarkdownChange(event.target.value);
-        }}
-        placeholder="Write markdown…"
-        spellCheck={false}
-      />
+    <div className="h-full overflow-auto p-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <IconFileCode aria-hidden="true" />
+            Source mode
+          </CardTitle>
+          <CardDescription id={descriptionId}>
+            Preserving {reasons.join(', ')} that rich-text editing may rewrite.
+          </CardDescription>
+        </CardHeader>
+        <CardPanel>
+          <Textarea
+            aria-describedby={descriptionId}
+            aria-label={ariaLabel}
+            defaultValue={initialMarkdown}
+            placeholder="Write markdown…"
+            rows={24}
+            spellCheck={false}
+            onChange={(event) => {
+              onMarkdownChange(event.target.value);
+            }}
+          />
+        </CardPanel>
+      </Card>
     </div>
   );
 }
@@ -65,13 +69,13 @@ function TiptapMarkdownEditor({
   });
 
   return (
-    <div className="dao-markdown-editor dao-markdown-editor--rich">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <MarkdownEditorToolbar
         editor={editor}
         saveStatus={saveStatus}
         saveStatusLabel={saveStatusLabel}
       />
-      <EditorContent className="dao-markdown-editor__content" editor={editor} />
+      <EditorContent className="min-h-0 flex-1 overflow-auto" editor={editor} />
     </div>
   );
 }

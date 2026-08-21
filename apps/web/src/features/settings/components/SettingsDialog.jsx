@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { IconFolder, IconRefresh } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button.jsx';
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
 import {
   Dialog,
   DialogClose,
@@ -25,48 +25,48 @@ export function SettingsDialog({ model, open, onOpenChange, onReplayOnboarding }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPopup className="dao-corner sm:max-w-lg">
+      <DialogPopup>
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
-        <DialogPanel className="dao-settings-panel">
-          <section>
-            <p className="dao-settings-label">Storage</p>
-            <div className="dao-setting-row">
-              <IconFolder aria-hidden="true" />
-              <span>
-                <strong>Working directory</strong>
-                <small>{model.workingDirectory?.path ?? 'Not configured'}</small>
-              </span>
-              <Button size="sm" variant="outline" onClick={onReplayOnboarding}>
-                Change
-              </Button>
-            </div>
-          </section>
-          <section>
-            <p className="dao-settings-label">Development</p>
-            <div className="dao-setting-row">
-              <IconRefresh aria-hidden="true" />
-              <span>
-                <strong>Local service</strong>
-                <small>
+        <DialogPanel>
+          <div className="flex flex-col gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Working directory</CardTitle>
+                <CardDescription>
+                  {model.workingDirectory?.path ?? 'Not configured'}
+                </CardDescription>
+                <CardAction>
+                  <Button size="sm" variant="outline" onClick={onReplayOnboarding}>
+                    Change
+                  </Button>
+                </CardAction>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Local service</CardTitle>
+                <CardDescription>
                   {restartStatus === 'ready'
                     ? 'Restarted'
                     : restartStatus === 'error'
                       ? 'Restart failed'
                       : 'Go + SQLite'}
-                </small>
-              </span>
-              <Button
-                disabled={restartStatus === 'loading'}
-                size="sm"
-                variant="outline"
-                onClick={restart}
-              >
-                {restartStatus === 'loading' ? 'Restarting…' : 'Restart'}
-              </Button>
-            </div>
-          </section>
+                </CardDescription>
+                <CardAction>
+                  <Button
+                    loading={restartStatus === 'loading'}
+                    size="sm"
+                    variant="outline"
+                    onClick={restart}
+                  >
+                    Restart
+                  </Button>
+                </CardAction>
+              </CardHeader>
+            </Card>
+          </div>
         </DialogPanel>
         <DialogFooter>
           <DialogClose render={<Button variant="ghost" />}>Done</DialogClose>

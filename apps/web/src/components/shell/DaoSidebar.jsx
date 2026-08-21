@@ -1,15 +1,14 @@
 import { useMemo, useState } from 'react';
 import {
   IconChevronDown,
-  IconChevronLeft,
   IconChevronRight,
-  IconChevronUp,
   IconCircleCheck,
   IconClock,
   IconFile,
   IconFolder,
   IconFolderPlus,
   IconHome,
+  IconLeaf,
   IconMessageCircle,
   IconPlus,
   IconSearch,
@@ -26,7 +25,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog.jsx';
 import { Button } from '@/components/ui/button.jsx';
-import { Collapsible, CollapsiblePanel } from '@/components/ui/collapsible.jsx';
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from '@/components/ui/collapsible.jsx';
 import {
   ContextMenu,
   ContextMenuItem,
@@ -46,10 +45,24 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from '@/components/ui/menu.jsx';
-import { ScrollArea } from '@/components/ui/scroll-area.jsx';
-import { Sidebar } from '@/components/ui/sidebar.jsx';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@/components/ui/tooltip.jsx';
-import { cn } from '@/lib/utils.js';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupAction,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarRail,
+  SidebarTrigger,
+} from '@/components/ui/sidebar.jsx';
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: IconHome },
@@ -76,7 +89,7 @@ function NameDialog({ open, title, label, initialValue = '', onOpenChange, onSub
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPopup className="dao-corner sm:max-w-sm">
+      <DialogPopup>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -97,61 +110,42 @@ function NameDialog({ open, title, label, initialValue = '', onOpenChange, onSub
   );
 }
 
-function HintButton({ label, disabled = false, icon: Icon, active, onClick }) {
-  const button = (
-    <Button
-      aria-label={label}
-      className={cn(
-        'dao-nav-button dao-corner',
-        active && 'dao-nav-button--active',
-        active && label === 'Home' && 'dao-nav-button--home',
-      )}
-      disabled={disabled}
-      size="icon"
-      type="button"
-      variant="ghost"
-      onClick={onClick}
-    >
-      <Icon aria-hidden="true" />
-      {active && label === 'Home' ? <span>Home</span> : null}
-    </Button>
-  );
-  return (
-    <Tooltip>
-      <TooltipTrigger render={button} />
-      <TooltipPopup className="dao-corner">
-        {disabled ? `${label} · Coming later` : label}
-      </TooltipPopup>
-    </Tooltip>
-  );
-}
-
-function NoteRow({ active, note, onOpen, onRename, onDelete }) {
+function NoteRow({ active, nested = false, note, onOpen, onRename, onDelete }) {
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const RowItem = nested ? SidebarMenuSubItem : SidebarMenuItem;
+  const row = nested ? (
+    <SidebarMenuSubButton
+      isActive={active}
+      render={<button type="button" />}
+      onClick={() => onOpen(note)}
+    >
+      <IconFile aria-hidden="true" />
+      <span>{noteFileName(note)}</span>
+    </SidebarMenuSubButton>
+  ) : (
+    <SidebarMenuButton isActive={active} tooltip={noteFileName(note)} onClick={() => onOpen(note)}>
+      <IconFile aria-hidden="true" />
+      <span>{noteFileName(note)}</span>
+    </SidebarMenuButton>
+  );
+
   return (
     <>
-      <ContextMenu>
-        <ContextMenuTrigger>
-          <button
-            className={cn('dao-tree-row dao-corner', active && 'dao-tree-row--active')}
-            type="button"
-            onClick={() => onOpen(note)}
-          >
-            <IconFile aria-hidden="true" />
-            <span>{noteFileName(note)}</span>
-          </button>
-        </ContextMenuTrigger>
-        <ContextMenuPopup className="dao-corner">
-          <ContextMenuItem onClick={() => onOpen(note)}>Open</ContextMenuItem>
-          <ContextMenuItem onClick={() => setRenameOpen(true)}>Rename</ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
-            <IconTrash aria-hidden="true" />
-            Delete
-          </ContextMenuItem>
-        </ContextMenuPopup>
-      </ContextMenu>
+      <RowItem>
+        <ContextMenu>
+          <ContextMenuTrigger>{row}</ContextMenuTrigger>
+          <ContextMenuPopup>
+            <ContextMenuItem onClick={() => onOpen(note)}>Open</ContextMenuItem>
+            <ContextMenuItem onClick={() => setRenameOpen(true)}>Rename</ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
+              <IconTrash aria-hidden="true" />
+              Delete
+            </ContextMenuItem>
+          </ContextMenuPopup>
+        </ContextMenu>
+      </RowItem>
       {renameOpen ? (
         <NameDialog
           initialValue={note.title}
@@ -163,7 +157,7 @@ function NoteRow({ active, note, onOpen, onRename, onDelete }) {
         />
       ) : null}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogPopup className="dao-corner sm:max-w-sm">
+        <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete “{noteFileName(note)}”?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -207,59 +201,59 @@ function ProjectFolder({
   return (
     <>
       <Collapsible open={open || revealed} onOpenChange={setOpen}>
-        <ContextMenu>
-          <ContextMenuTrigger>
-            <button
-              className={cn(
-                'dao-tree-row dao-tree-folder dao-corner',
-                revealed && 'dao-tree-row--revealed',
-              )}
-              type="button"
-              onClick={() => setOpen((current) => !current)}
-            >
-              {open || revealed ? (
-                <IconChevronDown aria-hidden="true" />
-              ) : (
-                <IconChevronRight aria-hidden="true" />
-              )}
-              <IconFolder aria-hidden="true" />
-              <span>{project.name}</span>
-            </button>
-          </ContextMenuTrigger>
-          <ContextMenuPopup className="dao-corner">
-            <ContextMenuItem onClick={() => onCreateNote(project.id)}>
-              <IconPlus aria-hidden="true" />
-              New note
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => setRenameOpen(true)}>Rename folder</ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
-              <IconTrash aria-hidden="true" />
-              Delete folder
-            </ContextMenuItem>
-          </ContextMenuPopup>
-        </ContextMenu>
-        <CollapsiblePanel className="dao-tree-children">
-          {projectNotes.map((note) => (
-            <NoteRow
-              key={note.id}
-              active={activeNoteId === note.id}
-              note={note}
-              onDelete={onDeleteNote}
-              onOpen={onOpenNote}
-              onRename={onRenameNote}
-            />
-          ))}
-          {projectNotes.length === 0 ? (
-            <button
-              className="dao-tree-empty"
-              type="button"
-              onClick={() => onCreateNote(project.id)}
-            >
-              <IconPlus aria-hidden="true" /> New note
-            </button>
-          ) : null}
-        </CollapsiblePanel>
+        <SidebarMenuItem>
+          <ContextMenu>
+            <ContextMenuTrigger>
+              <CollapsibleTrigger render={<SidebarMenuButton isActive={revealed} />}>
+                {open || revealed ? (
+                  <IconChevronDown aria-hidden="true" />
+                ) : (
+                  <IconChevronRight aria-hidden="true" />
+                )}
+                <IconFolder aria-hidden="true" />
+                <span>{project.name}</span>
+              </CollapsibleTrigger>
+            </ContextMenuTrigger>
+            <ContextMenuPopup>
+              <ContextMenuItem onClick={() => onCreateNote(project.id)}>
+                <IconPlus aria-hidden="true" />
+                New note
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => setRenameOpen(true)}>Rename folder</ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
+                <IconTrash aria-hidden="true" />
+                Delete folder
+              </ContextMenuItem>
+            </ContextMenuPopup>
+          </ContextMenu>
+          <CollapsiblePanel>
+            <SidebarMenuSub>
+              {projectNotes.map((note) => (
+                <NoteRow
+                  key={note.id}
+                  active={activeNoteId === note.id}
+                  nested
+                  note={note}
+                  onDelete={onDeleteNote}
+                  onOpen={onOpenNote}
+                  onRename={onRenameNote}
+                />
+              ))}
+              {projectNotes.length === 0 ? (
+                <SidebarMenuSubItem>
+                  <SidebarMenuSubButton
+                    render={<button type="button" />}
+                    onClick={() => onCreateNote(project.id)}
+                  >
+                    <IconPlus aria-hidden="true" />
+                    <span>New note</span>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              ) : null}
+            </SidebarMenuSub>
+          </CollapsiblePanel>
+        </SidebarMenuItem>
       </Collapsible>
       {renameOpen ? (
         <NameDialog
@@ -272,7 +266,7 @@ function ProjectFolder({
         />
       ) : null}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogPopup className="dao-corner sm:max-w-sm">
+        <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete folder “{project.name}”?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -294,9 +288,7 @@ function ProjectFolder({
   );
 }
 
-export function DaoSidebar({ model, onOpenSettings, collapsed, onCollapsedChange }) {
-  const [recentsOpen, setRecentsOpen] = useState(true);
-  const [workspaceOpen, setWorkspaceOpen] = useState(true);
+export function DaoSidebar({ model, onOpenSettings }) {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newWorkspaceOpen, setNewWorkspaceOpen] = useState(false);
   const notesByProject = useMemo(() => {
@@ -310,110 +302,83 @@ export function DaoSidebar({ model, onOpenSettings, collapsed, onCollapsedChange
   const rootNotes = model.notes.filter((note) => note.projectId === null);
   const activeNoteId = model.selectedEntity?.type === 'note' ? model.selectedEntity.id : '';
 
-  if (collapsed) {
-    return (
-      <Sidebar collapsible="none" className="dao-sidebar dao-sidebar--collapsed">
-        <Button
-          aria-label="Expand sidebar"
-          className="dao-corner dao-sidebar-expand"
-          size="icon"
-          variant="ghost"
-          onClick={() => onCollapsedChange(false)}
-        >
-          <IconChevronRight aria-hidden="true" />
-        </Button>
-      </Sidebar>
-    );
-  }
-
   return (
-    <Sidebar collapsible="none" className="dao-sidebar">
-      <header className="dao-workspace-header app-drag-region">
-        <Menu>
-          <MenuTrigger
-            className="dao-workspace-trigger app-no-drag dao-corner"
-            aria-label="Switch workspace"
-          >
-            <span className="dao-workspace-mark">{model.currentWorkspace?.name?.[0] ?? 'D'}</span>
-            <span>{model.currentWorkspace?.name ?? 'Dao'}</span>
-            <IconChevronDown aria-hidden="true" />
-          </MenuTrigger>
-          <MenuPopup align="start" className="dao-corner">
-            {model.workspaces.map((workspace) => (
-              <MenuItem key={workspace.id} onClick={() => model.selectWorkspace(workspace.id)}>
-                {workspace.name}
-              </MenuItem>
-            ))}
-            <MenuSeparator />
-            <MenuItem onClick={() => setNewWorkspaceOpen(true)}>
-              <IconPlus aria-hidden="true" /> New workspace
-            </MenuItem>
-          </MenuPopup>
-        </Menu>
-        <div className="dao-workspace-actions app-no-drag">
-          <Button aria-label="Settings" size="icon" variant="ghost" onClick={onOpenSettings}>
-            <IconSettings aria-hidden="true" />
-          </Button>
-          <Button
-            aria-label="Collapse sidebar"
-            size="icon"
-            variant="ghost"
-            onClick={() => onCollapsedChange(true)}
-          >
-            <IconChevronLeft aria-hidden="true" />
-          </Button>
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <div className="app-drag-region flex items-center gap-2">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <Menu>
+                <MenuTrigger render={<SidebarMenuButton size="lg" />}>
+                  <IconLeaf aria-hidden="true" />
+                  <span>{model.currentWorkspace?.name ?? 'Dao'}</span>
+                  <IconChevronDown aria-hidden="true" />
+                </MenuTrigger>
+                <MenuPopup align="start">
+                  {model.workspaces.map((workspace) => (
+                    <MenuItem
+                      key={workspace.id}
+                      onClick={() => model.selectWorkspace(workspace.id)}
+                    >
+                      {workspace.name}
+                    </MenuItem>
+                  ))}
+                  <MenuSeparator />
+                  <MenuItem onClick={() => setNewWorkspaceOpen(true)}>
+                    <IconPlus aria-hidden="true" />
+                    New workspace
+                  </MenuItem>
+                </MenuPopup>
+              </Menu>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          <SidebarTrigger aria-label="Toggle sidebar" />
         </div>
-      </header>
+      </SidebarHeader>
 
-      <nav aria-label="Primary" className="dao-primary-nav">
-        {NAV_ITEMS.map((item) => (
-          <HintButton
-            key={item.id}
-            active={model.activeView === item.id}
-            disabled={item.disabled}
-            icon={item.icon}
-            label={item.label}
-            onClick={() => {
-              if (item.id === 'home') model.openHome();
-              else if (!item.disabled) model.setActiveView(item.id);
-            }}
-          />
-        ))}
-      </nav>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {NAV_ITEMS.map((item) => (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    disabled={item.disabled}
+                    isActive={model.activeView === item.id}
+                    tooltip={item.disabled ? `${item.label} · Coming later` : item.label}
+                    onClick={() => {
+                      if (item.id === 'home') model.openHome();
+                      else if (!item.disabled) model.setActiveView(item.id);
+                    }}
+                  >
+                    <item.icon aria-hidden="true" />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-      <ScrollArea className="dao-sidebar-scroll" fill overscrollContain>
-        <div className="dao-sidebar-content">
-          <section>
-            <button
-              className="dao-section-label"
-              type="button"
-              onClick={() => setRecentsOpen(!recentsOpen)}
-            >
-              <span>Recents</span>
-              {recentsOpen ? (
-                <IconChevronDown aria-hidden="true" />
-              ) : (
-                <IconChevronRight aria-hidden="true" />
-              )}
-            </button>
-            {recentsOpen ? (
-              <div className="dao-section-list">
-                {model.recents.slice(0, 5).map((recent) => {
-                  const entity =
-                    recent.entityType === 'note'
-                      ? model.notes.find((note) => note.id === recent.entityId)
-                      : model.tasks.find((task) => task.id === recent.entityId);
-                  if (!entity) return null;
-                  return (
-                    <button
-                      key={`${recent.entityType}:${recent.entityId}`}
-                      className={cn(
-                        'dao-tree-row dao-corner',
+        <SidebarGroup>
+          <SidebarGroupLabel>Recents</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {model.recents.slice(0, 5).map((recent) => {
+                const entity =
+                  recent.entityType === 'note'
+                    ? model.notes.find((note) => note.id === recent.entityId)
+                    : model.tasks.find((task) => task.id === recent.entityId);
+                if (!entity) return null;
+                const label = recent.entityType === 'note' ? noteFileName(entity) : entity.title;
+                return (
+                  <SidebarMenuItem key={`${recent.entityType}:${recent.entityId}`}>
+                    <SidebarMenuButton
+                      isActive={
                         model.selectedEntity?.type === recent.entityType &&
-                          model.selectedEntity?.id === recent.entityId &&
-                          'dao-tree-row--active',
-                      )}
-                      type="button"
+                        model.selectedEntity?.id === recent.entityId
+                      }
+                      tooltip={label}
                       onClick={() => model.openEntity(entity)}
                     >
                       {recent.entityType === 'note' ? (
@@ -421,83 +386,73 @@ export function DaoSidebar({ model, onOpenSettings, collapsed, onCollapsedChange
                       ) : (
                         <IconCircleCheck aria-hidden="true" />
                       )}
-                      <span>
-                        {recent.entityType === 'note' ? noteFileName(entity) : entity.title}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-          </section>
+                      <span>{label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-          <section className="dao-workspace-tree">
-            <div className="dao-section-heading">
-              <button
-                className="dao-section-label"
-                type="button"
-                onClick={() => setWorkspaceOpen(!workspaceOpen)}
-              >
-                <span>Workspace</span>
-                {workspaceOpen ? (
-                  <IconChevronUp aria-hidden="true" />
-                ) : (
-                  <IconChevronRight aria-hidden="true" />
-                )}
-              </button>
-              <Button
-                aria-label="New folder"
-                size="icon-xs"
-                variant="ghost"
-                onClick={() => setNewProjectOpen(true)}
-              >
-                <IconFolderPlus aria-hidden="true" />
-              </Button>
-            </div>
-            {workspaceOpen ? (
-              <div className="dao-section-list">
-                {model.projects.map((project, index) => (
-                  <ProjectFolder
-                    key={project.id}
-                    activeNoteId={activeNoteId}
-                    defaultOpen={index === 0}
-                    project={project}
-                    projectNotes={notesByProject.get(project.id) ?? []}
-                    revealed={model.revealedProjectId === project.id}
-                    onCreateNote={(projectId) => model.addNote({ projectId })}
-                    onDelete={model.removeProject}
-                    onDeleteNote={model.removeNote}
-                    onOpenNote={model.openEntity}
-                    onRename={model.renameProject}
-                    onRenameNote={model.renameNote}
-                  />
-                ))}
-                {rootNotes.map((note) => (
-                  <NoteRow
-                    key={note.id}
-                    active={activeNoteId === note.id}
-                    note={note}
-                    onDelete={model.removeNote}
-                    onOpen={model.openEntity}
-                    onRename={model.renameNote}
-                  />
-                ))}
-                <button
-                  className="dao-tree-empty dao-tree-new-root"
-                  type="button"
-                  onClick={() => model.addNote()}
-                >
-                  <IconPlus aria-hidden="true" /> New note
-                </button>
-              </div>
-            ) : null}
-          </section>
-        </div>
-      </ScrollArea>
+        <SidebarGroup>
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupAction aria-label="New folder" onClick={() => setNewProjectOpen(true)}>
+            <IconFolderPlus aria-hidden="true" />
+          </SidebarGroupAction>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {model.projects.map((project, index) => (
+                <ProjectFolder
+                  key={project.id}
+                  activeNoteId={activeNoteId}
+                  defaultOpen={index === 0}
+                  project={project}
+                  projectNotes={notesByProject.get(project.id) ?? []}
+                  revealed={model.revealedProjectId === project.id}
+                  onCreateNote={(projectId) => model.addNote({ projectId })}
+                  onDelete={model.removeProject}
+                  onDeleteNote={model.removeNote}
+                  onOpenNote={model.openEntity}
+                  onRename={model.renameProject}
+                  onRenameNote={model.renameNote}
+                />
+              ))}
+              {rootNotes.map((note) => (
+                <NoteRow
+                  key={note.id}
+                  active={activeNoteId === note.id}
+                  note={note}
+                  onDelete={model.removeNote}
+                  onOpen={model.openEntity}
+                  onRename={model.renameNote}
+                />
+              ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => model.addNote()}>
+                  <IconPlus aria-hidden="true" />
+                  <span>New note</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Settings" onClick={onOpenSettings}>
+              <IconSettings aria-hidden="true" />
+              <span>Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+      <SidebarRail />
 
       {newProjectOpen ? (
         <NameDialog
-          initialValue=""
           label="Folder name"
           open={newProjectOpen}
           title="New folder"
@@ -507,7 +462,6 @@ export function DaoSidebar({ model, onOpenSettings, collapsed, onCollapsedChange
       ) : null}
       {newWorkspaceOpen ? (
         <NameDialog
-          initialValue=""
           label="Workspace name"
           open={newWorkspaceOpen}
           title="New workspace"

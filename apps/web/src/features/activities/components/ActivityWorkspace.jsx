@@ -1,17 +1,14 @@
+import { IconActivity } from '@tabler/icons-react';
+import { Badge } from '@/components/ui/badge.jsx';
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
 import {
-  IconActivity,
-  IconCircleCheck,
-  IconFile,
-  IconFolder,
-  IconLayoutDashboard,
-} from '@tabler/icons-react';
-
-const ICONS = {
-  workspace: IconLayoutDashboard,
-  project: IconFolder,
-  task: IconCircleCheck,
-  note: IconFile,
-};
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty.jsx';
+import { ScrollArea } from '@/components/ui/scroll-area.jsx';
 
 function relativeTime(value) {
   const date = new Date(value);
@@ -32,39 +29,46 @@ function parseMetadata(value) {
 
 export function ActivityWorkspace({ model }) {
   return (
-    <section className="dao-surface dao-activity-workspace">
-      <header className="dao-surface-header">
+    <section className="flex h-full min-h-0 flex-col">
+      <header className="border-b p-4">
         <div>
-          <p className="dao-eyebrow">Local history</p>
-          <h1>Activity</h1>
-          <p>A quiet record of what has been created in this workspace.</p>
+          <h1 className="font-heading text-xl font-semibold">Activity</h1>
+          <p className="text-muted-foreground text-sm">
+            A quiet record of what has been created in this workspace.
+          </p>
         </div>
       </header>
-      <div className="dao-activity-list">
-        {model.activities.map((activity) => {
-          const Icon = ICONS[activity.entityType] ?? IconActivity;
-          const metadata = parseMetadata(activity.metadataJson);
-          return (
-            <div key={activity.id} className="dao-activity-row">
-              <span className="dao-activity-icon dao-corner">
-                <Icon aria-hidden="true" />
-              </span>
-              <span>
-                <strong>{metadata.title ?? metadata.name ?? activity.entityType}</strong>
-                <small>Created {activity.entityType}</small>
-              </span>
-              <time>{relativeTime(activity.createdAt)}</time>
-            </div>
-          );
-        })}
-        {model.activities.length === 0 ? (
-          <div className="dao-empty-state">
-            <IconActivity aria-hidden="true" />
-            <h2>No activity yet</h2>
-            <p>New work will appear here as Dao records it locally.</p>
-          </div>
-        ) : null}
-      </div>
+      <ScrollArea className="min-h-0 flex-1" overscrollContain>
+        <div className="flex flex-col gap-4 p-4">
+          {model.activities.map((activity) => {
+            const metadata = parseMetadata(activity.metadataJson);
+            return (
+              <Card key={activity.id}>
+                <CardHeader>
+                  <CardTitle>{metadata.title ?? metadata.name ?? activity.entityType}</CardTitle>
+                  <CardDescription>Created {activity.entityType}</CardDescription>
+                  <CardAction>
+                    <Badge variant="secondary">{relativeTime(activity.createdAt)}</Badge>
+                  </CardAction>
+                </CardHeader>
+              </Card>
+            );
+          })}
+          {model.activities.length === 0 ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <IconActivity aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>No activity yet</EmptyTitle>
+                <EmptyDescription>
+                  New work will appear here as Dao records it locally.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : null}
+        </div>
+      </ScrollArea>
     </section>
   );
 }

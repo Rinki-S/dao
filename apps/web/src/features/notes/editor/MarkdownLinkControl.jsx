@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button.jsx';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover.jsx';
+import { ToolbarButton } from '@/components/ui/toolbar.jsx';
 import {
   escapeMarkdownDestination,
   getMarkdownLinkDestinationError,
@@ -64,26 +65,29 @@ export function MarkdownLinkControl({ editor, isActive }) {
   };
 
   const trigger = (
-    <Button
-      aria-label={isActive ? 'Edit link' : 'Add link'}
-      aria-pressed={isActive || undefined}
-      className="dao-markdown-toolbar__button"
-      size="icon-sm"
-      type="button"
-      variant={isActive ? 'secondary' : 'ghost'}
+    <ToolbarButton
+      render={
+        <Button
+          aria-label={isActive ? 'Edit link' : 'Add link'}
+          aria-pressed={isActive || undefined}
+          size="icon-sm"
+          type="button"
+          variant={isActive ? 'secondary' : 'ghost'}
+        />
+      }
     >
-      <IconLink aria-hidden="true" className="size-4" data-icon="inline-start" />
-    </Button>
+      <IconLink aria-hidden="true" data-icon="inline-start" />
+    </ToolbarButton>
   );
 
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger render={trigger} />
-      <PopoverContent className="dao-corner dao-markdown-link-popover__content">
+      <PopoverContent>
         <PopoverTitle className="sr-only">
           {isActive ? 'Edit Markdown link' : 'Add Markdown link'}
         </PopoverTitle>
-        <form className="dao-markdown-link-popover__form" onSubmit={applyLink}>
+        <form onSubmit={applyLink}>
           <div className="grid gap-3">
             <Field data-invalid={Boolean(hrefError)}>
               <FieldLabel htmlFor={hrefId}>Link URL</FieldLabel>
@@ -114,7 +118,7 @@ export function MarkdownLinkControl({ editor, isActive }) {
               <FieldError>{titleError}</FieldError>
             </Field>
           </div>
-          <div className="dao-markdown-link-popover__actions">
+          <div className="mt-4 flex justify-end gap-2">
             {isActive && (
               <Button size="sm" type="button" variant="ghost" onClick={removeLink}>
                 Remove

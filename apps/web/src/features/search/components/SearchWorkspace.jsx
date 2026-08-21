@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react';
-import { IconCircleCheck, IconFile, IconFolder, IconSearch } from '@tabler/icons-react';
+import { IconSearch } from '@tabler/icons-react';
+import { Badge } from '@/components/ui/badge.jsx';
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty.jsx';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group.jsx';
-import { Skeleton } from '@/components/ui/skeleton.jsx';
+import { ScrollArea } from '@/components/ui/scroll-area.jsx';
+import { Spinner } from '@/components/ui/spinner.jsx';
 import { searchAll } from '@/features/search/api.js';
-
-const TYPE_ICONS = { project: IconFolder, task: IconCircleCheck, note: IconFile };
 
 export function SearchWorkspace({ model }) {
   const [query, setQuery] = useState('');
@@ -33,78 +41,99 @@ export function SearchWorkspace({ model }) {
   }, [model.currentWorkspace?.id, query]);
 
   return (
-    <section className="dao-surface dao-search-workspace">
-      <header className="dao-surface-header">
+    <section className="flex h-full min-h-0 flex-col">
+      <header className="border-b p-4">
         <div>
-          <p className="dao-eyebrow">Workspace</p>
-          <h1>Search</h1>
-          <p>Open notes, tasks, and folders without leaving your train of thought.</p>
+          <h1 className="font-heading text-xl font-semibold">Search</h1>
+          <p className="text-muted-foreground text-sm">
+            Open notes, tasks, and folders without leaving your train of thought.
+          </p>
         </div>
       </header>
-      <InputGroup className="dao-search-input dao-corner">
-        <InputGroupAddon>
-          <IconSearch aria-hidden="true" />
-        </InputGroupAddon>
-        <InputGroupInput
-          autoFocus
-          data-command-target="search-query"
-          placeholder="Search everything…"
-          value={query}
-          onChange={(event) => {
-            const nextQuery = event.target.value;
-            setQuery(nextQuery);
-            if (!nextQuery.trim()) {
-              setResults([]);
-              setStatus('idle');
-            }
-          }}
-        />
-      </InputGroup>
-      <div className="dao-search-results">
-        {status === 'loading'
-          ? Array.from({ length: 4 }, (_, index) => (
-              <Skeleton key={index} className="h-14 w-full" />
-            ))
-          : null}
-        {status === 'ready' &&
-          results.map((result) => {
-            const Icon = TYPE_ICONS[result.entityType];
-            return (
-              <button
-                key={`${result.entityType}:${result.entityId}`}
-                className="dao-search-result dao-corner"
-                type="button"
-                onClick={() => model.revealSearchResult(result)}
-              >
-                <Icon aria-hidden="true" />
-                <span>
-                  <strong>{result.title}</strong>
-                  <small>{result.snippet || result.entityType}</small>
-                </span>
-                <em>{result.entityType}</em>
-              </button>
-            );
-          })}
-        {status === 'ready' && results.length === 0 ? (
-          <div className="dao-empty-state">
-            <IconSearch aria-hidden="true" />
-            <h2>No matches</h2>
-            <p>Try a title, technical term, or phrase from a note.</p>
-          </div>
-        ) : null}
-        {status === 'idle' ? (
-          <div className="dao-empty-state dao-empty-state--quiet">
-            <IconSearch aria-hidden="true" />
-            <h2>Search your local workspace</h2>
-            <p>Results come from Dao's SQLite full-text index.</p>
-          </div>
-        ) : null}
-        {status === 'error' ? (
-          <p className="dao-error" role="alert">
-            Search is unavailable right now.
-          </p>
-        ) : null}
-      </div>
+      <ScrollArea className="min-h-0 flex-1" overscrollContain>
+        <div className="flex flex-col gap-4 p-4">
+          <InputGroup>
+            <InputGroupInput
+              autoFocus
+              aria-label="Search"
+              data-command-target="search-query"
+              placeholder="Search everything…"
+              type="search"
+              value={query}
+              onChange={(event) => {
+                const nextQuery = event.target.value;
+                setQuery(nextQuery);
+                if (!nextQuery.trim()) {
+                  setResults([]);
+                  setStatus('idle');
+                }
+              }}
+            />
+            <InputGroupAddon>
+              <IconSearch aria-hidden="true" />
+            </InputGroupAddon>
+          </InputGroup>
+          {status === 'loading' ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia>
+                  <Spinner aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>Searching…</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
+          ) : null}
+          {status === 'ready' &&
+            results.map((result) => {
+              return (
+                <Card
+                  key={`${result.entityType}:${result.entityId}`}
+                  render={<button type="button" onClick={() => model.revealSearchResult(result)} />}
+                >
+                  <CardHeader>
+                    <CardTitle>{result.title}</CardTitle>
+                    <CardDescription>{result.snippet || result.entityType}</CardDescription>
+                    <CardAction>
+                      <Badge variant="secondary">{result.entityType}</Badge>
+                    </CardAction>
+                  </CardHeader>
+                </Card>
+              );
+            })}
+          {status === 'ready' && results.length === 0 ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <IconSearch aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>No matches</EmptyTitle>
+                <EmptyDescription>
+                  Try a title, technical term, or phrase from a note.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : null}
+          {status === 'idle' ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <IconSearch aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>Search your local workspace</EmptyTitle>
+                <EmptyDescription>Results come from Dao's SQLite full-text index.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : null}
+          {status === 'error' ? (
+            <Empty role="alert">
+              <EmptyHeader>
+                <EmptyTitle>Search is unavailable</EmptyTitle>
+                <EmptyDescription>Try again in a moment.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : null}
+        </div>
+      </ScrollArea>
     </section>
   );
 }

@@ -12,6 +12,7 @@ import {
   MenuShortcut,
   MenuTrigger,
 } from '@/components/ui/menu.jsx';
+import { ToolbarButton } from '@/components/ui/toolbar.jsx';
 
 const BLOCK_TYPES = [
   { id: 'paragraph', label: 'Paragraph', shortLabel: 'Text', shortcut: 'Mod+Alt+0' },
@@ -70,35 +71,32 @@ export function MarkdownBlockTypeControl({ disabled = false, editor }) {
     <Menu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
       <MenuTrigger
         render={
-          <Button
-            aria-label={`Text style: ${activeTextStyle?.label ?? 'Other block'}`}
-            className="dao-markdown-toolbar__block-type"
-            disabled={disabled}
-            size="sm"
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              if (!isMenuOpen) {
-                setIsMenuOpen(true);
-              }
-            }}
+          <ToolbarButton
+            render={
+              <Button
+                aria-label={`Text style: ${activeTextStyle?.label ?? 'Other block'}`}
+                disabled={disabled}
+                size="sm"
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  if (!isMenuOpen) setIsMenuOpen(true);
+                }}
+              />
+            }
           />
         }
       >
-        <span className="dao-markdown-toolbar__block-type-label">
-          {activeTextStyle?.shortLabel ?? 'Style'}
-        </span>
-        <IconChevronDown aria-hidden="true" className="size-3.5" data-icon="inline-end" />
+        <span>{activeTextStyle?.shortLabel ?? 'Style'}</span>
+        <IconChevronDown aria-hidden="true" data-icon="inline-end" />
       </MenuTrigger>
-      <MenuPopup align="start" className="dao-corner w-52">
+      <MenuPopup align="start">
         <MenuGroup>
           <MenuRadioGroup value={activeTextStyle?.id ?? ''} onValueChange={handleBlockTypeAction}>
             {BLOCK_TYPES.map((blockType) => (
               <MenuRadioItem closeOnClick key={blockType.id} value={blockType.id}>
-                <span className="dao-markdown-block-option__label">{blockType.label}</span>
-                <MenuShortcut aria-hidden="true" className="dao-markdown-block-option__shortcut">
-                  {blockType.shortcut}
-                </MenuShortcut>
+                <span>{blockType.label}</span>
+                <MenuShortcut aria-hidden="true">{blockType.shortcut}</MenuShortcut>
               </MenuRadioItem>
             ))}
           </MenuRadioGroup>

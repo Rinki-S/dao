@@ -1,9 +1,16 @@
 import { useState } from 'react';
-import { IconFolderOpen, IconLeaf } from '@tabler/icons-react';
+import { IconFolderOpen } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button.jsx';
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardPanel,
+  CardTitle,
+} from '@/components/ui/card.jsx';
 import { Field, FieldLabel } from '@/components/ui/field.jsx';
 import { Input } from '@/components/ui/input.jsx';
-import { Spinner } from '@/components/ui/spinner.jsx';
 import { DirectoryPickerResultSchema } from '@/features/settings/schemas.js';
 
 export function WorkingDirectoryOnboarding({
@@ -51,53 +58,61 @@ export function WorkingDirectoryOnboarding({
   }
 
   return (
-    <main className="dao-onboarding app-drag-region">
-      <form className="dao-onboarding-card dao-corner app-no-drag" onSubmit={submit}>
-        <span className="dao-onboarding-mark dao-corner">
-          <IconLeaf aria-hidden="true" />
-        </span>
-        <p className="dao-eyebrow">A local place for long-term work</p>
-        <h1>Start your path with Dao.</h1>
-        <p className="dao-onboarding-copy">
-          Choose one folder you control. Dao will keep workspaces, project folders, Markdown notes,
-          and future formats there.
-        </p>
-        <button className="dao-directory-picker dao-corner" type="button" onClick={chooseFolder}>
-          <IconFolderOpen aria-hidden="true" />
-          <span>
-            <strong>{path ? 'Working directory' : 'Choose a folder'}</strong>
-            <small>{path || 'Nothing leaves this device by default.'}</small>
-          </span>
-        </button>
-        {!hasWorkspace ? (
-          <Field>
-            <FieldLabel>Workspace name</FieldLabel>
-            <Input
-              value={workspaceName}
-              onChange={(event) => setWorkspaceName(event.target.value)}
-            />
-          </Field>
-        ) : null}
-        {error ? (
-          <p className="dao-error" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <div className="dao-onboarding-actions">
-          {onCancel ? (
-            <Button type="button" variant="ghost" onClick={onCancel}>
-              Cancel
-            </Button>
-          ) : null}
-          <Button
-            disabled={!path || status !== 'idle' || (!hasWorkspace && !workspaceName.trim())}
-            type="submit"
-          >
-            {status === 'saving' ? <Spinner aria-hidden="true" /> : null}
-            {status === 'saving' ? 'Preparing Dao…' : 'Continue'}
-          </Button>
-        </div>
-      </form>
+    <main className="app-drag-region grid h-svh place-items-center bg-background p-4">
+      <div className="app-no-drag w-full max-w-md">
+        <Card render={<form onSubmit={submit} />}>
+          <CardHeader>
+            <CardTitle>Start your path with Dao.</CardTitle>
+            <CardDescription>
+              Choose one folder you control. Dao will keep workspaces, project folders, Markdown
+              notes, and future formats there.
+            </CardDescription>
+          </CardHeader>
+          <CardPanel>
+            <div className="flex flex-col gap-4">
+              <Button type="button" variant="outline" onClick={chooseFolder}>
+                <IconFolderOpen aria-hidden="true" />
+                {path ? 'Change working directory' : 'Choose a folder'}
+              </Button>
+              <p className="break-all text-muted-foreground text-sm">
+                {path || 'Nothing leaves this device by default.'}
+              </p>
+              {!hasWorkspace ? (
+                <Field>
+                  <FieldLabel>Workspace name</FieldLabel>
+                  <Input
+                    value={workspaceName}
+                    onChange={(event) => setWorkspaceName(event.target.value)}
+                  />
+                </Field>
+              ) : null}
+              {error ? (
+                <p className="text-destructive text-sm" role="alert">
+                  {error}
+                </p>
+              ) : null}
+            </div>
+          </CardPanel>
+          <CardFooter>
+            <div className="flex w-full justify-end gap-2">
+              {onCancel ? (
+                <Button type="button" variant="ghost" onClick={onCancel}>
+                  Cancel
+                </Button>
+              ) : null}
+              <Button
+                loading={status === 'saving'}
+                disabled={
+                  !path || status === 'choosing' || (!hasWorkspace && !workspaceName.trim())
+                }
+                type="submit"
+              >
+                Continue
+              </Button>
+            </div>
+          </CardFooter>
+        </Card>
+      </div>
     </main>
   );
 }

@@ -10,31 +10,40 @@ import {
   IconListNumbers,
 } from '@tabler/icons-react';
 import { useEditorState } from '@tiptap/react';
+import { Badge } from '@/components/ui/badge.jsx';
 import { Button } from '@/components/ui/button.jsx';
-import { Toolbar, ToolbarGroup, ToolbarSeparator } from '@/components/ui/toolbar.jsx';
+import {
+  Toolbar,
+  ToolbarButton,
+  ToolbarGroup,
+  ToolbarSeparator,
+} from '@/components/ui/toolbar.jsx';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@/components/ui/tooltip.jsx';
 import { MarkdownBlockTypeControl } from './MarkdownBlockTypeControl.jsx';
 import { MarkdownLinkControl } from './MarkdownLinkControl.jsx';
 
 function EditorButton({ disabled = false, editor, icon: Icon, isActive = false, label, onClick }) {
   const button = (
-    <Button
-      aria-label={label}
-      aria-pressed={isActive || undefined}
-      className="dao-markdown-toolbar__button dao-corner"
-      disabled={disabled}
-      size="icon-sm"
-      type="button"
-      variant={isActive ? 'secondary' : 'ghost'}
-      onClick={() => onClick(editor)}
+    <ToolbarButton
+      render={
+        <Button
+          aria-label={label}
+          aria-pressed={isActive || undefined}
+          disabled={disabled}
+          size="icon-sm"
+          type="button"
+          variant={isActive ? 'secondary' : 'ghost'}
+          onClick={() => onClick(editor)}
+        />
+      }
     >
       <Icon aria-hidden="true" />
-    </Button>
+    </ToolbarButton>
   );
   return (
     <Tooltip>
       <TooltipTrigger delay={300} render={button} />
-      <TooltipPopup className="dao-corner">{label}</TooltipPopup>
+      <TooltipPopup>{label}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -73,8 +82,8 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
   });
 
   return (
-    <div className="dao-markdown-toolbar-shell">
-      <Toolbar aria-label="Markdown formatting" className="dao-markdown-toolbar dao-corner">
+    <div className="flex items-center gap-2 border-b p-2">
+      <Toolbar aria-label="Markdown formatting">
         <ToolbarGroup>
           <MarkdownBlockTypeControl disabled={state.isInTable} editor={editor} />
         </ToolbarGroup>
@@ -149,27 +158,21 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
         </ToolbarGroup>
       </Toolbar>
       {saveStatusLabel ? (
-        <span
+        <Badge
           aria-live="polite"
-          className={`dao-note-save-status dao-note-save-status--${saveStatus}`}
+          variant={
+            saveStatus === 'failed' ? 'error' : saveStatus === 'saved' ? 'success' : 'secondary'
+          }
         >
           <IconCircleCheck aria-hidden="true" />
           {saveStatusLabel}
-        </span>
+        </Badge>
       ) : null}
     </div>
   );
 }
 
 export function MarkdownEditorToolbar({ editor, saveStatus, saveStatusLabel }) {
-  if (!editor)
-    return (
-      <div
-        aria-busy="true"
-        aria-label="Markdown formatting"
-        className="dao-markdown-toolbar-shell"
-        role="toolbar"
-      />
-    );
+  if (!editor) return <div aria-busy="true" aria-label="Markdown formatting" role="toolbar" />;
   return <ReadyToolbar editor={editor} saveStatus={saveStatus} saveStatusLabel={saveStatusLabel} />;
 }

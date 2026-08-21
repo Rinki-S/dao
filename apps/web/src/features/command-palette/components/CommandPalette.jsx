@@ -91,7 +91,7 @@ export function CommandPalette({ model, onOpenSettings }) {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandDialogPopup className="dao-corner">
+      <CommandDialogPopup>
         <Command items={items}>
           <CommandInput placeholder="Search commands…" />
           <CommandPanel>
