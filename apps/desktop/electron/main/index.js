@@ -21,10 +21,10 @@ let mainWindow = null
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        minWidth: 900,
-        minHeight: 600,
+        width: 1488,
+        height: 1024,
+        minWidth: 960,
+        minHeight: 640,
         icon: appIconPath,
         backgroundColor: '#00000000',
         // macOS system material (NSVisualEffectView) behind the window; the
@@ -32,7 +32,7 @@ function createWindow() {
         vibrancy: 'sidebar',
         titleBarStyle: 'hiddenInset',
         // Titlebar is 42px tall; nudge traffic lights up until optically centered.
-        trafficLightPosition: { x: 16, y: 14 },
+        trafficLightPosition: { x: 16, y: 18 },
         webPreferences: {
             preload: path.join(__dirname, '../preload/index.cjs'),
             contextIsolation: true,
@@ -45,7 +45,6 @@ function createWindow() {
     })
 
     mainWindow.loadURL('http://localhost:5173')
-    mainWindow.webContents.openDevTools()
 
     mainWindow.on('closed', () => {
         mainWindow = null
