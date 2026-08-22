@@ -133,10 +133,14 @@
   }
 }
 
-* {
-  box-sizing: border-box;
-  border-color: var(--border);
-  outline-color: color-mix(in oklab, var(--ring) 48%, transparent);
+/* Layered so Tailwind utilities (border-transparent on ghost buttons, for
+   example) can still win. Unlayered rules outrank every @layer. */
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: var(--border);
+    outline-color: color-mix(in oklab, var(--ring) 48%, transparent);
+  }
 }
 
 html,
