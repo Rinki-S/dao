@@ -1,18 +1,54 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button.jsx';
-import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
 import {
   Dialog,
-  DialogClose,
-  DialogFooter,
   DialogHeader,
   DialogPanel,
   DialogPopup,
   DialogTitle,
 } from '@/components/ui/dialog.jsx';
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select.jsx';
+import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs.jsx';
 import { waitForAllPendingNoteSaves } from '@/features/notes/note-save-queue.js';
+import { APPEARANCES, APPEARANCE_LABELS } from '@/lib/appearance.js';
 
-export function SettingsDialog({ model, open, onOpenChange, onReplayOnboarding }) {
+const APPEARANCE_OPTIONS = APPEARANCES.map((value) => ({
+  label: APPEARANCE_LABELS[value],
+  value,
+}));
+
+/**
+ * One setting: what it is on the left, the control that changes it on the
+ * right. Rows stack into a section, separated by hairlines.
+ */
+function SettingRow({ title, description, children }) {
+  return (
+    <div className="flex items-center justify-between gap-6 border-b py-4 first:pt-0 last:border-b-0 last:pb-0">
+      <div className="min-w-0">
+        <p className="font-medium text-sm">{title}</p>
+        {description ? (
+          <p className="mt-0.5 truncate text-muted-foreground text-sm">{description}</p>
+        ) : null}
+      </div>
+      {children ? <div className="shrink-0">{children}</div> : null}
+    </div>
+  );
+}
+
+export function SettingsDialog({
+  appearance,
+  model,
+  open,
+  onAppearanceChange,
+  onOpenChange,
+  onReplayOnboarding,
+}) {
   const [restartStatus, setRestartStatus] = useState('idle');
 
   async function restart() {
@@ -25,36 +61,63 @@ export function SettingsDialog({ model, open, onOpenChange, onReplayOnboarding }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPopup>
+      <DialogPopup className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
         <DialogPanel>
-          <div className="flex flex-col gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Working directory</CardTitle>
-                <CardDescription>
-                  {model.workingDirectory?.path ?? 'Not configured'}
-                </CardDescription>
-                <CardAction>
+          <Tabs className="gap-6" defaultValue="general" orientation="vertical">
+            <TabsList className="w-40 shrink-0 self-start" variant="underline">
+              <TabsTab value="general">General</TabsTab>
+              <TabsTab value="appearance">Appearance</TabsTab>
+              <TabsTab value="advanced">Advanced</TabsTab>
+            </TabsList>
+            <div className="min-h-56 min-w-0 flex-1">
+              <TabsPanel value="general">
+                <SettingRow
+                  description={model.workingDirectory?.path ?? 'Not configured'}
+                  title="Working directory"
+                >
                   <Button size="sm" variant="outline" onClick={onReplayOnboarding}>
                     Change
                   </Button>
-                </CardAction>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Local service</CardTitle>
-                <CardDescription>
-                  {restartStatus === 'ready'
-                    ? 'Restarted'
-                    : restartStatus === 'error'
-                      ? 'Restart failed'
-                      : 'Go + SQLite'}
-                </CardDescription>
-                <CardAction>
+                </SettingRow>
+                <SettingRow
+                  description={model.currentWorkspace?.name ?? 'None'}
+                  title="Current workspace"
+                />
+              </TabsPanel>
+              <TabsPanel value="appearance">
+                <SettingRow description="Light, dark, or whatever macOS is set to." title="Theme">
+                  <Select
+                    items={APPEARANCE_OPTIONS}
+                    value={appearance}
+                    onValueChange={onAppearanceChange}
+                  >
+                    <SelectTrigger aria-label="Theme" size="sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectPopup alignItemWithTrigger={false}>
+                      {APPEARANCE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectPopup>
+                  </Select>
+                </SettingRow>
+              </TabsPanel>
+              <TabsPanel value="advanced">
+                <SettingRow
+                  description={
+                    restartStatus === 'ready'
+                      ? 'Restarted'
+                      : restartStatus === 'error'
+                        ? 'Restart failed'
+                        : 'Go + SQLite, running on this device only.'
+                  }
+                  title="Local service"
+                >
                   <Button
                     loading={restartStatus === 'loading'}
                     size="sm"
@@ -63,14 +126,11 @@ export function SettingsDialog({ model, open, onOpenChange, onReplayOnboarding }
                   >
                     Restart
                   </Button>
-                </CardAction>
-              </CardHeader>
-            </Card>
-          </div>
+                </SettingRow>
+              </TabsPanel>
+            </div>
+          </Tabs>
         </DialogPanel>
-        <DialogFooter>
-          <DialogClose render={<Button variant="ghost" />}>Done</DialogClose>
-        </DialogFooter>
       </DialogPopup>
     </Dialog>
   );
