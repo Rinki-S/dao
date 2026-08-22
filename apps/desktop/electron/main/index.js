@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -62,6 +62,20 @@ ipcMain.handle('dao:select-working-directory', async () => {
     }
 
     return { canceled: false, path: result.filePaths[0] }
+})
+
+const APPEARANCE_SOURCES = new Set(['system', 'light', 'dark'])
+
+// Keeps the native window materials (sidebar vibrancy, traffic lights, menus)
+// on the same appearance the renderer painted, instead of the OS setting.
+ipcMain.handle('dao:set-appearance', (_event, source) => {
+    if (!APPEARANCE_SOURCES.has(source)) {
+        return { ok: false, error: `Unsupported appearance: ${String(source)}` }
+    }
+
+    nativeTheme.themeSource = source
+
+    return { ok: true, error: '' }
 })
 
 ipcMain.handle('dao:restart-local-service', async () => {
