@@ -1,6 +1,17 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 
+const storageValues = new Map();
+Object.defineProperty(window, 'localStorage', {
+  configurable: true,
+  value: {
+    clear: () => storageValues.clear(),
+    getItem: (key) => storageValues.get(key) ?? null,
+    removeItem: (key) => storageValues.delete(key),
+    setItem: (key, value) => storageValues.set(key, String(value)),
+  },
+});
+
 Element.prototype.scrollIntoView = vi.fn();
 
 Object.defineProperty(Element.prototype, 'getAnimations', {

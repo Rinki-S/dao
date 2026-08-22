@@ -30,10 +30,7 @@ function getUnsupportedSyntax(markdown) {
       syntax.hasFootnoteDefinition = true;
     }
 
-    if (
-      (token.type === 'link' || token.type === 'image') &&
-      token.title?.includes('"')
-    ) {
+    if ((token.type === 'link' || token.type === 'image') && token.title?.includes('"')) {
       syntax.hasUnsafeQuotedTitle = true;
     }
   });

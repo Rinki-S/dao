@@ -1,16 +1,13 @@
+import { IconLoader2 as Loader2Icon } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
-import { IconLoader } from '@tabler/icons-react';
 
-function Spinner({ className, ...props }) {
+export function Spinner({ className, ...props }) {
   return (
-    <IconLoader
-      data-slot="spinner"
-      role="status"
+    <Loader2Icon
       aria-label="Loading"
-      className={cn('size-4 animate-spin', className)}
+      className={cn('animate-spin', className)}
+      role="status"
       {...props}
     />
   );
 }
-
-export { Spinner };

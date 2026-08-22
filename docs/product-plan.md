@@ -127,10 +127,10 @@ The MVP user flow:
 
 ```txt
 1. User opens Dao
-2. User creates a workspace
-3. User creates a project
-4. User creates tasks under the project
-5. User writes notes related to the project
+2. User chooses a working directory and creates a workspace
+3. Dao creates and opens a root Welcome Note as the first Recent
+4. User creates project folders, notes, and tasks
+5. Home restores the most recently opened note or task
 6. User searches across projects, tasks, and notes
 7. User uses command palette to quickly create or open content
 8. User sees lightweight progress signals derived from local activity
@@ -186,7 +186,7 @@ The selected working directory is app-level local configuration. Users should ch
 
 ## 6.2 Project
 
-Project is the central unit of Dao.
+Project is the persisted folder model used to group local work. In the UI, “project” is only an alias for a real folder and never a standalone destination.
 
 A project can contain:
 
@@ -213,7 +213,7 @@ Dao should store the absolute folder path in project metadata, while the Go loca
 - update project
 - archive project
 - delete project
-- project detail page
+- expand, collapse, and reveal the corresponding folder in the workspace tree
 
 ### Project status
 
@@ -491,29 +491,26 @@ Expected behavior:
 ### Current Shell
 
 ```txt
-Titlebar
-  Sidebar toggle
-  App name
-  Global search
-
 Sidebar
   Workspace switcher
-  Workspace
-    Tasks
-  Projects
+  Home / Tasks / Chats / Search / Activity
+  Recents
+  Workspace file tree
     Project folders
-    Project notes
-    Workspace-root notes
-  Settings
+    Markdown notes
+    Future file formats
 
 Main content
-  Fixed surface title
-  Active surface body
+  Latest Recent by default
+  Markdown editor or selected core surface
+
+Inspector
+  Info / Activity
 ```
 
-The current product shell intentionally keeps the sidebar focused on Tasks, project folders, note files, and Settings. Dashboard, standalone Notes, and extension browsing surfaces are deferred until the core workstation loop is stronger.
+The shell is edge-to-edge and has no separate global top bar or bottom bar. The left column uses Electron's macOS system material; content and inspector surfaces remain opaque for reading clarity.
 
-Unassigned notes are shown directly at the workspace root in the sidebar file tree rather than under a synthetic "No Project" folder.
+Home is not a dashboard. It restores the most recent valid openable entity for the current workspace. A first-run root `Welcome Note.md` guarantees that Home has useful content immediately. Project folders can expand, collapse, or be revealed by Search, but clicking one never opens a project page.
 
 ### Command Palette
 
@@ -521,32 +518,10 @@ The command palette should stay global and keyboard-first.
 
 Implementation direction:
 
-- use `cmdk` for command search, selection, and keyboard interaction
-- use the shadcn `Command`, `Dialog`, and `Kbd` components backed by Base UI for the shell
+- use coss `Command`, `Dialog`, and `Kbd` components backed by Base UI
 - center the palette above the app shell
-- keep the backdrop above the titlebar
-- use shadcn semantic colors while retaining Dao's jade `accent-soft` selected state
-- use Lisse for the palette, input, item, and keyboard-hint corner geometry
-
-### Dashboard
-
-Dashboard should show:
-
-- today’s tasks
-- active projects
-- recent notes
-- lightweight activity metrics
-- quick actions
-
-### Project detail page
-
-Project detail should show:
-
-- overview
-- related tasks
-- related notes
-- activity
-- future AI summary
+- use coss semantic colors and Tabler icons
+- use shared radius tokens and Electron `system-ui` corner smoothing
 
 ### Notes page
 
@@ -592,7 +567,7 @@ Deliverables:
 - project CRUD
 - task CRUD
 - note CRUD
-- dashboard
+- recent-first workspace shell
 - settings
 
 ## Month 3: Search and Efficiency
@@ -610,7 +585,7 @@ Deliverables:
 - shortcuts
 - activity log
 - better empty states
-- better project detail page
+- better workspace file-tree interactions
 
 ## Month 4: Extensions
 
@@ -764,11 +739,11 @@ Dao should demonstrate:
 The immediate goal is:
 
 ```txt
-Finish the shadcn Base UI product-shell migration and note editor loop.
+Finish the recent-first coss workspace shell and note editor loop.
 ```
 
 The current meaningful demo should prove:
 
 ```txt
-Dao can open as a desktop app, configure a working directory, create a workspace, manage tasks, create project-backed or workspace-root markdown notes, search local data, and navigate through the sidebar and command palette.
+Dao can open as a desktop app, configure a working directory, create a workspace and Welcome Note, restore recent work, manage task and project-folder data, edit local Markdown notes, search local data, and navigate through the coss sidebar and command palette.
 ```

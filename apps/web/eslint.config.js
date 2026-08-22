@@ -28,5 +28,12 @@ export default defineConfig([
       },
     },
   },
+  {
+    files: ['src/components/ui/**/*.{js,jsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+      'react-hooks/purity': 'off',
+    },
+  },
   prettier,
 ]);

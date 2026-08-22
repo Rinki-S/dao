@@ -51,15 +51,12 @@ describe('getMarkdownCompatibility', () => {
     });
   });
 
-  it.each(UNSAFE_QUOTED_TITLE_FIXTURES)(
-    'requires source mode for $name',
-    ({ markdown }) => {
-      expect(getMarkdownCompatibility(markdown)).toEqual({
-        isRichTextSafe: false,
-        reasons: ['link or image titles with double quotes'],
-      });
-    },
-  );
+  it.each(UNSAFE_QUOTED_TITLE_FIXTURES)('requires source mode for $name', ({ markdown }) => {
+    expect(getMarkdownCompatibility(markdown)).toEqual({
+      isRichTextSafe: false,
+      reasons: ['link or image titles with double quotes'],
+    });
+  });
 
   it.each(CODE_BLOCK_REFERENCE_LIKE_FIXTURES)(
     'does not mistake definition-like text in a $name for a definition',

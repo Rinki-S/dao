@@ -1,7 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { IconFileOff } from '@tabler/icons-react';
-
-import { Skeleton } from '@/components/ui/skeleton.jsx';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty.jsx';
+import { Spinner } from '@/components/ui/spinner.jsx';
 import { notifyActivityChanged } from '@/features/activities/events.js';
 import {
   clearPendingNoteDraft,
@@ -12,11 +11,7 @@ import {
   setPendingNoteDraft,
   waitForNoteSaves,
 } from '@/features/notes/note-save-queue.js';
-import { listProjects } from '@/features/projects/api.js';
-import { listWorkspaces } from '@/features/workspaces/api.js';
-import { CornerSurface } from '@/lib/corners.jsx';
 import { getNote, updateNote, updateNoteContent } from '../api.js';
-import './note-editor-panel.css';
 
 const AUTOSAVE_DELAY_MS = 800;
 const MarkdownRichEditor = lazy(() =>
@@ -38,57 +33,29 @@ function getSaveStatusLabel(status) {
   }
 }
 
-function NoteEditorState({ title, description, tone = 'muted' }) {
+function NoteEditorState({ title, description }) {
   return (
-    <section aria-label={title} className="dao-note-editor-state">
-      <div className="flex max-w-sm flex-col items-center">
-        <IconFileOff
-          aria-hidden="true"
-          className={
-            tone === 'danger' ? 'mb-4 size-8 text-destructive' : 'mb-4 size-8 text-muted-foreground'
-          }
-        />
-        <h1
-          className={
-            tone === 'danger'
-              ? 'font-heading text-lg font-semibold text-destructive'
-              : 'font-heading text-lg font-semibold text-muted-foreground'
-          }
-        >
-          {title}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground text-pretty">{description}</p>
-      </div>
-    </section>
+    <Empty aria-label={title}>
+      <EmptyHeader>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }
 
 function MarkdownEditorLoadingState() {
   return (
-    <div
-      aria-busy="true"
-      aria-label="Loading Markdown editor"
-      className="dao-note-editor-loading"
-      role="status"
-    >
-      <div className="dao-note-editor-loading__toolbar">
-        <Skeleton className="h-7 w-72 max-w-full" />
-      </div>
-      <div className="dao-note-editor-loading__body space-y-3">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-5/6" />
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="mt-7 h-5 w-2/5" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-4/5" />
-      </div>
-    </div>
+    <Empty aria-busy="true" aria-label="Loading Markdown editor" role="status">
+      <EmptyHeader>
+        <Spinner aria-hidden="true" />
+        <EmptyTitle>Loading editor…</EmptyTitle>
+      </EmptyHeader>
+    </Empty>
   );
 }
 
 export function NoteEditorPanel({ noteId }) {
-  const [workspaceName, setWorkspaceName] = useState('');
-  const [projectName, setProjectName] = useState('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [loadStatus, setLoadStatus] = useState('idle');
@@ -412,22 +379,6 @@ export function NoteEditorPanel({ noteId }) {
               ? 'Failed to save note'
               : '',
         );
-
-        const workspaces = await listWorkspaces();
-        if (!cancelled) {
-          const workspace = workspaces.find((w) => w.id === nextNote.workspaceId);
-          setWorkspaceName(workspace?.name ?? '');
-        }
-
-        if (nextNote.projectId) {
-          const projects = await listProjects();
-          if (!cancelled) {
-            const project = projects.find((p) => p.id === nextNote.projectId);
-            setProjectName(project?.name ?? '');
-          }
-        } else if (!cancelled) {
-          setProjectName('');
-        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load note');
@@ -504,114 +455,25 @@ export function NoteEditorPanel({ noteId }) {
 
   if (loadStatus === 'loading' || (loadStatus !== 'error' && loadedNoteId !== noteId)) {
     return (
-      <section aria-busy="true" aria-label="Loading note" className="dao-note-editor" role="status">
-        <div className="dao-note-document-header">
-          <div className="dao-note-document-meta">
-            <Skeleton className="h-3 w-48" />
-            <Skeleton className="h-3 w-14" />
-          </div>
-          <Skeleton className="mt-3 h-10 w-80 max-w-full" />
-        </div>
-        <div className="dao-note-editor-loading__toolbar">
-          <Skeleton className="h-7 w-72 max-w-full" />
-        </div>
-        <div className="dao-note-loading-body space-y-3">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-5/6" />
-          <Skeleton className="h-4 w-4/5" />
-          <Skeleton className="mt-7 h-5 w-2/5" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-3/4" />
-        </div>
-      </section>
+      <Empty aria-busy="true" aria-label="Loading note" role="status">
+        <EmptyHeader>
+          <Spinner aria-hidden="true" />
+          <EmptyTitle>Loading note…</EmptyTitle>
+        </EmptyHeader>
+      </Empty>
     );
   }
 
   if (loadStatus === 'error') {
-    return <NoteEditorState title="Unable to load note" description={error} tone="danger" />;
+    return <NoteEditorState title="Unable to load note" description={error} />;
   }
 
   const saveStatusLabel = getSaveStatusLabel(saveStatus);
 
   return (
-    <section aria-label="Note editor" className="dao-note-editor">
-      <header className="dao-note-document-header">
-        <div className="dao-note-document-header__layout">
-          <div className="dao-note-document-copy">
-            <nav aria-label="Note location" className="dao-note-location">
-              <ol>
-                {workspaceName ? (
-                  <li className="dao-note-location__item">{workspaceName}</li>
-                ) : (
-                  <li className="dao-note-location__item">Notes</li>
-                )}
-                {workspaceName && projectName && (
-                  <li aria-hidden="true" className="dao-note-location__separator">
-                    /
-                  </li>
-                )}
-                {projectName && <li className="dao-note-location__item">{projectName}</li>}
-              </ol>
-            </nav>
-            <input
-              type="text"
-              aria-label="Note title"
-              className="dao-note-document-title"
-              value={title}
-              onChange={(event) => {
-                const nextTitle = event.target.value;
-                const normalizedTitle = nextTitle.trim();
-                latestTitleRef.current = nextTitle;
-
-                if (loadStatus === 'ready' && noteId && loadedNoteIdRef.current === noteId) {
-                  if (
-                    normalizedTitle === savedTitleRef.current &&
-                    !hasPendingFieldSave(noteId, 'title')
-                  ) {
-                    clearPendingNoteDraft(noteId, 'title');
-                    saveErrorsRef.current.title = null;
-                  } else {
-                    setPendingNoteDraft(noteId, 'title', normalizedTitle);
-
-                    if (normalizedTitle === '') {
-                      const validationError = new Error('Note title cannot be empty');
-                      markPendingNoteDraftFailed(noteId, 'title', normalizedTitle, validationError);
-                      saveErrorsRef.current.title = validationError;
-                    } else {
-                      saveErrorsRef.current.title = null;
-                    }
-                  }
-
-                  updateSavePresentation(noteId, noteGenerationRef.current);
-                }
-
-                setTitle(nextTitle);
-              }}
-              placeholder="Untitled"
-            />
-          </div>
-          {saveStatusLabel && (
-            <span
-              aria-atomic="true"
-              aria-live="polite"
-              className={`dao-note-save-status dao-note-save-status--${saveStatus}`}
-              role="status"
-            >
-              <CornerSurface
-                as="span"
-                aria-hidden="true"
-                className="dao-note-save-status__dot"
-                corner="circle"
-                dataSlot="note-save-status-dot"
-              />
-              {saveStatusLabel}
-            </span>
-          )}
-        </div>
-      </header>
-
+    <section aria-label="Note editor" className="flex h-full min-h-0 flex-col overflow-hidden">
       {error && saveStatus === 'failed' && (
-        <p className="dao-note-save-error" role="alert">
+        <p className="bg-destructive/8 p-2 text-destructive text-sm" role="alert">
           {error}
         </p>
       )}
@@ -621,6 +483,8 @@ export function NoteEditorPanel({ noteId }) {
           key={noteId}
           ariaLabel="Markdown note content"
           initialMarkdown={content}
+          saveStatus={saveStatus}
+          saveStatusLabel={saveStatusLabel}
           onMarkdownChange={(nextMarkdown) => {
             if (loadedNoteIdRef.current !== noteId) {
               return;
