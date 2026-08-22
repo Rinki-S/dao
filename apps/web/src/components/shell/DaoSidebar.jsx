@@ -93,7 +93,7 @@ function NameDialog({ open, title, label, initialValue = '', onOpenChange, onSub
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={submit}>
+        <form className="contents" onSubmit={submit}>
           <DialogPanel>
             <Field>
               <FieldLabel>{label}</FieldLabel>

@@ -89,7 +89,7 @@ function TaskFormDialog({ model, open, onOpenChange, parentId = null, task = nul
         <DialogHeader>
           <DialogTitle>{task ? 'Edit task' : parentId ? 'New subtask' : 'New task'}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={submit}>
+        <form className="contents" onSubmit={submit}>
           <DialogPanel>
             <div className="flex flex-col gap-4">
               <Field>
