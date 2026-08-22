@@ -13,8 +13,11 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { ScrollArea } from '@/components/ui/scroll-area.jsx';
 import { Spinner } from '@/components/ui/spinner.jsx';
 import { searchAll } from '@/features/search/api.js';
+import { useTitlebarInset } from '@/components/shell/use-titlebar-inset.js';
+import { cn } from '@/lib/utils';
 
 export function SearchWorkspace({ model }) {
+  const titlebarInset = useTitlebarInset();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState('idle');
@@ -42,8 +45,8 @@ export function SearchWorkspace({ model }) {
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <header className="border-b p-4">
-        <div>
+      <header className={cn('flex items-center border-b p-4', titlebarInset.padding)}>
+        <div className="app-drag-region flex-1">
           <h1 className="font-heading text-xl font-semibold">Search</h1>
           <p className="text-muted-foreground text-sm">
             Open notes, tasks, and folders without leaving your train of thought.

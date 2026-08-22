@@ -3,7 +3,6 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconCircleCheck,
-  IconClock,
   IconFile,
   IconFolder,
   IconFolderPlus,
@@ -61,7 +60,6 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarRail,
-  SidebarTrigger,
 } from '@/components/ui/sidebar.jsx';
 
 const NAV_ITEMS = [
@@ -69,7 +67,6 @@ const NAV_ITEMS = [
   { id: 'tasks', label: 'Tasks', icon: IconCircleCheck },
   { id: 'chats', label: 'Chats', icon: IconMessageCircle, disabled: true },
   { id: 'search', label: 'Search', icon: IconSearch },
-  { id: 'activity', label: 'Activity', icon: IconClock },
 ];
 
 function noteFileName(note) {
@@ -303,13 +300,17 @@ export function DaoSidebar({ model, onOpenSettings }) {
   const activeNoteId = model.selectedEntity?.type === 'note' ? model.selectedEntity.id : '';
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="app-drag-region flex items-center gap-2">
+    <Sidebar>
+      {/* Titlebar band. Same height as a workspace top bar so the macOS traffic
+          lights stay optically centred in either sidebar state, and the trigger
+          keeps the same x as the one in SidebarRevealSlot. */}
+      <SidebarHeader className="gap-0 p-0">
+        <div aria-hidden="true" className="app-drag-region me-12 h-12 shrink-0" />
+        <div className="px-2 pb-2">
           <SidebarMenu>
             <SidebarMenuItem>
               <Menu>
-                <MenuTrigger render={<SidebarMenuButton size="lg" />}>
+                <MenuTrigger render={<SidebarMenuButton />}>
                   <IconLeaf aria-hidden="true" />
                   <span>{model.currentWorkspace?.name ?? 'Dao'}</span>
                   <IconChevronDown aria-hidden="true" />
@@ -332,7 +333,6 @@ export function DaoSidebar({ model, onOpenSettings }) {
               </Menu>
             </SidebarMenuItem>
           </SidebarMenu>
-          <SidebarTrigger aria-label="Toggle sidebar" />
         </div>
       </SidebarHeader>
 

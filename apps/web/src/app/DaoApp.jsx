@@ -1,7 +1,6 @@
 import { IconMessageCircle } from '@tabler/icons-react';
 import { useState } from 'react';
 import { DaoSidebar } from '@/components/shell/DaoSidebar.jsx';
-import { EntityInspector } from '@/components/shell/EntityInspector.jsx';
 import { WorkingDirectoryOnboarding } from '@/components/app/WorkingDirectoryOnboarding.jsx';
 import {
   Empty,
@@ -13,13 +12,14 @@ import {
 } from '@/components/ui/empty.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar.jsx';
+import { WindowSidebarTrigger } from '@/components/shell/WindowSidebarTrigger.jsx';
 import { Spinner } from '@/components/ui/spinner.jsx';
-import { ActivityWorkspace } from '@/features/activities/components/ActivityWorkspace.jsx';
 import { CommandPalette } from '@/features/command-palette/components/CommandPalette.jsx';
 import { NoteEditorPanel } from '@/features/notes/components/NoteEditorPanel.jsx';
 import { SearchWorkspace } from '@/features/search/components/SearchWorkspace.jsx';
 import { SettingsDialog } from '@/features/settings/components/SettingsDialog.jsx';
 import { TasksWorkspace } from '@/features/tasks/components/TasksWorkspace.jsx';
+import { useAppearance } from '@/hooks/use-appearance.js';
 import { useDaoWorkspace } from './use-dao-workspace.js';
 
 function EmptyHome({ model }) {
@@ -38,6 +38,7 @@ function EmptyHome({ model }) {
 
 export function DaoApp() {
   const model = useDaoWorkspace();
+  const { appearance, setAppearance } = useAppearance();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [replayOnboarding, setReplayOnboarding] = useState(false);
 
@@ -89,7 +90,6 @@ export function DaoApp() {
       );
     if (model.activeView === 'tasks') return <TasksWorkspace model={model} />;
     if (model.activeView === 'search') return <SearchWorkspace model={model} />;
-    if (model.activeView === 'activity') return <ActivityWorkspace model={model} />;
     return (
       <Empty>
         <EmptyHeader>
@@ -110,13 +110,15 @@ export function DaoApp() {
     <SidebarProvider>
       <CommandPalette model={model} onOpenSettings={() => setSettingsOpen(true)} />
       <DaoSidebar model={model} onOpenSettings={() => setSettingsOpen(true)} />
+      <WindowSidebarTrigger />
       <SidebarInset>
         <div className="min-h-0 flex-1 overflow-hidden">{content}</div>
       </SidebarInset>
-      <EntityInspector model={model} />
       <SettingsDialog
+        appearance={appearance}
         model={model}
         open={settingsOpen}
+        onAppearanceChange={setAppearance}
         onOpenChange={setSettingsOpen}
         onReplayOnboarding={() => {
           setSettingsOpen(false);

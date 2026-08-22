@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  IconActivity,
-  IconCircleCheck,
-  IconFile,
-  IconHome,
-  IconSearch,
-  IconSettings,
-} from '@tabler/icons-react';
+import { IconCircleCheck, IconFile, IconHome, IconSearch, IconSettings } from '@tabler/icons-react';
 import {
   Command,
   CommandCollection,
@@ -48,12 +41,6 @@ export function CommandPalette({ model, onOpenSettings }) {
         icon: IconSearch,
         shortcut: '⌘F',
         action: () => model.setActiveView('search'),
-      },
-      {
-        value: 'activity',
-        label: 'Open Activity',
-        icon: IconActivity,
-        action: () => model.setActiveView('activity'),
       },
       {
         value: 'new-note',

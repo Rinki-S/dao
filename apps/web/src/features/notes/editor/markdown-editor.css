@@ -1,6 +1,13 @@
+:root {
+  --dao-note-measure: 46rem;
+}
+
 .dao-markdown-editor__prose {
   min-height: 100%;
-  padding: 1rem;
+  /* Text sits in a centred column of at most --dao-note-measure, but the
+     editable surface stays full width so clicking anywhere still focuses. */
+  padding-block: 1.5rem;
+  padding-inline: max(1.5rem, calc((100% - var(--dao-note-measure)) / 2));
   color: var(--foreground);
   caret-color: var(--primary);
   outline: none;

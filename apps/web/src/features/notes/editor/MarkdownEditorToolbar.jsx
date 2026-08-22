@@ -21,6 +21,8 @@ import {
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@/components/ui/tooltip.jsx';
 import { MarkdownBlockTypeControl } from './MarkdownBlockTypeControl.jsx';
 import { MarkdownLinkControl } from './MarkdownLinkControl.jsx';
+import { useTitlebarInset } from '@/components/shell/use-titlebar-inset.js';
+import { cn } from '@/lib/utils';
 
 function EditorButton({ disabled = false, editor, icon: Icon, isActive = false, label, onClick }) {
   const button = (
@@ -49,6 +51,7 @@ function EditorButton({ disabled = false, editor, icon: Icon, isActive = false, 
 }
 
 function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
+  const titlebarInset = useTitlebarInset();
   const state = useEditorState({
     editor,
     selector: ({ editor: current }) => {
@@ -82,7 +85,13 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
   });
 
   return (
-    <div className="flex items-center gap-2 border-b p-2">
+    <div className="flex h-12 items-center gap-2 border-b px-2">
+      {/* Equal-flex rails on both sides keep the toolbar centred in the bar no
+          matter how wide the save status gets; the leading one also reserves
+          room for the window controls while the sidebar is hidden. */}
+      <div aria-hidden="true" className={cn('flex self-stretch', titlebarInset.rail)}>
+        <div className={cn('app-drag-region flex-1', titlebarInset.controlsOffset)} />
+      </div>
       <Toolbar aria-label="Markdown formatting">
         <ToolbarGroup>
           <MarkdownBlockTypeControl disabled={state.isInTable} editor={editor} />
@@ -157,17 +166,22 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
           />
         </ToolbarGroup>
       </Toolbar>
-      {saveStatusLabel ? (
-        <Badge
-          aria-live="polite"
-          variant={
-            saveStatus === 'failed' ? 'error' : saveStatus === 'saved' ? 'success' : 'secondary'
-          }
-        >
-          <IconCircleCheck aria-hidden="true" />
-          {saveStatusLabel}
-        </Badge>
-      ) : null}
+      {/* Drag lives here rather than on the bar: an app-region ancestor swallows
+          clicks for the fixed window trigger overlapping it, and the trigger is
+          not a descendant of this bar. */}
+      <div className="app-drag-region flex min-w-0 flex-1 items-center justify-end self-stretch">
+        {saveStatusLabel ? (
+          <Badge
+            aria-live="polite"
+            variant={
+              saveStatus === 'failed' ? 'error' : saveStatus === 'saved' ? 'success' : 'secondary'
+            }
+          >
+            <IconCircleCheck aria-hidden="true" />
+            {saveStatusLabel}
+          </Badge>
+        ) : null}
+      </div>
     </div>
   );
 }

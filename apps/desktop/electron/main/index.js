@@ -31,8 +31,12 @@ function createWindow() {
         // titlebar and sidebar render transparent so it shows through.
         vibrancy: 'sidebar',
         titleBarStyle: 'hiddenInset',
-        // Titlebar is 42px tall; nudge traffic lights up until optically centered.
-        trafficLightPosition: { x: 16, y: 18 },
+        // The workspace top bar is 48px tall and the sidebar titlebar band
+        // matches it, so 18px is the geometric centre for the 12px traffic
+        // lights. macOS draws them ~1px below the origin it is given, so 17px
+        // is what actually lands them on the centre line the sidebar trigger's
+        // 12px glyph sits on. x matches for an equal leading inset.
+        trafficLightPosition: { x: 17, y: 17 },
         webPreferences: {
             preload: path.join(__dirname, '../preload/index.cjs'),
             contextIsolation: true,

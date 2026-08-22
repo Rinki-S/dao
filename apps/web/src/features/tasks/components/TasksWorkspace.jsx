@@ -50,6 +50,8 @@ import {
   SelectValue,
 } from '@/components/ui/select.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
+import { useTitlebarInset } from '@/components/shell/use-titlebar-inset.js';
+import { cn } from '@/lib/utils';
 
 const PRIORITIES = [
   { label: 'High', value: 'high' },
@@ -268,6 +270,7 @@ function TaskCard({ model, task, children }) {
 }
 
 export function TasksWorkspace({ model }) {
+  const titlebarInset = useTitlebarInset();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [quickTitle, setQuickTitle] = useState('');
   const parents = useMemo(
@@ -294,15 +297,17 @@ export function TasksWorkspace({ model }) {
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <header className="flex items-center justify-between gap-4 border-b p-4">
-        <div>
-          <h1 className="font-heading text-xl font-semibold">Tasks</h1>
-          <p className="text-muted-foreground text-sm">{model.currentWorkspace?.name}</p>
+      <header className={cn('flex items-center border-b p-4', titlebarInset.padding)}>
+        <div className="app-drag-region flex flex-1 items-center gap-4">
+          <div className="flex-1">
+            <h1 className="font-heading text-xl font-semibold">Tasks</h1>
+            <p className="text-muted-foreground text-sm">{model.currentWorkspace?.name}</p>
+          </div>
+          <Button onClick={() => setDialogOpen(true)}>
+            <IconPlus aria-hidden="true" />
+            New task
+          </Button>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <IconPlus aria-hidden="true" />
-          New task
-        </Button>
       </header>
       <ScrollArea className="min-h-0 flex-1" overscrollContain>
         <div className="flex flex-col gap-4 p-4">

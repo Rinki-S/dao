@@ -9,8 +9,6 @@ const productSurfaceSource = [
   'src/app/DaoApp.jsx',
   'src/components/app/WorkingDirectoryOnboarding.jsx',
   'src/components/shell/DaoSidebar.jsx',
-  'src/components/shell/EntityInspector.jsx',
-  'src/features/activities/components/ActivityWorkspace.jsx',
   'src/features/command-palette/components/CommandPalette.jsx',
   'src/features/search/components/SearchWorkspace.jsx',
   'src/features/settings/components/SettingsDialog.jsx',
