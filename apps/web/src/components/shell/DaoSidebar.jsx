@@ -75,6 +75,13 @@ function noteFileName(note) {
 
 function NameDialog({ open, title, label, initialValue = '', onOpenChange, onSubmit }) {
   const [value, setValue] = useState(initialValue);
+  // The dialog stays mounted so it can animate in and out, so the field is
+  // seeded on each open instead of by a fresh mount.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setValue(initialValue);
+  }
 
   async function submit(event) {
     event.preventDefault();
@@ -143,16 +150,14 @@ function NoteRow({ active, nested = false, note, onOpen, onRename, onDelete }) {
           </ContextMenuPopup>
         </ContextMenu>
       </RowItem>
-      {renameOpen ? (
-        <NameDialog
-          initialValue={note.title}
-          label="Note name"
-          open={renameOpen}
-          title="Rename note"
-          onOpenChange={setRenameOpen}
-          onSubmit={(name) => onRename(note, name.replace(/\.md$/i, ''))}
-        />
-      ) : null}
+      <NameDialog
+        initialValue={note.title}
+        label="Note name"
+        open={renameOpen}
+        title="Rename note"
+        onOpenChange={setRenameOpen}
+        onSubmit={(name) => onRename(note, name.replace(/\.md$/i, ''))}
+      />
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogPopup>
           <AlertDialogHeader>
@@ -252,16 +257,14 @@ function ProjectFolder({
           </CollapsiblePanel>
         </SidebarMenuItem>
       </Collapsible>
-      {renameOpen ? (
-        <NameDialog
-          initialValue={project.name}
-          label="Folder name"
-          open={renameOpen}
-          title="Rename folder"
-          onOpenChange={setRenameOpen}
-          onSubmit={(name) => onRename(project, name)}
-        />
-      ) : null}
+      <NameDialog
+        initialValue={project.name}
+        label="Folder name"
+        open={renameOpen}
+        title="Rename folder"
+        onOpenChange={setRenameOpen}
+        onSubmit={(name) => onRename(project, name)}
+      />
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogPopup>
           <AlertDialogHeader>
@@ -451,24 +454,20 @@ export function DaoSidebar({ model, onOpenSettings }) {
       </SidebarFooter>
       <SidebarRail />
 
-      {newProjectOpen ? (
-        <NameDialog
-          label="Folder name"
-          open={newProjectOpen}
-          title="New folder"
-          onOpenChange={setNewProjectOpen}
-          onSubmit={(name) => model.addProject({ name, description: '' })}
-        />
-      ) : null}
-      {newWorkspaceOpen ? (
-        <NameDialog
-          label="Workspace name"
-          open={newWorkspaceOpen}
-          title="New workspace"
-          onOpenChange={setNewWorkspaceOpen}
-          onSubmit={(name) => model.addWorkspace({ name, description: '' })}
-        />
-      ) : null}
+      <NameDialog
+        label="Folder name"
+        open={newProjectOpen}
+        title="New folder"
+        onOpenChange={setNewProjectOpen}
+        onSubmit={(name) => model.addProject({ name, description: '' })}
+      />
+      <NameDialog
+        label="Workspace name"
+        open={newWorkspaceOpen}
+        title="New workspace"
+        onOpenChange={setNewWorkspaceOpen}
+        onSubmit={(name) => model.addWorkspace({ name, description: '' })}
+      />
     </Sidebar>
   );
 }

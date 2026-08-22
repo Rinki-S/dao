@@ -65,6 +65,19 @@ function TaskFormDialog({ model, open, onOpenChange, parentId = null, task = nul
   const [priority, setPriority] = useState(task?.priority ?? 'medium');
   const [projectId, setProjectId] = useState(task?.projectId ?? 'none');
   const [dueDate, setDueDate] = useState(task?.dueDate?.slice(0, 10) ?? '');
+  // The dialog stays mounted so it can animate in and out, so the fields are
+  // seeded on each open instead of by a fresh mount.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setTitle(task?.title ?? '');
+      setDescription(task?.description ?? '');
+      setPriority(task?.priority ?? 'medium');
+      setProjectId(task?.projectId ?? 'none');
+      setDueDate(task?.dueDate?.slice(0, 10) ?? '');
+    }
+  }
   const projectOptions = [
     { label: 'Workspace root', value: 'none' },
     ...model.projects.map((project) => ({ label: project.name, value: project.id })),
@@ -235,17 +248,13 @@ function TaskCard({ model, task, children }) {
         </CardPanel>
       ) : null}
 
-      {subtaskOpen ? (
-        <TaskFormDialog
-          model={model}
-          open={subtaskOpen}
-          parentId={task.id}
-          onOpenChange={setSubtaskOpen}
-        />
-      ) : null}
-      {editOpen ? (
-        <TaskFormDialog model={model} open={editOpen} task={task} onOpenChange={setEditOpen} />
-      ) : null}
+      <TaskFormDialog
+        model={model}
+        open={subtaskOpen}
+        parentId={task.id}
+        onOpenChange={setSubtaskOpen}
+      />
+      <TaskFormDialog model={model} open={editOpen} task={task} onOpenChange={setEditOpen} />
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogPopup>
           <AlertDialogHeader>
@@ -355,9 +364,7 @@ export function TasksWorkspace({ model }) {
           ) : null}
         </div>
       </ScrollArea>
-      {dialogOpen ? (
-        <TaskFormDialog model={model} open={dialogOpen} onOpenChange={setDialogOpen} />
-      ) : null}
+      <TaskFormDialog model={model} open={dialogOpen} onOpenChange={setDialogOpen} />
     </section>
   );
 }
