@@ -366,7 +366,16 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
       )}
       <Sidebar
         ref={peekRef}
-        className={cn(peeked && 'left-0! [--sidebar:var(--sidebar-solid)] shadow-xl/10')}
+        className={cn(
+          // Backing layer behind the translucent surface. Fading its opacity
+          // keeps the colour itself switching with the theme like every other
+          // token, and opacity composites instead of repainting.
+          'before:pointer-events-none before:absolute before:-z-1 before:inset-0 before:bg-(--sidebar-solid) before:opacity-0 before:transition-opacity before:delay-[160ms] before:duration-[140ms] before:ease-shell',
+          // Arriving over content it must already be opaque, so the way in is
+          // instant — it happens off-screen. The way out waits for the
+          // workspace to finish sliding back underneath before it clears.
+          peeked && 'left-0! shadow-xl/10 before:opacity-100 before:delay-0 before:duration-0',
+        )}
       >
         {/* Titlebar band. Same height as a workspace top bar so the macOS traffic
           lights stay optically centred in either sidebar state, and the trigger
