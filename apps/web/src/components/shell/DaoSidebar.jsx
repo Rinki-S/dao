@@ -347,7 +347,7 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
         />
       )}
       <Sidebar
-        className={cn(peeked && 'left-0! shadow-xl/10')}
+        className={cn(peeked && 'left-0! [--sidebar:var(--sidebar-solid)] shadow-xl/10')}
         onPointerLeave={() => onPeekChange?.(false)}
       >
         {/* Titlebar band. Same height as a workspace top bar so the macOS traffic
