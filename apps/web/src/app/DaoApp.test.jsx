@@ -82,6 +82,14 @@ describe('DaoApp shell', () => {
     expect(screen.queryByRole('heading', { name: 'Home' })).not.toBeInTheDocument();
   });
 
+  it('keeps the open note out of Recents so only the tree marks it', () => {
+    render(<DaoApp />);
+    // note-1 is both the open note and the only recent, so Recents has nothing
+    // left to offer and the group is gone with it.
+    expect(screen.queryByText('Recents')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Welcome Note.md' })).toHaveLength(1);
+  });
+
   it('treats project rows as folders and routes Tasks through primary navigation', async () => {
     const user = userEvent.setup();
     render(<DaoApp />);

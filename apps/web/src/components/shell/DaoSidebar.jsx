@@ -301,10 +301,19 @@ export function DaoSidebar({ model, onOpenSettings }) {
   }, [model.notes, model.projects]);
   const rootNotes = model.notes.filter((note) => note.projectId === null);
   // Resolved up front: an entry whose entity is gone must not count towards the
-  // five shown, and must not leave the group rendering an empty list.
+  // five shown, and must not leave the group rendering an empty list. What is
+  // open is dropped too — it is already on screen and marked in the tree, so
+  // listing it here only competes for the same selected state.
   const recentEntries = useMemo(
     () =>
       model.recents
+        .filter(
+          (recent) =>
+            !(
+              model.selectedEntity?.type === recent.entityType &&
+              model.selectedEntity?.id === recent.entityId
+            ),
+        )
         .map((recent) => {
           const entity =
             recent.entityType === 'note'
@@ -314,7 +323,7 @@ export function DaoSidebar({ model, onOpenSettings }) {
         })
         .filter(Boolean)
         .slice(0, 5),
-    [model.notes, model.recents, model.tasks],
+    [model.notes, model.recents, model.selectedEntity, model.tasks],
   );
   const workspaceIsEmpty = model.projects.length === 0 && rootNotes.length === 0;
   const activeNoteId = model.selectedEntity?.type === 'note' ? model.selectedEntity.id : '';
@@ -389,14 +398,7 @@ export function DaoSidebar({ model, onOpenSettings }) {
                   const label = recent.entityType === 'note' ? noteFileName(entity) : entity.title;
                   return (
                     <SidebarMenuItem key={`${recent.entityType}:${recent.entityId}`}>
-                      <SidebarMenuButton
-                        isActive={
-                          model.selectedEntity?.type === recent.entityType &&
-                          model.selectedEntity?.id === recent.entityId
-                        }
-                        tooltip={label}
-                        onClick={() => model.openEntity(entity)}
-                      >
+                      <SidebarMenuButton tooltip={label} onClick={() => model.openEntity(entity)}>
                         {recent.entityType === 'note' ? (
                           <IconFile aria-hidden="true" />
                         ) : (
