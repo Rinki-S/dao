@@ -216,6 +216,7 @@ export function useDaoWorkspace() {
   async function addProject(input) {
     const project = await createProject({
       workspaceId: currentWorkspace.id,
+      parentId: input.parentId ?? null,
       name: input.name,
       description: input.description ?? '',
     });
@@ -223,6 +224,24 @@ export function useDaoWorkspace() {
     setRevealedProjectId(project.id);
     toastManager.add({ type: 'success', title: 'Folder created', description: project.name });
     return project;
+  }
+
+  // parentId is null for the workspace root, so it is passed through as-is.
+  // The whole set is refetched because moving a folder moves every path
+  // underneath it, not just this row.
+  async function moveProject(project, parentId) {
+    if ((project.parentId ?? null) === parentId) return;
+    try {
+      await updateProject(project.id, { parentId });
+      await refreshData();
+      if (parentId) setRevealedProjectId(parentId);
+    } catch (moveError) {
+      toastManager.add({
+        type: 'error',
+        title: 'Could not move folder',
+        description: messageFrom(moveError, 'The folder was left where it was.'),
+      });
+    }
   }
 
   async function renameProject(project, name) {
@@ -260,6 +279,16 @@ export function useDaoWorkspace() {
           : item,
       ),
     );
+  }
+
+  // projectId is null for the workspace root, so it is passed through as-is
+  // rather than being coalesced away.
+  async function moveNote(note, projectId) {
+    if ((note.projectId ?? null) === projectId) return;
+    const updated = await updateNote(note.id, { projectId });
+    setNotes((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+    if (projectId) setRevealedProjectId(projectId);
+    notifyActivityChanged();
   }
 
   async function removeNote(note) {
@@ -370,9 +399,11 @@ export function useDaoWorkspace() {
     revealSearchResult,
     addProject,
     renameProject,
+    moveProject,
     removeProject,
     addNote,
     renameNote,
+    moveNote,
     removeNote,
     addTask,
     patchTask,

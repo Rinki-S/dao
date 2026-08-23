@@ -3,6 +3,7 @@ package notes
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -174,13 +175,27 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		req.NoteType = &noteType
 	}
 
-	if req.Title == nil && req.NoteType == nil {
+	if req.ProjectID.Set && req.ProjectID.Value != nil {
+		projectID := strings.TrimSpace(*req.ProjectID.Value)
+		if projectID == "" {
+			httpx.Error(w, http.StatusBadRequest, "note projectId is invalid")
+			return
+		}
+		req.ProjectID.Value = &projectID
+	}
+
+	if req.Title == nil && req.NoteType == nil && !req.ProjectID.Set {
 		httpx.Error(w, http.StatusBadRequest, "note update payload is required")
 		return
 	}
 
 	note, err := h.repo.Update(id, req)
 	if err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			httpx.Error(w, http.StatusBadRequest, "note projectId is invalid")
+			return
+		}
+
 		if err == sql.ErrNoRows {
 			httpx.Error(w, http.StatusNotFound, "note not found")
 			return

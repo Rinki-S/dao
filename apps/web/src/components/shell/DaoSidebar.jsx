@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   IconChevronDown,
   IconChevronRight,
@@ -71,6 +71,106 @@ const NAV_ITEMS = [
   { id: 'search', label: 'Search', icon: IconSearch },
 ];
 
+// A private MIME type keeps the sidebar from accepting text dragged in from
+// anywhere else, and lets a drop target check the payload during dragover —
+// where getData() is deliberately blank.
+const NOTE_DRAG_TYPE = 'application/x-dao-note-id';
+const FOLDER_DRAG_TYPE = 'application/x-dao-folder-id';
+
+/**
+ * The one row currently under the pointer during a drag. Shared rather than
+ * per-row because a row cannot tell that a descendant has taken over: entering
+ * a child fires no leave on the parent, so both would stay lit.
+ *
+ * `undefined` means no target, `null` means the workspace root.
+ */
+const TreeDropContext = createContext({ target: undefined, setTarget: () => {} });
+
+/**
+ * Wiring for a region that accepts a dropped note or folder. The callbacks
+ * receive the dragged id; the caller decides which destination that means.
+ *
+ * `id` identifies the region so it can highlight only while it is the target,
+ * and so a folder can refuse itself — the service rejects a folder moved inside
+ * itself, but the row should not invite the gesture in the first place.
+ */
+function useTreeDropTarget({ id, onDropNote, onDropFolder }) {
+  const { target, setTarget } = useContext(TreeDropContext);
+
+  const accepts = (event) => {
+    const { types } = event.dataTransfer;
+    if (types.includes(NOTE_DRAG_TYPE)) return true;
+    // getData is blank during dragover, so a folder cannot be identified yet —
+    // only whether one is being dragged at all.
+    return Boolean(onDropFolder) && types.includes(FOLDER_DRAG_TYPE);
+  };
+
+  // Regions nest, so dragging over a child bubbles through its ancestors.
+  // Stopping here leaves the innermost region as the only claimant, and
+  // dragover repeating means the claim re-asserts itself every frame.
+  const claim = (event) => {
+    if (!accepts(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'move';
+    setTarget(id);
+  };
+
+  return {
+    over: target === id,
+    props: {
+      onDragEnter: claim,
+      onDragOver: claim,
+      onDragLeave: (event) => {
+        // Moving onto a child fires leave on the parent, so ignore anything
+        // still inside this region.
+        if (event.currentTarget.contains(event.relatedTarget)) return;
+        setTarget((current) => (current === id ? undefined : current));
+      },
+      onDrop: (event) => {
+        setTarget(undefined);
+
+        const noteId = event.dataTransfer.getData(NOTE_DRAG_TYPE);
+        if (noteId) {
+          event.preventDefault();
+          event.stopPropagation();
+          onDropNote(noteId);
+          return;
+        }
+
+        const folderId = event.dataTransfer.getData(FOLDER_DRAG_TYPE);
+        if (!folderId || !onDropFolder) return;
+        event.preventDefault();
+        event.stopPropagation();
+        // Dropping a folder on itself is a no-op, not a move to its parent.
+        if (folderId === id) return;
+        onDropFolder(folderId);
+      },
+    },
+  };
+}
+
+/**
+ * The workspace root as a drop region: dropping here is what takes a note or
+ * folder back out of whatever folder it was in.
+ *
+ * It is a component rather than a hook call in DaoSidebar because DaoSidebar
+ * is what provides TreeDropContext, and a component cannot read a context it
+ * provides itself — it would see the default value.
+ */
+function WorkspaceDropRegion({ children, onDropFolder, onDropNote }) {
+  const drop = useTreeDropTarget({ id: null, onDropFolder, onDropNote });
+
+  return (
+    <SidebarGroupContent
+      className={cn('rounded-lg', drop.over && 'bg-sidebar-accent/40')}
+      {...drop.props}
+    >
+      {children}
+    </SidebarGroupContent>
+  );
+}
+
 function noteFileName(note) {
   return note.title.toLowerCase().endsWith('.md') ? note.title : `${note.title}.md`;
 }
@@ -120,17 +220,33 @@ function NoteRow({ active, nested = false, note, onOpen, onRename, onDelete }) {
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const RowItem = nested ? SidebarMenuSubItem : SidebarMenuItem;
+  // The note id travels in the drag payload; drop targets read it back to know
+  // what to move. text/plain carries the file name so a drag that lands outside
+  // the app still says something useful.
+  const dragProps = {
+    draggable: true,
+    onDragStart: (event) => {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData(NOTE_DRAG_TYPE, note.id);
+      event.dataTransfer.setData('text/plain', noteFileName(note));
+    },
+  };
   const row = nested ? (
     <SidebarMenuSubButton
       isActive={active}
-      render={<button type="button" />}
+      render={<button type="button" {...dragProps} />}
       onClick={() => onOpen(note)}
     >
       <IconFile aria-hidden="true" />
       <span>{noteFileName(note)}</span>
     </SidebarMenuSubButton>
   ) : (
-    <SidebarMenuButton isActive={active} tooltip={noteFileName(note)} onClick={() => onOpen(note)}>
+    <SidebarMenuButton
+      isActive={active}
+      render={<button type="button" {...dragProps} />}
+      tooltip={noteFileName(note)}
+      onClick={() => onOpen(note)}
+    >
       <IconFile aria-hidden="true" />
       <span>{noteFileName(note)}</span>
     </SidebarMenuButton>
@@ -185,30 +301,66 @@ function NoteRow({ active, nested = false, note, onOpen, onRename, onDelete }) {
 
 function ProjectFolder({
   activeNoteId,
+  childFolders,
   defaultOpen,
+  notesByProject,
   project,
   projectNotes,
-  revealed,
+  revealedProjectId,
+  onCreateFolder,
   onCreateNote,
   onDelete,
   onOpenNote,
   onRename,
   onRenameNote,
   onDeleteNote,
+  onDropFolder,
+  onDropNote,
 }) {
+  const revealed = revealedProjectId === project.id;
   const [open, setOpen] = useState(
     defaultOpen || revealed || projectNotes.some((note) => note.id === activeNoteId),
   );
   const [renameOpen, setRenameOpen] = useState(false);
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const drop = useTreeDropTarget({
+    id: project.id,
+    onDropNote: (noteId) => onDropNote(noteId, project.id),
+    onDropFolder: (folderId) => onDropFolder(folderId, project.id),
+  });
+  const dragProps = {
+    draggable: true,
+    onDragStart: (event) => {
+      // A folder drag must not also read as a drag of the rows inside it.
+      event.stopPropagation();
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData(FOLDER_DRAG_TYPE, project.id);
+      event.dataTransfer.setData('text/plain', project.name);
+    },
+  };
+  const isEmpty = projectNotes.length === 0 && childFolders.length === 0;
 
   return (
     <>
       <Collapsible open={open || revealed} onOpenChange={setOpen}>
-        <SidebarMenuItem>
+        {/* The drop region is the folder row plus whatever it contains, so an
+            open folder highlights over its whole subtree and a note dropped
+            anywhere inside it lands in this folder. */}
+        <SidebarMenuItem
+          className={cn('rounded-lg', drop.over && 'bg-sidebar-accent/60')}
+          {...drop.props}
+        >
           <ContextMenu>
             <ContextMenuTrigger>
-              <CollapsibleTrigger render={<SidebarMenuButton isActive={revealed} />}>
+              <CollapsibleTrigger
+                render={
+                  <SidebarMenuButton
+                    isActive={revealed}
+                    render={<button type="button" {...dragProps} />}
+                  />
+                }
+              >
                 {open || revealed ? (
                   <IconChevronDown aria-hidden="true" />
                 ) : (
@@ -223,6 +375,10 @@ function ProjectFolder({
                 <IconPlus aria-hidden="true" />
                 New note
               </ContextMenuItem>
+              <ContextMenuItem onClick={() => setNewFolderOpen(true)}>
+                <IconFolderPlus aria-hidden="true" />
+                New folder
+              </ContextMenuItem>
               <ContextMenuItem onClick={() => setRenameOpen(true)}>Rename folder</ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
@@ -233,6 +389,29 @@ function ProjectFolder({
           </ContextMenu>
           <CollapsiblePanel>
             <SidebarMenuSub>
+              {/* Folders before notes, and folders render themselves, so depth
+                  is whatever the data says rather than a fixed two levels. */}
+              {childFolders.map((child) => (
+                <ProjectFolder
+                  key={child.id}
+                  activeNoteId={activeNoteId}
+                  childFolders={child.children}
+                  defaultOpen={false}
+                  notesByProject={notesByProject}
+                  project={child}
+                  projectNotes={notesByProject.get(child.id) ?? []}
+                  revealedProjectId={revealedProjectId}
+                  onCreateFolder={onCreateFolder}
+                  onCreateNote={onCreateNote}
+                  onDelete={onDelete}
+                  onDeleteNote={onDeleteNote}
+                  onDropFolder={onDropFolder}
+                  onDropNote={onDropNote}
+                  onOpenNote={onOpenNote}
+                  onRename={onRename}
+                  onRenameNote={onRenameNote}
+                />
+              ))}
               {projectNotes.map((note) => (
                 <NoteRow
                   key={note.id}
@@ -244,7 +423,7 @@ function ProjectFolder({
                   onRename={onRenameNote}
                 />
               ))}
-              {projectNotes.length === 0 ? (
+              {isEmpty ? (
                 <SidebarMenuSubItem>
                   <SidebarMenuSubButton
                     render={<button type="button" />}
@@ -259,6 +438,13 @@ function ProjectFolder({
           </CollapsiblePanel>
         </SidebarMenuItem>
       </Collapsible>
+      <NameDialog
+        label="Folder name"
+        open={newFolderOpen}
+        title={`New folder in ${project.name}`}
+        onOpenChange={setNewFolderOpen}
+        onSubmit={(name) => onCreateFolder(name, project.id)}
+      />
       <NameDialog
         initialValue={project.name}
         label="Folder name"
@@ -322,6 +508,28 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
     return map;
   }, [model.notes, model.projects]);
   const rootNotes = model.notes.filter((note) => note.projectId === null);
+  // Folders arrive flat with a parentId; the tree is assembled once here so
+  // every level renders from the same shape.
+  const folderTree = useMemo(() => {
+    const children = new Map();
+    for (const project of model.projects) children.set(project.id, []);
+
+    const roots = [];
+    for (const project of model.projects) {
+      const siblings = children.get(project.parentId);
+      // A folder whose parent is missing would otherwise vanish from the tree,
+      // so it falls back to the root rather than being dropped.
+      if (project.parentId && siblings) siblings.push(project);
+      else roots.push(project);
+    }
+
+    const attach = (project) => ({
+      ...project,
+      children: (children.get(project.id) ?? []).map(attach),
+    });
+
+    return roots.map(attach);
+  }, [model.projects]);
   // Resolved up front: an entry whose entity is gone must not count towards the
   // five shown, and must not leave the group rendering an empty list. What is
   // open is dropped too — it is already on screen and marked in the tree, so
@@ -348,10 +556,33 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
     [model.notes, model.recents, model.selectedEntity, model.tasks],
   );
   const workspaceIsEmpty = model.projects.length === 0 && rootNotes.length === 0;
+  // Drop targets carry a note id, not the note, so the row that started the
+  // drag does not have to stay mounted for the drop to resolve.
+  const moveNoteById = (noteId, projectId) => {
+    const note = model.notes.find((item) => item.id === noteId);
+    if (note) model.moveNote(note, projectId);
+  };
+  const [dropTarget, setDropTarget] = useState(undefined);
+  const dropContext = useMemo(
+    () => ({ setTarget: setDropTarget, target: dropTarget }),
+    [dropTarget],
+  );
+  const moveFolderById = (folderId, parentId) => {
+    const folder = model.projects.find((item) => item.id === folderId);
+    if (folder) model.moveProject(folder, parentId);
+  };
   const activeNoteId = model.selectedEntity?.type === 'note' ? model.selectedEntity.id : '';
 
+  // A drag can end without a drop — Escape, or released outside the window —
+  // and no row would hear about it, leaving the last target highlighted.
+  useEffect(() => {
+    const clear = () => setDropTarget(undefined);
+    window.addEventListener('dragend', clear);
+    return () => window.removeEventListener('dragend', clear);
+  }, []);
+
   return (
-    <>
+    <TreeDropContext.Provider value={dropContext}>
       {/* Hover target for peeking the hidden sidebar back in. It starts below
           the titlebar so the window's top-left drag corner stays reachable, and
           only mouse pointers arm it — a touch would open it on any left swipe. */}
@@ -470,19 +701,29 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
             <SidebarGroupAction aria-label="New folder" onClick={() => setNewProjectOpen(true)}>
               <IconFolderPlus aria-hidden="true" />
             </SidebarGroupAction>
-            <SidebarGroupContent>
+            {/* Dropping on the group itself, rather than on any folder, is
+                what takes a note back out to the workspace root. */}
+            <WorkspaceDropRegion
+              onDropFolder={(folderId) => moveFolderById(folderId, null)}
+              onDropNote={(noteId) => moveNoteById(noteId, null)}
+            >
               <SidebarMenu>
-                {model.projects.map((project, index) => (
+                {folderTree.map((project, index) => (
                   <ProjectFolder
                     key={project.id}
                     activeNoteId={activeNoteId}
+                    childFolders={project.children}
                     defaultOpen={index === 0}
+                    notesByProject={notesByProject}
                     project={project}
                     projectNotes={notesByProject.get(project.id) ?? []}
-                    revealed={model.revealedProjectId === project.id}
+                    revealedProjectId={model.revealedProjectId}
+                    onCreateFolder={(name, parentId) => model.addProject({ name, parentId })}
                     onCreateNote={(projectId) => model.addNote({ projectId })}
                     onDelete={model.removeProject}
                     onDeleteNote={model.removeNote}
+                    onDropFolder={moveFolderById}
+                    onDropNote={moveNoteById}
                     onOpenNote={model.openEntity}
                     onRename={model.renameProject}
                     onRenameNote={model.renameNote}
@@ -512,7 +753,7 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
-            </SidebarGroupContent>
+            </WorkspaceDropRegion>
           </SidebarGroup>
         </SidebarContent>
 
@@ -543,6 +784,6 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
           onSubmit={(name) => model.addWorkspace({ name, description: '' })}
         />
       </Sidebar>
-    </>
+    </TreeDropContext.Provider>
   );
 }

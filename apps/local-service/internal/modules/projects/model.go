@@ -1,8 +1,11 @@
 package projects
 
+import "encoding/json"
+
 type Project struct {
 	ID          string  `json:"id"`
 	WorkspaceID string  `json:"workspaceId"`
+	ParentID    *string `json:"parentId"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
 	FolderPath  string  `json:"folderPath"`
@@ -17,14 +20,29 @@ type Project struct {
 }
 
 type CreateProjectRequest struct {
-	WorkspaceID string `json:"workspaceId"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	WorkspaceID string  `json:"workspaceId"`
+	ParentID    *string `json:"parentId"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
 }
 
 type UpdateProjectRequest struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
+	Name        *string          `json:"name"`
+	Description *string          `json:"description"`
+	ParentID    OptionalParentID `json:"parentId"`
+}
+
+// OptionalParentID tells "leave the folder where it is" apart from "move it to
+// the workspace root", which a *string cannot: both arrive as nil.
+type OptionalParentID struct {
+	Set   bool
+	Value *string
+}
+
+func (o *OptionalParentID) UnmarshalJSON(data []byte) error {
+	o.Set = true
+
+	return json.Unmarshal(data, &o.Value)
 }
 
 type DeleteProjectRequest struct {
