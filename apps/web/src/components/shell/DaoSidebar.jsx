@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   IconChevronDown,
   IconChevronRight,
@@ -78,15 +78,24 @@ const NOTE_DRAG_TYPE = 'application/x-dao-note-id';
 const FOLDER_DRAG_TYPE = 'application/x-dao-folder-id';
 
 /**
- * Wiring for a row that accepts a dropped note or folder. The callbacks receive
- * the dragged id; the caller decides which destination folder that means.
+ * The one row currently under the pointer during a drag. Shared rather than
+ * per-row because a row cannot tell that a descendant has taken over: entering
+ * a child fires no leave on the parent, so both would stay lit.
  *
- * `selfId` is the folder doing the accepting, so it can refuse itself — the
- * service rejects a folder moved inside itself, but the row should not invite
- * the gesture in the first place.
+ * `undefined` means no target, `null` means the workspace root.
  */
-function useTreeDropTarget({ selfId, onDropNote, onDropFolder }) {
-  const [over, setOver] = useState(false);
+const TreeDropContext = createContext({ target: undefined, setTarget: () => {} });
+
+/**
+ * Wiring for a region that accepts a dropped note or folder. The callbacks
+ * receive the dragged id; the caller decides which destination that means.
+ *
+ * `id` identifies the region so it can highlight only while it is the target,
+ * and so a folder can refuse itself — the service rejects a folder moved inside
+ * itself, but the row should not invite the gesture in the first place.
+ */
+function useTreeDropTarget({ id, onDropNote, onDropFolder }) {
+  const { target, setTarget } = useContext(TreeDropContext);
 
   const accepts = (event) => {
     const { types } = event.dataTransfer;
@@ -96,31 +105,31 @@ function useTreeDropTarget({ selfId, onDropNote, onDropFolder }) {
     return Boolean(onDropFolder) && types.includes(FOLDER_DRAG_TYPE);
   };
 
+  // Regions nest, so dragging over a child bubbles through its ancestors.
+  // Stopping here leaves the innermost region as the only claimant, and
+  // dragover repeating means the claim re-asserts itself every frame.
+  const claim = (event) => {
+    if (!accepts(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'move';
+    setTarget(id);
+  };
+
   return {
-    over,
+    over: target === id,
     props: {
-      onDragEnter: (event) => {
-        if (!accepts(event)) return;
-        event.preventDefault();
-        setOver(true);
-      },
+      onDragEnter: claim,
+      onDragOver: claim,
       onDragLeave: (event) => {
         // Moving onto a child fires leave on the parent, so ignore anything
-        // still inside this row.
+        // still inside this region.
         if (event.currentTarget.contains(event.relatedTarget)) return;
-        setOver(false);
-      },
-      onDragOver: (event) => {
-        if (!accepts(event)) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
+        setTarget((current) => (current === id ? undefined : current));
       },
       onDrop: (event) => {
-        setOver(false);
+        setTarget(undefined);
 
-        // Rows nest, and drop bubbles. Whichever row is innermost owns the
-        // drop; without stopping it here every ancestor would handle the same
-        // drop too and the item would land in the outermost one.
         const noteId = event.dataTransfer.getData(NOTE_DRAG_TYPE);
         if (noteId) {
           event.preventDefault();
@@ -134,7 +143,7 @@ function useTreeDropTarget({ selfId, onDropNote, onDropFolder }) {
         event.preventDefault();
         event.stopPropagation();
         // Dropping a folder on itself is a no-op, not a move to its parent.
-        if (folderId === selfId) return;
+        if (folderId === id) return;
         onDropFolder(folderId);
       },
     },
@@ -295,7 +304,7 @@ function ProjectFolder({
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const drop = useTreeDropTarget({
-    selfId: project.id,
+    id: project.id,
     onDropNote: (noteId) => onDropNote(noteId, project.id),
     onDropFolder: (folderId) => onDropFolder(folderId, project.id),
   });
@@ -314,16 +323,20 @@ function ProjectFolder({
   return (
     <>
       <Collapsible open={open || revealed} onOpenChange={setOpen}>
-        <SidebarMenuItem>
+        {/* The drop region is the folder row plus whatever it contains, so an
+            open folder highlights over its whole subtree and a note dropped
+            anywhere inside it lands in this folder. */}
+        <SidebarMenuItem
+          className={cn('rounded-lg', drop.over && 'bg-sidebar-accent/60')}
+          {...drop.props}
+        >
           <ContextMenu>
             <ContextMenuTrigger>
               <CollapsibleTrigger
                 render={
                   <SidebarMenuButton
-                    className={cn(drop.over && 'bg-sidebar-accent ring-2 ring-sidebar-ring')}
                     isActive={revealed}
                     render={<button type="button" {...dragProps} />}
-                    {...drop.props}
                   />
                 }
               >
@@ -528,19 +541,32 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
     const note = model.notes.find((item) => item.id === noteId);
     if (note) model.moveNote(note, projectId);
   };
+  const [dropTarget, setDropTarget] = useState(undefined);
+  const dropContext = useMemo(
+    () => ({ setTarget: setDropTarget, target: dropTarget }),
+    [dropTarget],
+  );
   const moveFolderById = (folderId, parentId) => {
     const folder = model.projects.find((item) => item.id === folderId);
     if (folder) model.moveProject(folder, parentId);
   };
   const rootDrop = useTreeDropTarget({
-    selfId: null,
+    id: null,
     onDropNote: (noteId) => moveNoteById(noteId, null),
     onDropFolder: (folderId) => moveFolderById(folderId, null),
   });
   const activeNoteId = model.selectedEntity?.type === 'note' ? model.selectedEntity.id : '';
 
+  // A drag can end without a drop — Escape, or released outside the window —
+  // and no row would hear about it, leaving the last target highlighted.
+  useEffect(() => {
+    const clear = () => setDropTarget(undefined);
+    window.addEventListener('dragend', clear);
+    return () => window.removeEventListener('dragend', clear);
+  }, []);
+
   return (
-    <>
+    <TreeDropContext.Provider value={dropContext}>
       {/* Hover target for peeking the hidden sidebar back in. It starts below
           the titlebar so the window's top-left drag corner stays reachable, and
           only mouse pointers arm it — a touch would open it on any left swipe. */}
@@ -742,6 +768,6 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
           onSubmit={(name) => model.addWorkspace({ name, description: '' })}
         />
       </Sidebar>
-    </>
+    </TreeDropContext.Provider>
   );
 }

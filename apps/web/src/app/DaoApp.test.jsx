@@ -143,6 +143,43 @@ describe('DaoApp shell', () => {
     expect(screen.getByRole('button', { name: 'Recovery' })).toBeInTheDocument();
   });
 
+  it('highlights only the folder a drop would land in', () => {
+    render(<DaoApp />);
+
+    const note = screen.getByRole('button', { name: 'Welcome Note.md' });
+    const child = screen.getByRole('button', { name: 'Parser' });
+    const parentRegion = screen.getByRole('button', { name: 'Compiler Lab' }).closest('li');
+    const childRegion = child.closest('li');
+
+    const carried = new Map();
+    const dataTransfer = {
+      effectAllowed: '',
+      dropEffect: '',
+      get types() {
+        return [...carried.keys()];
+      },
+      setData: (type, value) => carried.set(type, value),
+      getData: (type) => carried.get(type) ?? '',
+    };
+
+    const lit = (element) => element.className.includes('bg-sidebar-accent');
+
+    fireEvent.dragStart(note, { dataTransfer });
+    fireEvent.dragOver(parentRegion, { dataTransfer });
+    expect(lit(parentRegion)).toBe(true);
+
+    // Entering a nested folder fires no leave on its parent, so the parent has
+    // to stop being lit because the child claimed the drop, not because it was
+    // told it was left.
+    fireEvent.dragOver(childRegion, { dataTransfer });
+    expect(lit(childRegion)).toBe(true);
+    expect(lit(parentRegion)).toBe(false);
+
+    // A drag abandoned without a drop must not leave the tree lit.
+    fireEvent.dragEnd(note, { dataTransfer });
+    expect(lit(childRegion)).toBe(false);
+  });
+
   it('moves a folder into the folder it is dropped on, but never into itself', () => {
     render(<DaoApp />);
 
