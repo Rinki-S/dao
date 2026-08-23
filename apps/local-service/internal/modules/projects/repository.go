@@ -3,6 +3,7 @@ package projects
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -10,6 +11,10 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
+
+// ErrParentNotFound distinguishes an unknown parent folder from an unknown
+// folder, which both surface as sql.ErrNoRows otherwise.
+var ErrParentNotFound = errors.New("parent project not found")
 
 type Repository struct {
 	db       *sql.DB
@@ -22,7 +27,7 @@ func NewRepository(db *sql.DB, indexer search.Indexer, activity *activities.Repo
 }
 
 const projectSelectColumns = `
-	id, workspace_id, name, description, folder_path, status, started_at, ended_at, created_at, updated_at, deleted_at, version, sync_status
+	id, workspace_id, parent_id, name, description, folder_path, status, started_at, ended_at, created_at, updated_at, deleted_at, version, sync_status
 `
 
 func (r *Repository) List() ([]Project, error) {
@@ -56,20 +61,19 @@ func (r *Repository) Create(req CreateProjectRequest) (Project, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	id := ulid.Make().String()
 
-	var workspaceRootPath string
-	if err := r.db.QueryRow(`
-		SELECT root_path
-		FROM workspaces
-		WHERE id = ? AND deleted_at IS NULL
-	`, req.WorkspaceID).Scan(&workspaceRootPath); err != nil {
+	// A folder nests under its parent on disk, so the parent's own path is the
+	// root to build from. Without a parent that is the workspace root.
+	parentPath, err := r.folderParentPath(req.WorkspaceID, req.ParentID)
+	if err != nil {
 		return Project{}, err
 	}
 
-	folderPath := files.ProjectFolderPath(workspaceRootPath, req.Name, id)
+	folderPath := files.ProjectFolderPath(parentPath, req.Name, id)
 
 	project := Project{
 		ID:          id,
 		WorkspaceID: req.WorkspaceID,
+		ParentID:    req.ParentID,
 		Name:        req.Name,
 		Description: req.Description,
 		FolderPath:  folderPath,
@@ -95,14 +99,15 @@ func (r *Repository) Create(req CreateProjectRequest) (Project, error) {
 
 	_, err = tx.Exec(`
 			INSERT INTO projects (
-				id, workspace_id, name, description, folder_path, status, started_at, ended_at, created_at, updated_at, deleted_at, version, sync_status
+				id, workspace_id, parent_id, name, description, folder_path, status, started_at, ended_at, created_at, updated_at, deleted_at, version, sync_status
 			)
 			VALUES (
-				?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+				?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 			)
 		`,
 		project.ID,
 		project.WorkspaceID,
+		project.ParentID,
 		project.Name,
 		project.Description,
 		project.FolderPath,
@@ -290,6 +295,38 @@ func (r *Repository) Delete(id string, req DeleteProjectRequest) error {
 	return tx.Commit()
 }
 
+// folderParentPath resolves where a folder's directory lives: inside its
+// parent folder, or at the workspace root when it has none.
+func (r *Repository) folderParentPath(workspaceID string, parentID *string) (string, error) {
+	if parentID != nil {
+		var folderPath string
+		if err := r.db.QueryRow(`
+			SELECT folder_path
+			FROM projects
+			WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL
+		`, *parentID, workspaceID).Scan(&folderPath); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return "", ErrParentNotFound
+			}
+
+			return "", err
+		}
+
+		return folderPath, nil
+	}
+
+	var rootPath string
+	if err := r.db.QueryRow(`
+		SELECT root_path
+		FROM workspaces
+		WHERE id = ? AND deleted_at IS NULL
+	`, workspaceID).Scan(&rootPath); err != nil {
+		return "", err
+	}
+
+	return rootPath, nil
+}
+
 type projectScanner interface {
 	Scan(dest ...any) error
 }
@@ -300,6 +337,7 @@ func scanProject(scanner projectScanner) (Project, error) {
 	if err := scanner.Scan(
 		&project.ID,
 		&project.WorkspaceID,
+		&project.ParentID,
 		&project.Name,
 		&project.Description,
 		&project.FolderPath,

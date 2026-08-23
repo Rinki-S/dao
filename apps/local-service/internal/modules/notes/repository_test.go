@@ -781,6 +781,7 @@ func openNotesTestDB(t *testing.T) *sql.DB {
 		CREATE TABLE projects (
 			id TEXT PRIMARY KEY,
 			workspace_id TEXT NOT NULL,
+			parent_id TEXT,
 			name TEXT NOT NULL,
 			description TEXT NOT NULL DEFAULT '',
 			folder_path TEXT NOT NULL DEFAULT '',

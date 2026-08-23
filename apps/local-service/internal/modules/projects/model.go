@@ -3,6 +3,7 @@ package projects
 type Project struct {
 	ID          string  `json:"id"`
 	WorkspaceID string  `json:"workspaceId"`
+	ParentID    *string `json:"parentId"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
 	FolderPath  string  `json:"folderPath"`
@@ -17,9 +18,10 @@ type Project struct {
 }
 
 type CreateProjectRequest struct {
-	WorkspaceID string `json:"workspaceId"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	WorkspaceID string  `json:"workspaceId"`
+	ParentID    *string `json:"parentId"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
 }
 
 type UpdateProjectRequest struct {

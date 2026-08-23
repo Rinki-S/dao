@@ -3,6 +3,7 @@ package projects
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -125,8 +126,22 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.ParentID != nil {
+		parentID := strings.TrimSpace(*req.ParentID)
+		if parentID == "" {
+			httpx.Error(w, http.StatusBadRequest, "project parentId is invalid")
+			return
+		}
+		req.ParentID = &parentID
+	}
+
 	project, err := h.repo.Create(req)
 	if err != nil {
+		if errors.Is(err, ErrParentNotFound) {
+			httpx.Error(w, http.StatusBadRequest, "project parentId is invalid")
+			return
+		}
+
 		httpx.Error(w, http.StatusInternalServerError, "failed to create project")
 		return
 	}

@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
@@ -44,6 +47,75 @@ func TestRepositoryUpdateRenamesProjectAndReplacesSearchIndex(t *testing.T) {
 	}
 	if title != "Renamed" {
 		t.Fatalf("search title = %q, want Renamed", title)
+	}
+}
+
+func TestRepositoryCreateNestsFolderInsideItsParent(t *testing.T) {
+	db := openProjectsTestDB(t)
+	workspaceRoot := t.TempDir()
+	insertProjectsTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, search.NewRepository(db), activities.NewRepository(db))
+
+	parent, err := repo.Create(CreateProjectRequest{WorkspaceID: "workspace-1", Name: "Compiler"})
+	if err != nil {
+		t.Fatalf("create parent: %v", err)
+	}
+
+	if filepath.Dir(parent.FolderPath) != workspaceRoot {
+		t.Fatalf("parent dir = %q, want %q", filepath.Dir(parent.FolderPath), workspaceRoot)
+	}
+
+	child, err := repo.Create(CreateProjectRequest{
+		WorkspaceID: "workspace-1",
+		ParentID:    &parent.ID,
+		Name:        "Parser",
+	})
+	if err != nil {
+		t.Fatalf("create child: %v", err)
+	}
+
+	if filepath.Dir(child.FolderPath) != parent.FolderPath {
+		t.Fatalf("child dir = %q, want %q", filepath.Dir(child.FolderPath), parent.FolderPath)
+	}
+
+	if child.ParentID == nil || *child.ParentID != parent.ID {
+		t.Fatalf("ParentID = %v, want %q", child.ParentID, parent.ID)
+	}
+
+	if info, err := os.Stat(child.FolderPath); err != nil || !info.IsDir() {
+		t.Fatalf("child folder not created at %q: %v", child.FolderPath, err)
+	}
+
+	// A third level proves the path is built from the parent's own path rather
+	// than from the workspace root plus one.
+	grandchild, err := repo.Create(CreateProjectRequest{
+		WorkspaceID: "workspace-1",
+		ParentID:    &child.ID,
+		Name:        "Recovery",
+	})
+	if err != nil {
+		t.Fatalf("create grandchild: %v", err)
+	}
+
+	if filepath.Dir(grandchild.FolderPath) != child.FolderPath {
+		t.Fatalf("grandchild dir = %q, want %q", filepath.Dir(grandchild.FolderPath), child.FolderPath)
+	}
+}
+
+func TestRepositoryCreateRejectsUnknownParent(t *testing.T) {
+	db := openProjectsTestDB(t)
+	insertProjectsTestWorkspace(t, db, "workspace-1", t.TempDir())
+
+	repo := NewRepository(db, search.NewRepository(db), activities.NewRepository(db))
+	missing := "project-does-not-exist"
+
+	if _, err := repo.Create(CreateProjectRequest{
+		WorkspaceID: "workspace-1",
+		ParentID:    &missing,
+		Name:        "Orphan",
+	}); !errors.Is(err, ErrParentNotFound) {
+		t.Fatalf("err = %v, want ErrParentNotFound", err)
 	}
 }
 
@@ -199,6 +271,7 @@ func openProjectsTestDB(t *testing.T) *sql.DB {
 		CREATE TABLE projects (
 			id TEXT PRIMARY KEY,
 			workspace_id TEXT NOT NULL,
+			parent_id TEXT,
 			name TEXT NOT NULL,
 			description TEXT NOT NULL DEFAULT '',
 			folder_path TEXT NOT NULL DEFAULT '',
