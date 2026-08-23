@@ -217,7 +217,7 @@ func TestRepositoryUpdateChangesMetadataAndReplacesIndex(t *testing.T) {
 		t.Fatalf("Version = %d, want %d", updatedNote.Version, createdNote.Version+1)
 	}
 
-	assertFileContent(t, createdNote.FilePath, "Markdown body")
+	assertFileContent(t, updatedNote.FilePath, "Markdown body")
 
 	if len(indexer.replacedEntries) != 1 {
 		t.Fatalf("len(indexer.replacedEntries) = %d, want 1", len(indexer.replacedEntries))
@@ -230,6 +230,87 @@ func TestRepositoryUpdateChangesMetadataAndReplacesIndex(t *testing.T) {
 	if indexer.replacedEntries[0].Body != "Markdown body" {
 		t.Fatalf("replaced body = %q", indexer.replacedEntries[0].Body)
 	}
+}
+
+func TestRepositoryUpdateMovesMarkdownFileWhenTitleChanges(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+
+	createdNote, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		Title:       "Draft Title",
+		Content:     "Markdown body",
+		ContentType: "markdown",
+		NoteType:    "general",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	title := "Published Title"
+	updatedNote, err := repo.Update(createdNote.ID, UpdateNoteRequest{Title: &title})
+	if err != nil {
+		t.Fatalf("update note: %v", err)
+	}
+
+	wantPath := filepath.Join(workspaceRoot, "published-title-"+createdNote.ID+".md")
+
+	if updatedNote.FilePath != wantPath {
+		t.Fatalf("FilePath = %q, want %q", updatedNote.FilePath, wantPath)
+	}
+
+	if _, err := os.Stat(createdNote.FilePath); !os.IsNotExist(err) {
+		t.Fatalf("file left behind at %q, stat err = %v", createdNote.FilePath, err)
+	}
+
+	assertFileContent(t, updatedNote.FilePath, "Markdown body")
+
+	// The stored path has to follow the move, or every later read opens a file
+	// that is no longer there.
+	var storedPath string
+	if err := db.QueryRow(`SELECT file_path FROM notes WHERE id = ?`, createdNote.ID).Scan(&storedPath); err != nil {
+		t.Fatalf("select file_path: %v", err)
+	}
+
+	if storedPath != wantPath {
+		t.Fatalf("stored file_path = %q, want %q", storedPath, wantPath)
+	}
+}
+
+func TestRepositoryUpdateKeepsFilePathWhenTitleIsUnchanged(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+
+	createdNote, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		Title:       "Steady Title",
+		Content:     "Markdown body",
+		ContentType: "markdown",
+		NoteType:    "general",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	noteType := "learning"
+	updatedNote, err := repo.Update(createdNote.ID, UpdateNoteRequest{NoteType: &noteType})
+	if err != nil {
+		t.Fatalf("update note: %v", err)
+	}
+
+	if updatedNote.FilePath != createdNote.FilePath {
+		t.Fatalf("FilePath = %q, want it unchanged at %q", updatedNote.FilePath, createdNote.FilePath)
+	}
+
+	assertFileContent(t, createdNote.FilePath, "Markdown body")
 }
 
 func TestRepositoryDeleteSoftDeletesNoteAndRemovesSearchIndex(t *testing.T) {

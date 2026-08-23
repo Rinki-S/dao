@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -294,6 +295,28 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 		note.NoteType = *req.NoteType
 	}
 
+	// The title is part of the file name, so renaming a note has to move its
+	// file. The id is in the name too, which is what makes the destination
+	// unique without a collision check.
+	previousPath := note.FilePath
+	nextPath := files.MarkdownNoteFilePath(filepath.Dir(previousPath), note.Title, note.ID)
+	moved := nextPath != previousPath
+
+	if moved {
+		if err := os.Rename(previousPath, nextPath); err != nil {
+			return Note{}, err
+		}
+
+		note.FilePath = nextPath
+	}
+
+	committed := false
+	defer func() {
+		if moved && !committed {
+			_ = os.Rename(nextPath, previousPath)
+		}
+	}()
+
 	content, err := os.ReadFile(note.FilePath)
 	if err != nil {
 		return Note{}, err
@@ -307,9 +330,9 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 
 	result, err := tx.Exec(`
 		UPDATE notes
-		SET title = ?, note_type = ?, updated_at = ?, version = version + 1, sync_status = 'local'
+		SET title = ?, note_type = ?, file_path = ?, updated_at = ?, version = version + 1, sync_status = 'local'
 		WHERE id = ? AND deleted_at IS NULL
-	`, note.Title, note.NoteType, now, id)
+	`, note.Title, note.NoteType, note.FilePath, now, id)
 	if err != nil {
 		return Note{}, err
 	}
@@ -343,6 +366,8 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 	if err := tx.Commit(); err != nil {
 		return Note{}, err
 	}
+
+	committed = true
 
 	return note, nil
 }
