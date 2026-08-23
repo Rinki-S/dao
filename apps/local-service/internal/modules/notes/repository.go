@@ -3,7 +3,9 @@ package notes
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -11,6 +13,10 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
+
+// ErrProjectNotFound distinguishes an unknown destination folder from an
+// unknown note, which both surface as sql.ErrNoRows otherwise.
+var ErrProjectNotFound = errors.New("project not found")
 
 type Repository struct {
 	db       *sql.DB
@@ -294,6 +300,40 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 		note.NoteType = *req.NoteType
 	}
 
+	// The title is the file name and the folder is the directory, so renaming
+	// and moving are the same operation: recompute the path. The id is in the
+	// name, which is what makes the destination unique without a collision
+	// check.
+	previousPath := note.FilePath
+	parentDir := filepath.Dir(previousPath)
+
+	if req.ProjectID.Set {
+		note.ProjectID = req.ProjectID.Value
+
+		parentDir, err = r.noteParentDir(note.WorkspaceID, note.ProjectID)
+		if err != nil {
+			return Note{}, err
+		}
+	}
+
+	nextPath := files.MarkdownNoteFilePath(parentDir, note.Title, note.ID)
+	moved := nextPath != previousPath
+
+	if moved {
+		if err := os.Rename(previousPath, nextPath); err != nil {
+			return Note{}, err
+		}
+
+		note.FilePath = nextPath
+	}
+
+	committed := false
+	defer func() {
+		if moved && !committed {
+			_ = os.Rename(nextPath, previousPath)
+		}
+	}()
+
 	content, err := os.ReadFile(note.FilePath)
 	if err != nil {
 		return Note{}, err
@@ -307,9 +347,9 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 
 	result, err := tx.Exec(`
 		UPDATE notes
-		SET title = ?, note_type = ?, updated_at = ?, version = version + 1, sync_status = 'local'
+		SET title = ?, note_type = ?, project_id = ?, file_path = ?, updated_at = ?, version = version + 1, sync_status = 'local'
 		WHERE id = ? AND deleted_at IS NULL
-	`, note.Title, note.NoteType, now, id)
+	`, note.Title, note.NoteType, note.ProjectID, note.FilePath, now, id)
 	if err != nil {
 		return Note{}, err
 	}
@@ -343,6 +383,8 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 	if err := tx.Commit(); err != nil {
 		return Note{}, err
 	}
+
+	committed = true
 
 	return note, nil
 }
@@ -388,6 +430,10 @@ func (r *Repository) noteParentDir(workspaceID string, projectID *string) (strin
 			FROM projects
 			WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL
 		`, *projectID, workspaceID).Scan(&folderPath); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return "", ErrProjectNotFound
+			}
+
 			return "", err
 		}
 

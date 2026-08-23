@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button.jsx';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar.jsx';
 import { WindowSidebarTrigger } from '@/components/shell/WindowSidebarTrigger.jsx';
+import { TitlebarPeekContext } from '@/components/shell/use-titlebar-inset.js';
 import { Spinner } from '@/components/ui/spinner.jsx';
 import { CommandPalette } from '@/features/command-palette/components/CommandPalette.jsx';
 import { NoteEditorPanel } from '@/features/notes/components/NoteEditorPanel.jsx';
@@ -40,6 +41,9 @@ export function DaoApp() {
   const model = useDaoWorkspace();
   const { appearance, setAppearance } = useAppearance();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Peeking the hidden sidebar back in: owned here because the sidebar and the
+  // trigger are siblings and both have to move together.
+  const [sidebarPeek, setSidebarPeek] = useState(false);
   const [replayOnboarding, setReplayOnboarding] = useState(false);
 
   if (model.status === 'loading') {
@@ -108,23 +112,30 @@ export function DaoApp() {
 
   return (
     <SidebarProvider>
-      <CommandPalette model={model} onOpenSettings={() => setSettingsOpen(true)} />
-      <DaoSidebar model={model} onOpenSettings={() => setSettingsOpen(true)} />
-      <WindowSidebarTrigger />
-      <SidebarInset>
-        <div className="min-h-0 flex-1 overflow-hidden">{content}</div>
-      </SidebarInset>
-      <SettingsDialog
-        appearance={appearance}
-        model={model}
-        open={settingsOpen}
-        onAppearanceChange={setAppearance}
-        onOpenChange={setSettingsOpen}
-        onReplayOnboarding={() => {
-          setSettingsOpen(false);
-          setReplayOnboarding(true);
-        }}
-      />
+      <TitlebarPeekContext.Provider value={sidebarPeek}>
+        <CommandPalette model={model} onOpenSettings={() => setSettingsOpen(true)} />
+        <DaoSidebar
+          model={model}
+          peeking={sidebarPeek}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onPeekChange={setSidebarPeek}
+        />
+        <WindowSidebarTrigger peeking={sidebarPeek} onPeekChange={setSidebarPeek} />
+        <SidebarInset>
+          <div className="min-h-0 flex-1 overflow-hidden">{content}</div>
+        </SidebarInset>
+        <SettingsDialog
+          appearance={appearance}
+          model={model}
+          open={settingsOpen}
+          onAppearanceChange={setAppearance}
+          onOpenChange={setSettingsOpen}
+          onReplayOnboarding={() => {
+            setSettingsOpen(false);
+            setReplayOnboarding(true);
+          }}
+        />
+      </TitlebarPeekContext.Provider>
     </SidebarProvider>
   );
 }

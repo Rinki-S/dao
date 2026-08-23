@@ -47,6 +47,10 @@
   --focus: var(--ring);
   --danger: var(--destructive);
   --sidebar: oklch(96.5% 0.012 255 / 68%);
+  /* The sidebar is translucent so the macOS material shows through while it is
+     docked at the window edge. Peeked, it floats over the surface instead, and
+     has to be opaque or the note reads through it. */
+  --sidebar-solid: oklch(96.5% 0.012 255);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
@@ -87,6 +91,7 @@
   --warning: oklch(80% 0.15 70);
   --warning-foreground: oklch(88% 0.11 70);
   --sidebar: oklch(26% 0.016 258 / 55%);
+  --sidebar-solid: oklch(26% 0.016 258);
   --sidebar-accent: oklch(40% 0.07 256 / 72%);
   --sidebar-accent-foreground: oklch(86% 0.1 259);
 }

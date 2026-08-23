@@ -90,7 +90,7 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
           matter how wide the save status gets; the leading one also reserves
           room for the window controls while the sidebar is hidden. */}
       <div aria-hidden="true" className={cn('flex self-stretch', titlebarInset.rail)}>
-        <div className={cn('app-drag-region flex-1', titlebarInset.controlsOffset)} />
+        <div className={cn(titlebarInset.drag, 'flex-1', titlebarInset.controlsOffset)} />
       </div>
       <Toolbar aria-label="Markdown formatting">
         <ToolbarGroup>
@@ -169,7 +169,12 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
       {/* Drag lives here rather than on the bar: an app-region ancestor swallows
           clicks for the fixed window trigger overlapping it, and the trigger is
           not a descendant of this bar. */}
-      <div className="app-drag-region flex min-w-0 flex-1 items-center justify-end self-stretch">
+      <div
+        className={cn(
+          titlebarInset.drag,
+          'flex min-w-0 flex-1 items-center justify-end self-stretch',
+        )}
+      >
         {saveStatusLabel ? (
           <Badge
             aria-live="polite"

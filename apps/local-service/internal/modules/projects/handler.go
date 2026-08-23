@@ -3,6 +3,7 @@ package projects
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -60,13 +61,29 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		description := strings.TrimSpace(*req.Description)
 		req.Description = &description
 	}
-	if req.Name == nil && req.Description == nil {
+	if req.ParentID.Set && req.ParentID.Value != nil {
+		parentID := strings.TrimSpace(*req.ParentID.Value)
+		if parentID == "" {
+			httpx.Error(w, http.StatusBadRequest, "project parentId is invalid")
+			return
+		}
+		req.ParentID.Value = &parentID
+	}
+	if req.Name == nil && req.Description == nil && !req.ParentID.Set {
 		httpx.Error(w, http.StatusBadRequest, "project update payload is required")
 		return
 	}
 
 	project, err := h.repo.Update(id, req)
 	if err != nil {
+		if errors.Is(err, ErrParentCycle) {
+			httpx.Error(w, http.StatusBadRequest, "project cannot be moved inside itself")
+			return
+		}
+		if errors.Is(err, ErrParentNotFound) {
+			httpx.Error(w, http.StatusBadRequest, "project parentId is invalid")
+			return
+		}
 		if err == sql.ErrNoRows {
 			httpx.Error(w, http.StatusNotFound, "project not found")
 			return
@@ -125,8 +142,22 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.ParentID != nil {
+		parentID := strings.TrimSpace(*req.ParentID)
+		if parentID == "" {
+			httpx.Error(w, http.StatusBadRequest, "project parentId is invalid")
+			return
+		}
+		req.ParentID = &parentID
+	}
+
 	project, err := h.repo.Create(req)
 	if err != nil {
+		if errors.Is(err, ErrParentNotFound) {
+			httpx.Error(w, http.StatusBadRequest, "project parentId is invalid")
+			return
+		}
+
 		httpx.Error(w, http.StatusInternalServerError, "failed to create project")
 		return
 	}

@@ -307,7 +307,7 @@ export function TasksWorkspace({ model }) {
   return (
     <section className="flex h-full min-h-0 flex-col">
       <header className={cn('flex items-center border-b p-4', titlebarInset.padding)}>
-        <div className="app-drag-region flex flex-1 items-center gap-4">
+        <div className={cn(titlebarInset.drag, 'flex flex-1 items-center gap-4')}>
           <div className="flex-1">
             <h1 className="font-heading text-xl font-semibold">Tasks</h1>
             <p className="text-muted-foreground text-sm">{model.currentWorkspace?.name}</p>
