@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DaoApp } from './DaoApp.jsx';
@@ -58,6 +58,7 @@ const mocks = vi.hoisted(() => ({
     removeProject: vi.fn(),
     addNote: vi.fn(),
     renameNote: vi.fn(),
+    moveNote: vi.fn(),
     removeNote: vi.fn(),
     addTask: vi.fn(),
     patchTask: vi.fn(),
@@ -88,6 +89,35 @@ describe('DaoApp shell', () => {
     // left to offer and the group is gone with it.
     expect(screen.queryByText('Recents')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Welcome Note.md' })).toHaveLength(1);
+  });
+
+  it('moves a note into the folder it is dropped on', () => {
+    render(<DaoApp />);
+
+    const note = screen.getByRole('button', { name: 'Welcome Note.md' });
+    const folder = screen.getByRole('button', { name: 'Compiler Lab' });
+
+    // jsdom has no drag implementation, so the payload is carried by a stub
+    // shaped like the DataTransfer the handlers actually read.
+    const carried = new Map();
+    const dataTransfer = {
+      effectAllowed: '',
+      dropEffect: '',
+      get types() {
+        return [...carried.keys()];
+      },
+      setData: (type, value) => carried.set(type, value),
+      getData: (type) => carried.get(type) ?? '',
+    };
+
+    fireEvent.dragStart(note, { dataTransfer });
+    fireEvent.dragOver(folder, { dataTransfer });
+    fireEvent.drop(folder, { dataTransfer });
+
+    expect(mocks.model.moveNote).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'note-1' }),
+      'project-1',
+    );
   });
 
   it('treats project rows as folders and routes Tasks through primary navigation', async () => {

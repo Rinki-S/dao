@@ -35,7 +35,12 @@ export const UpdateNoteInputSchema = z
   .object({
     title: z.string().trim().min(1, { error: 'Note title is required' }).optional(),
     noteType: z.enum(['general', 'project', 'learning', 'daily', 'interview']).optional(),
+    // null moves the note to the workspace root, so it has to stay
+    // distinguishable from the key being absent.
+    projectId: z.string().min(1, { error: 'Note projectId is required' }).nullable().optional(),
   })
-  .refine((input) => input.title !== undefined || input.noteType !== undefined, {
-    error: 'Note update payload is required',
-  });
+  .refine(
+    (input) =>
+      input.title !== undefined || input.noteType !== undefined || input.projectId !== undefined,
+    { error: 'Note update payload is required' },
+  );

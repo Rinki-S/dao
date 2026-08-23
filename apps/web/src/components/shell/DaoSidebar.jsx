@@ -71,6 +71,48 @@ const NAV_ITEMS = [
   { id: 'search', label: 'Search', icon: IconSearch },
 ];
 
+// A private MIME type keeps the sidebar from accepting text dragged in from
+// anywhere else, and lets a drop target check the payload during dragover —
+// where getData() is deliberately blank.
+const NOTE_DRAG_TYPE = 'application/x-dao-note-id';
+
+/**
+ * Wiring for a row that accepts a dropped note. `onDropNote` receives the note
+ * id; the caller decides which folder that means.
+ */
+function useNoteDropTarget(onDropNote) {
+  const [over, setOver] = useState(false);
+
+  return {
+    over,
+    props: {
+      onDragEnter: (event) => {
+        if (!event.dataTransfer.types.includes(NOTE_DRAG_TYPE)) return;
+        event.preventDefault();
+        setOver(true);
+      },
+      onDragLeave: (event) => {
+        // Moving onto a child fires leave on the parent, so ignore anything
+        // still inside this row.
+        if (event.currentTarget.contains(event.relatedTarget)) return;
+        setOver(false);
+      },
+      onDragOver: (event) => {
+        if (!event.dataTransfer.types.includes(NOTE_DRAG_TYPE)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+      },
+      onDrop: (event) => {
+        const noteId = event.dataTransfer.getData(NOTE_DRAG_TYPE);
+        setOver(false);
+        if (!noteId) return;
+        event.preventDefault();
+        onDropNote(noteId);
+      },
+    },
+  };
+}
+
 function noteFileName(note) {
   return note.title.toLowerCase().endsWith('.md') ? note.title : `${note.title}.md`;
 }
@@ -120,17 +162,33 @@ function NoteRow({ active, nested = false, note, onOpen, onRename, onDelete }) {
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const RowItem = nested ? SidebarMenuSubItem : SidebarMenuItem;
+  // The note id travels in the drag payload; drop targets read it back to know
+  // what to move. text/plain carries the file name so a drag that lands outside
+  // the app still says something useful.
+  const dragProps = {
+    draggable: true,
+    onDragStart: (event) => {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData(NOTE_DRAG_TYPE, note.id);
+      event.dataTransfer.setData('text/plain', noteFileName(note));
+    },
+  };
   const row = nested ? (
     <SidebarMenuSubButton
       isActive={active}
-      render={<button type="button" />}
+      render={<button type="button" {...dragProps} />}
       onClick={() => onOpen(note)}
     >
       <IconFile aria-hidden="true" />
       <span>{noteFileName(note)}</span>
     </SidebarMenuSubButton>
   ) : (
-    <SidebarMenuButton isActive={active} tooltip={noteFileName(note)} onClick={() => onOpen(note)}>
+    <SidebarMenuButton
+      isActive={active}
+      render={<button type="button" {...dragProps} />}
+      tooltip={noteFileName(note)}
+      onClick={() => onOpen(note)}
+    >
       <IconFile aria-hidden="true" />
       <span>{noteFileName(note)}</span>
     </SidebarMenuButton>
@@ -195,12 +253,14 @@ function ProjectFolder({
   onRename,
   onRenameNote,
   onDeleteNote,
+  onDropNote,
 }) {
   const [open, setOpen] = useState(
     defaultOpen || revealed || projectNotes.some((note) => note.id === activeNoteId),
   );
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const drop = useNoteDropTarget((noteId) => onDropNote(noteId, project.id));
 
   return (
     <>
@@ -208,7 +268,15 @@ function ProjectFolder({
         <SidebarMenuItem>
           <ContextMenu>
             <ContextMenuTrigger>
-              <CollapsibleTrigger render={<SidebarMenuButton isActive={revealed} />}>
+              <CollapsibleTrigger
+                render={
+                  <SidebarMenuButton
+                    className={cn(drop.over && 'bg-sidebar-accent ring-2 ring-sidebar-ring')}
+                    isActive={revealed}
+                    {...drop.props}
+                  />
+                }
+              >
                 {open || revealed ? (
                   <IconChevronDown aria-hidden="true" />
                 ) : (
@@ -348,6 +416,13 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
     [model.notes, model.recents, model.selectedEntity, model.tasks],
   );
   const workspaceIsEmpty = model.projects.length === 0 && rootNotes.length === 0;
+  // Drop targets carry a note id, not the note, so the row that started the
+  // drag does not have to stay mounted for the drop to resolve.
+  const moveNoteById = (noteId, projectId) => {
+    const note = model.notes.find((item) => item.id === noteId);
+    if (note) model.moveNote(note, projectId);
+  };
+  const rootDrop = useNoteDropTarget((noteId) => moveNoteById(noteId, null));
   const activeNoteId = model.selectedEntity?.type === 'note' ? model.selectedEntity.id : '';
 
   return (
@@ -470,7 +545,12 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
             <SidebarGroupAction aria-label="New folder" onClick={() => setNewProjectOpen(true)}>
               <IconFolderPlus aria-hidden="true" />
             </SidebarGroupAction>
-            <SidebarGroupContent>
+            {/* Dropping on the group itself, rather than on any folder, is
+                what takes a note back out to the workspace root. */}
+            <SidebarGroupContent
+              className={cn('rounded-lg', rootDrop.over && 'bg-sidebar-accent/40')}
+              {...rootDrop.props}
+            >
               <SidebarMenu>
                 {model.projects.map((project, index) => (
                   <ProjectFolder
@@ -483,6 +563,7 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
                     onCreateNote={(projectId) => model.addNote({ projectId })}
                     onDelete={model.removeProject}
                     onDeleteNote={model.removeNote}
+                    onDropNote={moveNoteById}
                     onOpenNote={model.openEntity}
                     onRename={model.renameProject}
                     onRenameNote={model.renameNote}

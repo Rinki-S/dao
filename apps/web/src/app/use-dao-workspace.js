@@ -262,6 +262,16 @@ export function useDaoWorkspace() {
     );
   }
 
+  // projectId is null for the workspace root, so it is passed through as-is
+  // rather than being coalesced away.
+  async function moveNote(note, projectId) {
+    if ((note.projectId ?? null) === projectId) return;
+    const updated = await updateNote(note.id, { projectId });
+    setNotes((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+    if (projectId) setRevealedProjectId(projectId);
+    notifyActivityChanged();
+  }
+
   async function removeNote(note) {
     await deleteNote(note.id);
     const nextNotes = notes.filter((item) => item.id !== note.id);
@@ -373,6 +383,7 @@ export function useDaoWorkspace() {
     removeProject,
     addNote,
     renameNote,
+    moveNote,
     removeNote,
     addTask,
     patchTask,
