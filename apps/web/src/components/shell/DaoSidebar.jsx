@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   IconChevronDown,
   IconChevronRight,
@@ -293,6 +293,24 @@ function ProjectFolder({
 export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChange }) {
   const { state } = useSidebar();
   const peeked = state === 'collapsed' && peeking;
+  const peekRef = useRef(null);
+
+  // The window trigger is fixed and the macOS traffic lights are native views,
+  // so both sit above the peeked sidebar without being inside it: a pointer
+  // moving onto either one fires leave on the sidebar while still visually
+  // over it. Geometry is what actually decides, and a pointer that stops
+  // reporting (because it is over native chrome) holds the peek open.
+  useEffect(() => {
+    if (!peeked) return undefined;
+
+    function handleMove(event) {
+      const edge = peekRef.current?.getBoundingClientRect().right ?? 0;
+      if (event.clientX > edge) onPeekChange?.(false);
+    }
+
+    window.addEventListener('pointermove', handleMove);
+    return () => window.removeEventListener('pointermove', handleMove);
+  }, [onPeekChange, peeked]);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newWorkspaceOpen, setNewWorkspaceOpen] = useState(false);
   const notesByProject = useMemo(() => {
@@ -347,8 +365,8 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
         />
       )}
       <Sidebar
+        ref={peekRef}
         className={cn(peeked && 'left-0! [--sidebar:var(--sidebar-solid)] shadow-xl/10')}
-        onPointerLeave={() => onPeekChange?.(false)}
       >
         {/* Titlebar band. Same height as a workspace top bar so the macOS traffic
           lights stay optically centred in either sidebar state, and the trigger
