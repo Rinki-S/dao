@@ -371,10 +371,13 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
           // keeps the colour itself switching with the theme like every other
           // token, and opacity composites instead of repainting.
           'before:pointer-events-none before:absolute before:-z-1 before:inset-0 before:bg-(--sidebar-solid) before:opacity-0 before:transition-opacity before:delay-[160ms] before:duration-[140ms] before:ease-shell',
-          // Arriving over content it must already be opaque, so the way in is
-          // instant — it happens off-screen. The way out waits for the
-          // workspace to finish sliding back underneath before it clears.
-          peeked && 'left-0! shadow-xl/10 before:opacity-100 before:delay-0 before:duration-0',
+          // Arriving, it fades in over half the slide: quick enough that the
+          // panel is opaque well before much of it has crossed the workspace,
+          // slow enough to read as the material arriving rather than a swap.
+          // Leaving, it waits for the workspace to finish sliding back
+          // underneath before it clears.
+          peeked &&
+            'left-0! shadow-xl/10 before:opacity-100 before:delay-0 before:duration-[100ms]',
         )}
       >
         {/* Titlebar band. Same height as a workspace top bar so the macOS traffic

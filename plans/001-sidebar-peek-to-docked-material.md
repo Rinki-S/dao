@@ -209,9 +209,11 @@ Why this is better on three counts:
   `box-shadow` transition) still touches `apps/web/src/components/ui/sidebar.jsx`.
 
 The asymmetric-delay technique is unchanged and still reads from the destination
-state. The way *in* additionally uses `duration-0`: with a 140ms fade the panel
-would be half-translucent while still sliding across content. Becoming opaque
-instantly is unobservable because it happens off-screen.
+state. The way *in* uses a shorter `duration-[100ms]` with no delay: the slide's
+`ease-shell` is front-loaded, so a fade matching the 140ms of the way out would
+leave the panel visibly translucent over the workspace while it crossed. 100ms
+finishes at half the slide — quick enough to stay ahead of the leading edge,
+long enough to read as the material arriving rather than being swapped in.
 
 `-z-1` keeps the layer behind the surface — a positioned pseudo-element would
 otherwise paint above the static content. The convention comes from
