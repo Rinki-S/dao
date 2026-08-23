@@ -196,6 +196,11 @@ function PrimaryNavItem({ active, item, onSelect }) {
         // than tall — an oval hover, an off-centre icon, and a strip of
         // clickable nothing beside it.
         'transition-[padding,gap,background-color,color] duration-200 ease-shell',
+        // Never narrower than it is tall, which is what makes the collapsed
+        // state a circle. Padding alone cannot: the button's own
+        // `[&_svg]:-mx-0.5` pulls 4px back out of the icon, so the natural
+        // width came to 24px against a 28px height — a vertical pill.
+        'min-w-8 sm:min-w-7',
         // The sidebar colours its own selection and hover, and this row sits in
         // it: --secondary belongs to the workspace surface and reads as a
         // different material here.
@@ -723,7 +728,11 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
             {/* Only the current view spells itself out; the rest stay icons.
                 The row reads as one control that way, and the label is the
                 thing that says where you are. */}
-            <nav aria-label="Primary" className="flex items-center gap-1">
+            {/* The cursor belongs to the row, not to each button. Four round
+                buttons with gaps between them put a dozen pointer/default
+                boundaries across 120px, and sweeping past turned the cursor
+                into a strobe. The row is one control; treat it as one. */}
+            <nav aria-label="Primary" className="flex cursor-pointer items-center gap-1">
               {NAV_ITEMS.map((item) => (
                 <PrimaryNavItem
                   key={item.id}
