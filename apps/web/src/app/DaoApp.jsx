@@ -40,6 +40,9 @@ export function DaoApp() {
   const model = useDaoWorkspace();
   const { appearance, setAppearance } = useAppearance();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Peeking the hidden sidebar back in: owned here because the sidebar and the
+  // trigger are siblings and both have to move together.
+  const [sidebarPeek, setSidebarPeek] = useState(false);
   const [replayOnboarding, setReplayOnboarding] = useState(false);
 
   if (model.status === 'loading') {
@@ -109,8 +112,13 @@ export function DaoApp() {
   return (
     <SidebarProvider>
       <CommandPalette model={model} onOpenSettings={() => setSettingsOpen(true)} />
-      <DaoSidebar model={model} onOpenSettings={() => setSettingsOpen(true)} />
-      <WindowSidebarTrigger />
+      <DaoSidebar
+        model={model}
+        peeking={sidebarPeek}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onPeekChange={setSidebarPeek}
+      />
+      <WindowSidebarTrigger peeking={sidebarPeek} onPeekChange={setSidebarPeek} />
       <SidebarInset>
         <div className="min-h-0 flex-1 overflow-hidden">{content}</div>
       </SidebarInset>

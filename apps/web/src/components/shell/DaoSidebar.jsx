@@ -60,7 +60,9 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarRail,
+  useSidebar,
 } from '@/components/ui/sidebar.jsx';
+import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: IconHome },
@@ -288,7 +290,9 @@ function ProjectFolder({
   );
 }
 
-export function DaoSidebar({ model, onOpenSettings }) {
+export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChange }) {
+  const { state } = useSidebar();
+  const peeked = state === 'collapsed' && peeking;
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newWorkspaceOpen, setNewWorkspaceOpen] = useState(false);
   const notesByProject = useMemo(() => {
@@ -329,168 +333,186 @@ export function DaoSidebar({ model, onOpenSettings }) {
   const activeNoteId = model.selectedEntity?.type === 'note' ? model.selectedEntity.id : '';
 
   return (
-    <Sidebar>
-      {/* Titlebar band. Same height as a workspace top bar so the macOS traffic
+    <>
+      {/* Hover target for peeking the hidden sidebar back in. It starts below
+          the titlebar so the window's top-left drag corner stays reachable, and
+          only mouse pointers arm it — a touch would open it on any left swipe. */}
+      {state === 'collapsed' && !peeking && (
+        <div
+          aria-hidden="true"
+          className="fixed top-12 bottom-0 left-0 z-20 w-2"
+          onPointerEnter={(event) => {
+            if (event.pointerType === 'mouse') onPeekChange?.(true);
+          }}
+        />
+      )}
+      <Sidebar
+        className={cn(peeked && 'left-0! shadow-xl/10')}
+        onPointerLeave={() => onPeekChange?.(false)}
+      >
+        {/* Titlebar band. Same height as a workspace top bar so the macOS traffic
           lights stay optically centred in either sidebar state, and the trigger
           keeps the same x as the one in SidebarRevealSlot. */}
-      <SidebarHeader className="gap-0 p-0">
-        <div aria-hidden="true" className="app-drag-region me-12 h-12 shrink-0" />
-        <div className="px-2 pb-2">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <Menu>
-                <MenuTrigger render={<SidebarMenuButton />}>
-                  <IconLeaf aria-hidden="true" />
-                  <span>{model.currentWorkspace?.name ?? 'Dao'}</span>
-                  <IconChevronDown aria-hidden="true" />
-                </MenuTrigger>
-                <MenuPopup align="start">
-                  {model.workspaces.map((workspace) => (
-                    <MenuItem
-                      key={workspace.id}
-                      onClick={() => model.selectWorkspace(workspace.id)}
-                    >
-                      {workspace.name}
-                    </MenuItem>
-                  ))}
-                  <MenuSeparator />
-                  <MenuItem onClick={() => setNewWorkspaceOpen(true)}>
-                    <IconPlus aria-hidden="true" />
-                    New workspace
-                  </MenuItem>
-                </MenuPopup>
-              </Menu>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </div>
-      </SidebarHeader>
-
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
+        <SidebarHeader className="gap-0 p-0">
+          <div aria-hidden="true" className="app-drag-region me-12 h-12 shrink-0" />
+          <div className="px-2 pb-2">
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    disabled={item.disabled}
-                    isActive={model.activeView === item.id}
-                    tooltip={item.disabled ? `${item.label} · Coming later` : item.label}
-                    onClick={() => {
-                      if (item.id === 'home') model.openHome();
-                      else if (!item.disabled) model.setActiveView(item.id);
-                    }}
-                  >
-                    <item.icon aria-hidden="true" />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <SidebarMenuItem>
+                <Menu>
+                  <MenuTrigger render={<SidebarMenuButton />}>
+                    <IconLeaf aria-hidden="true" />
+                    <span>{model.currentWorkspace?.name ?? 'Dao'}</span>
+                    <IconChevronDown aria-hidden="true" />
+                  </MenuTrigger>
+                  <MenuPopup align="start">
+                    {model.workspaces.map((workspace) => (
+                      <MenuItem
+                        key={workspace.id}
+                        onClick={() => model.selectWorkspace(workspace.id)}
+                      >
+                        {workspace.name}
+                      </MenuItem>
+                    ))}
+                    <MenuSeparator />
+                    <MenuItem onClick={() => setNewWorkspaceOpen(true)}>
+                      <IconPlus aria-hidden="true" />
+                      New workspace
+                    </MenuItem>
+                  </MenuPopup>
+                </Menu>
+              </SidebarMenuItem>
             </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+          </div>
+        </SidebarHeader>
 
-        {recentEntries.length > 0 && (
+        <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Recents</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {recentEntries.map(({ entity, recent }) => {
-                  const label = recent.entityType === 'note' ? noteFileName(entity) : entity.title;
-                  return (
-                    <SidebarMenuItem key={`${recent.entityType}:${recent.entityId}`}>
-                      <SidebarMenuButton tooltip={label} onClick={() => model.openEntity(entity)}>
-                        {recent.entityType === 'note' ? (
-                          <IconFile aria-hidden="true" />
-                        ) : (
-                          <IconCircleCheck aria-hidden="true" />
-                        )}
-                        <span>{label}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
+                {NAV_ITEMS.map((item) => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton
+                      disabled={item.disabled}
+                      isActive={model.activeView === item.id}
+                      tooltip={item.disabled ? `${item.label} · Coming later` : item.label}
+                      onClick={() => {
+                        if (item.id === 'home') model.openHome();
+                        else if (!item.disabled) model.setActiveView(item.id);
+                      }}
+                    >
+                      <item.icon aria-hidden="true" />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-        )}
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarGroupAction aria-label="New folder" onClick={() => setNewProjectOpen(true)}>
-            <IconFolderPlus aria-hidden="true" />
-          </SidebarGroupAction>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {model.projects.map((project, index) => (
-                <ProjectFolder
-                  key={project.id}
-                  activeNoteId={activeNoteId}
-                  defaultOpen={index === 0}
-                  project={project}
-                  projectNotes={notesByProject.get(project.id) ?? []}
-                  revealed={model.revealedProjectId === project.id}
-                  onCreateNote={(projectId) => model.addNote({ projectId })}
-                  onDelete={model.removeProject}
-                  onDeleteNote={model.removeNote}
-                  onOpenNote={model.openEntity}
-                  onRename={model.renameProject}
-                  onRenameNote={model.renameNote}
-                />
-              ))}
-              {rootNotes.map((note) => (
-                <NoteRow
-                  key={note.id}
-                  active={activeNoteId === note.id}
-                  note={note}
-                  onDelete={model.removeNote}
-                  onOpen={model.openEntity}
-                  onRename={model.renameNote}
-                />
-              ))}
-              {workspaceIsEmpty && (
+          {recentEntries.length > 0 && (
+            <SidebarGroup>
+              <SidebarGroupLabel>Recents</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {recentEntries.map(({ entity, recent }) => {
+                    const label =
+                      recent.entityType === 'note' ? noteFileName(entity) : entity.title;
+                    return (
+                      <SidebarMenuItem key={`${recent.entityType}:${recent.entityId}`}>
+                        <SidebarMenuButton tooltip={label} onClick={() => model.openEntity(entity)}>
+                          {recent.entityType === 'note' ? (
+                            <IconFile aria-hidden="true" />
+                          ) : (
+                            <IconCircleCheck aria-hidden="true" />
+                          )}
+                          <span>{label}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+            <SidebarGroupAction aria-label="New folder" onClick={() => setNewProjectOpen(true)}>
+              <IconFolderPlus aria-hidden="true" />
+            </SidebarGroupAction>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {model.projects.map((project, index) => (
+                  <ProjectFolder
+                    key={project.id}
+                    activeNoteId={activeNoteId}
+                    defaultOpen={index === 0}
+                    project={project}
+                    projectNotes={notesByProject.get(project.id) ?? []}
+                    revealed={model.revealedProjectId === project.id}
+                    onCreateNote={(projectId) => model.addNote({ projectId })}
+                    onDelete={model.removeProject}
+                    onDeleteNote={model.removeNote}
+                    onOpenNote={model.openEntity}
+                    onRename={model.renameProject}
+                    onRenameNote={model.renameNote}
+                  />
+                ))}
+                {rootNotes.map((note) => (
+                  <NoteRow
+                    key={note.id}
+                    active={activeNoteId === note.id}
+                    note={note}
+                    onDelete={model.removeNote}
+                    onOpen={model.openEntity}
+                    onRename={model.renameNote}
+                  />
+                ))}
+                {workspaceIsEmpty && (
+                  <SidebarMenuItem>
+                    <p className="px-2 py-1 text-muted-foreground text-xs">
+                      Nothing here yet. Notes are Markdown files in your workspace folder.
+                    </p>
+                  </SidebarMenuItem>
+                )}
                 <SidebarMenuItem>
-                  <p className="px-2 py-1 text-muted-foreground text-xs">
-                    Nothing here yet. Notes are Markdown files in your workspace folder.
-                  </p>
+                  <SidebarMenuButton onClick={() => model.addNote()}>
+                    <IconPlus aria-hidden="true" />
+                    <span>New note</span>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
-              )}
-              <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => model.addNote()}>
-                  <IconPlus aria-hidden="true" />
-                  <span>New note</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
 
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Settings" onClick={onOpenSettings}>
-              <IconSettings aria-hidden="true" />
-              <span>Settings</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-      <SidebarRail />
+        <SidebarFooter>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip="Settings" onClick={onOpenSettings}>
+                <IconSettings aria-hidden="true" />
+                <span>Settings</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+        <SidebarRail />
 
-      <NameDialog
-        label="Folder name"
-        open={newProjectOpen}
-        title="New folder"
-        onOpenChange={setNewProjectOpen}
-        onSubmit={(name) => model.addProject({ name, description: '' })}
-      />
-      <NameDialog
-        label="Workspace name"
-        open={newWorkspaceOpen}
-        title="New workspace"
-        onOpenChange={setNewWorkspaceOpen}
-        onSubmit={(name) => model.addWorkspace({ name, description: '' })}
-      />
-    </Sidebar>
+        <NameDialog
+          label="Folder name"
+          open={newProjectOpen}
+          title="New folder"
+          onOpenChange={setNewProjectOpen}
+          onSubmit={(name) => model.addProject({ name, description: '' })}
+        />
+        <NameDialog
+          label="Workspace name"
+          open={newWorkspaceOpen}
+          title="New workspace"
+          onOpenChange={setNewWorkspaceOpen}
+          onSubmit={(name) => model.addWorkspace({ name, description: '' })}
+        />
+      </Sidebar>
+    </>
   );
 }
