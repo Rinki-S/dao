@@ -300,6 +300,23 @@ export function DaoSidebar({ model, onOpenSettings }) {
     return map;
   }, [model.notes, model.projects]);
   const rootNotes = model.notes.filter((note) => note.projectId === null);
+  // Resolved up front: an entry whose entity is gone must not count towards the
+  // five shown, and must not leave the group rendering an empty list.
+  const recentEntries = useMemo(
+    () =>
+      model.recents
+        .map((recent) => {
+          const entity =
+            recent.entityType === 'note'
+              ? model.notes.find((note) => note.id === recent.entityId)
+              : model.tasks.find((task) => task.id === recent.entityId);
+          return entity ? { entity, recent } : null;
+        })
+        .filter(Boolean)
+        .slice(0, 5),
+    [model.notes, model.recents, model.tasks],
+  );
+  const workspaceIsEmpty = model.projects.length === 0 && rootNotes.length === 0;
   const activeNoteId = model.selectedEntity?.type === 'note' ? model.selectedEntity.id : '';
 
   return (
@@ -363,40 +380,37 @@ export function DaoSidebar({ model, onOpenSettings }) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Recents</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {model.recents.slice(0, 5).map((recent) => {
-                const entity =
-                  recent.entityType === 'note'
-                    ? model.notes.find((note) => note.id === recent.entityId)
-                    : model.tasks.find((task) => task.id === recent.entityId);
-                if (!entity) return null;
-                const label = recent.entityType === 'note' ? noteFileName(entity) : entity.title;
-                return (
-                  <SidebarMenuItem key={`${recent.entityType}:${recent.entityId}`}>
-                    <SidebarMenuButton
-                      isActive={
-                        model.selectedEntity?.type === recent.entityType &&
-                        model.selectedEntity?.id === recent.entityId
-                      }
-                      tooltip={label}
-                      onClick={() => model.openEntity(entity)}
-                    >
-                      {recent.entityType === 'note' ? (
-                        <IconFile aria-hidden="true" />
-                      ) : (
-                        <IconCircleCheck aria-hidden="true" />
-                      )}
-                      <span>{label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {recentEntries.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Recents</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {recentEntries.map(({ entity, recent }) => {
+                  const label = recent.entityType === 'note' ? noteFileName(entity) : entity.title;
+                  return (
+                    <SidebarMenuItem key={`${recent.entityType}:${recent.entityId}`}>
+                      <SidebarMenuButton
+                        isActive={
+                          model.selectedEntity?.type === recent.entityType &&
+                          model.selectedEntity?.id === recent.entityId
+                        }
+                        tooltip={label}
+                        onClick={() => model.openEntity(entity)}
+                      >
+                        {recent.entityType === 'note' ? (
+                          <IconFile aria-hidden="true" />
+                        ) : (
+                          <IconCircleCheck aria-hidden="true" />
+                        )}
+                        <span>{label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <SidebarGroup>
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
@@ -431,6 +445,13 @@ export function DaoSidebar({ model, onOpenSettings }) {
                   onRename={model.renameNote}
                 />
               ))}
+              {workspaceIsEmpty && (
+                <SidebarMenuItem>
+                  <p className="px-2 py-1 text-muted-foreground text-xs">
+                    Nothing here yet. Notes are Markdown files in your workspace folder.
+                  </p>
+                </SidebarMenuItem>
+              )}
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={() => model.addNote()}>
                   <IconPlus aria-hidden="true" />
