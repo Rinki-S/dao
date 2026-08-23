@@ -3,9 +3,11 @@ import { z } from 'zod';
 const STORAGE_KEY = 'dao.recents.v1';
 const MAX_RECENTS_PER_WORKSPACE = 12;
 
+// Notes are the only openable entity: a task is a line in a Markdown file and
+// has no id to come back to.
 export const RecentItemSchema = z.object({
   workspaceId: z.string().min(1),
-  entityType: z.enum(['note', 'task']),
+  entityType: z.literal('note'),
   entityId: z.string().min(1),
   title: z.string().min(1),
   openedAt: z.string().datetime(),
@@ -17,8 +19,16 @@ export function readRecents() {
   try {
     const rawValue = window.localStorage.getItem(STORAGE_KEY);
     if (!rawValue) return [];
-    const parsed = RecentListSchema.safeParse(JSON.parse(rawValue));
-    return parsed.success ? parsed.data : [];
+    const stored = JSON.parse(rawValue);
+    if (!Array.isArray(stored)) return [];
+
+    // Item by item rather than all at once: a stored entry the current schema
+    // no longer accepts — a task from when tasks were entities — should drop
+    // itself, not take every valid note with it.
+    return stored
+      .map((item) => RecentItemSchema.safeParse(item))
+      .filter((result) => result.success)
+      .map((result) => result.data);
   } catch {
     return [];
   }
@@ -62,12 +72,7 @@ export function recordRecent(items, item) {
 
 export function pruneRecents(items, entities) {
   const noteIds = new Set(entities.notes.map((note) => note.id));
-  const taskIds = new Set(entities.tasks.map((task) => task.id));
-  return writeRecents(
-    items.filter((item) =>
-      item.entityType === 'note' ? noteIds.has(item.entityId) : taskIds.has(item.entityId),
-    ),
-  );
+  return writeRecents(items.filter((item) => noteIds.has(item.entityId)));
 }
 
 export function getWorkspaceRecents(items, workspaceId) {

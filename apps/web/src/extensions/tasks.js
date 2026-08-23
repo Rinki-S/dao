@@ -22,21 +22,14 @@ export const tasksExtension = {
       },
     ],
     commands: [
-      {
-        id: 'create-task',
-        title: 'Create Task',
-        description: 'Focus the task form',
-        group: 'Create',
-        keywords: ['new task', 'add task', 'todo'],
-        targetId: 'tasks',
-        focusSelector: '[data-command-target="task-title"]',
-      },
+      // There is no form to focus any more: a task is a line you type into the
+      // file, so opening it is the whole command.
       {
         id: 'open-tasks',
         title: 'Open Tasks',
-        description: 'Jump to task management',
+        description: 'Jump to your task list',
         group: 'Navigate',
-        keywords: ['task', 'todo'],
+        keywords: ['task', 'todo', 'new task', 'add task'],
         targetId: 'tasks',
       },
     ],

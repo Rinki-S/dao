@@ -17,13 +17,6 @@ import {
   recordRecent,
 } from '@/features/recents/storage.js';
 import { getWorkingDirectory, updateWorkingDirectory } from '@/features/settings/api.js';
-import {
-  createTask,
-  deleteTask,
-  listTasks,
-  updateTask,
-  updateTaskStatus,
-} from '@/features/tasks/api.js';
 import { createWorkspace, listWorkspaces } from '@/features/workspaces/api.js';
 
 function messageFrom(error, fallback) {
@@ -38,7 +31,6 @@ export function useDaoWorkspace() {
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState('');
   const [projects, setProjects] = useState([]);
   const [notes, setNotes] = useState([]);
-  const [tasks, setTasks] = useState([]);
   const [activities, setActivities] = useState([]);
   const [recents, setRecents] = useState(() => readRecents());
   const [activeView, setActiveView] = useState('home');
@@ -57,10 +49,6 @@ export function useDaoWorkspace() {
     () => notes.filter((note) => note.workspaceId === currentWorkspaceId),
     [currentWorkspaceId, notes],
   );
-  const workspaceTasks = useMemo(
-    () => tasks.filter((task) => task.workspaceId === currentWorkspaceId),
-    [currentWorkspaceId, tasks],
-  );
   const workspaceActivities = useMemo(
     () => activities.filter((activity) => activity.workspaceId === currentWorkspaceId),
     [activities, currentWorkspaceId],
@@ -76,35 +64,27 @@ export function useDaoWorkspace() {
         : null,
     [notes, selectedEntity],
   );
-  const selectedTask = useMemo(
-    () =>
-      selectedEntity?.type === 'task'
-        ? (tasks.find((task) => task.id === selectedEntity.id) ?? null)
-        : null,
-    [selectedEntity, tasks],
-  );
-
   const refreshData = useCallback(async () => {
-    const [nextProjects, nextNotes, nextTasks, nextActivities] = await Promise.all([
+    const [nextProjects, nextNotes, nextActivities] = await Promise.all([
       listProjects(),
       listNotes(),
-      listTasks(),
       listActivities(),
     ]);
     setProjects(nextProjects);
     setNotes(nextNotes);
-    setTasks(nextTasks);
     setActivities(nextActivities);
-    const nextRecents = pruneRecents(readRecents(), { notes: nextNotes, tasks: nextTasks });
+    const nextRecents = pruneRecents(readRecents(), { notes: nextNotes });
     setRecents(nextRecents);
-    return { projects: nextProjects, notes: nextNotes, tasks: nextTasks };
+    return { projects: nextProjects, notes: nextNotes };
   }, []);
 
+  // Notes are the only openable entity now: a task is a line in a file, not
+  // something the app can select or return to.
   const openEntity = useCallback((entity) => {
     if (!entity) return;
-    const entityType = entity.contentType ? 'note' : 'task';
+    const entityType = 'note';
     setSelectedEntity({ type: entityType, id: entity.id });
-    setActiveView(entityType === 'task' ? 'tasks' : 'home');
+    setActiveView('home');
     setRecents((current) =>
       recordRecent(current, {
         workspaceId: entity.workspaceId,
@@ -135,10 +115,7 @@ export function useDaoWorkspace() {
         };
       }
 
-      const entity =
-        recent.entityType === 'note'
-          ? nextNotes.find((note) => note.id === recent.entityId)
-          : entities.tasks.find((task) => task.id === recent.entityId);
+      const entity = nextNotes.find((note) => note.id === recent.entityId);
       if (entity) openEntity(entity);
     },
     [openEntity],
@@ -199,7 +176,7 @@ export function useDaoWorkspace() {
     if (!workspace) return;
     setCurrentWorkspaceId(workspaceId);
     setRevealedProjectId('');
-    await restoreWorkspaceContext(workspace, { notes, tasks });
+    await restoreWorkspaceContext(workspace, { notes });
   }
 
   async function addWorkspace(input) {
@@ -295,54 +272,14 @@ export function useDaoWorkspace() {
     await deleteNote(note.id);
     const nextNotes = notes.filter((item) => item.id !== note.id);
     setNotes(nextNotes);
-    const nextRecents = pruneRecents(readRecents(), { notes: nextNotes, tasks });
+    const nextRecents = pruneRecents(readRecents(), { notes: nextNotes });
     setRecents(nextRecents);
     if (selectedEntity?.type === 'note' && selectedEntity.id === note.id) {
       const fallback = getWorkspaceRecents(nextRecents, currentWorkspace.id)[0];
-      const entity = fallback
-        ? fallback.entityType === 'note'
-          ? nextNotes.find((item) => item.id === fallback.entityId)
-          : tasks.find((item) => item.id === fallback.entityId)
-        : null;
+      const entity = fallback ? nextNotes.find((item) => item.id === fallback.entityId) : null;
       setSelectedEntity(null);
       if (entity) openEntity(entity);
     }
-  }
-
-  async function addTask(input) {
-    const task = await createTask({
-      workspaceId: currentWorkspace.id,
-      projectId: input.projectId ?? null,
-      parentId: input.parentId ?? null,
-      title: input.title,
-      description: input.description ?? '',
-      priority: input.priority ?? 'medium',
-      dueDate: input.dueDate ?? null,
-    });
-    setTasks((current) => [...current, task]);
-    openEntity(task);
-    return task;
-  }
-
-  async function patchTask(taskId, input) {
-    const updated = await updateTask(taskId, input);
-    setTasks((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-    return updated;
-  }
-
-  async function toggleTask(task) {
-    const updated = await updateTaskStatus(task.id, {
-      status: task.status === 'done' ? 'todo' : 'done',
-    });
-    setTasks((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-  }
-
-  async function removeTask(task) {
-    await deleteTask(task.id);
-    const nextTasks = tasks.filter((item) => item.id !== task.id && item.parentId !== task.id);
-    setTasks(nextTasks);
-    setRecents(pruneRecents(readRecents(), { notes, tasks: nextTasks }));
-    if (selectedEntity?.type === 'task' && selectedEntity.id === task.id) setSelectedEntity(null);
   }
 
   function openHome() {
@@ -364,10 +301,13 @@ export function useDaoWorkspace() {
       setActiveView('home');
       return;
     }
-    const entity =
-      result.entityType === 'note'
-        ? notes.find((note) => note.id === result.entityId)
-        : tasks.find((task) => task.id === result.entityId);
+    // A task hit is the whole task file, which has no entity to select — the
+    // view itself is the destination.
+    if (result.entityType === 'task') {
+      setActiveView('tasks');
+      return;
+    }
+    const entity = notes.find((note) => note.id === result.entityId);
     if (result.projectId) setRevealedProjectId(result.projectId);
     if (entity) openEntity(entity);
   }
@@ -380,13 +320,11 @@ export function useDaoWorkspace() {
     currentWorkspace,
     projects: workspaceProjects,
     notes: workspaceNotes,
-    tasks: workspaceTasks,
     activities: workspaceActivities,
     recents: workspaceRecents,
     activeView,
     selectedEntity,
     selectedNote,
-    selectedTask,
     revealedProjectId,
     setActiveView,
     setRevealedProjectId,
@@ -405,9 +343,5 @@ export function useDaoWorkspace() {
     renameNote,
     moveNote,
     removeNote,
-    addTask,
-    patchTask,
-    toggleTask,
-    removeTask,
   };
 }

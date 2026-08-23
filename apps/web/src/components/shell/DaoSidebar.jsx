@@ -623,15 +623,12 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
             ),
         )
         .map((recent) => {
-          const entity =
-            recent.entityType === 'note'
-              ? model.notes.find((note) => note.id === recent.entityId)
-              : model.tasks.find((task) => task.id === recent.entityId);
+          const entity = model.notes.find((note) => note.id === recent.entityId);
           return entity ? { entity, recent } : null;
         })
         .filter(Boolean)
         .slice(0, 5),
-    [model.notes, model.recents, model.selectedEntity, model.tasks],
+    [model.notes, model.recents, model.selectedEntity],
   );
   const workspaceIsEmpty = model.projects.length === 0 && rootNotes.length === 0;
   // Drop targets carry a note id, not the note, so the row that started the
@@ -755,16 +752,11 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
               <SidebarGroupContent>
                 <SidebarMenu>
                   {recentEntries.map(({ entity, recent }) => {
-                    const label =
-                      recent.entityType === 'note' ? noteFileName(entity) : entity.title;
+                    const label = noteFileName(entity);
                     return (
-                      <SidebarMenuItem key={`${recent.entityType}:${recent.entityId}`}>
+                      <SidebarMenuItem key={recent.entityId}>
                         <SidebarMenuButton tooltip={label} onClick={() => model.openEntity(entity)}>
-                          {recent.entityType === 'note' ? (
-                            <IconFile aria-hidden="true" />
-                          ) : (
-                            <IconCircleCheck aria-hidden="true" />
-                          )}
+                          <IconFile aria-hidden="true" />
                           <span>{label}</span>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
