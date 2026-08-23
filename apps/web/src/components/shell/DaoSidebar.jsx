@@ -190,19 +190,40 @@ function PrimaryNavItem({ active, item, onSelect }) {
         // rounded-full has to reach the inset ring as well, or the pill keeps a
         // rectangular highlight inside a round border.
         'rounded-full before:rounded-full',
+        // gap-0 so a collapsed label contributes no width at all; the spacing
+        // it needs when open lives inside it instead.
+        'gap-0 transition-[padding,background-color,color] duration-200 ease-shell',
         // The sidebar colours its own selection and hover, and this row sits in
         // it: --secondary belongs to the workspace surface and reads as a
         // different material here.
         'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-        active && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground',
+        active
+          ? 'bg-sidebar-accent px-[calc(--spacing(2.5)-1px)] font-medium text-sidebar-accent-foreground'
+          : 'px-[calc(--spacing(1.5)-1px)]',
       )}
       disabled={item.disabled}
-      size={active ? 'sm' : 'icon-sm'}
+      size="sm"
       variant="ghost"
       onClick={onSelect}
     >
       <item.icon aria-hidden="true" />
-      {active ? <span>{item.label}</span> : null}
+      {/* 0fr to 1fr animates to the label's own width, which a max-width
+          cannot: any fixed ceiling finishes the visible growth early. */}
+      <span
+        className={cn(
+          'grid transition-[grid-template-columns,opacity] duration-200 ease-shell',
+          active ? 'grid-cols-[1fr] opacity-100' : 'grid-cols-[0fr] opacity-0',
+        )}
+      >
+        {/* Clipped to nothing is not something anyone can perceive, so it
+            leaves the accessibility tree too — aria-label carries the name. */}
+        <span
+          aria-hidden={active ? undefined : 'true'}
+          className="overflow-hidden whitespace-nowrap ps-1.5"
+        >
+          {item.label}
+        </span>
+      </span>
     </Button>
   );
 
@@ -661,7 +682,11 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
           keeps the same x as the one in SidebarRevealSlot. */}
         <SidebarHeader className="gap-0 p-0">
           <div aria-hidden="true" className="app-drag-region me-12 h-12 shrink-0" />
-          <div className="px-2 pb-2">
+          {/* The workspace and the view it is showing belong together and stay
+              put: SidebarContent scrolls, SidebarHeader does not, so living
+              here is what pins them rather than a sticky offset. gap-1 is the
+              sidebar's own rhythm between rows. */}
+          <div className="flex flex-col gap-1 px-2 pb-2">
             <SidebarMenu>
               <SidebarMenuItem>
                 <Menu>
@@ -688,31 +713,26 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
                 </Menu>
               </SidebarMenuItem>
             </SidebarMenu>
+            {/* Only the current view spells itself out; the rest stay icons.
+                The row reads as one control that way, and the label is the
+                thing that says where you are. */}
+            <nav aria-label="Primary" className="flex items-center gap-1">
+              {NAV_ITEMS.map((item) => (
+                <PrimaryNavItem
+                  key={item.id}
+                  active={model.activeView === item.id}
+                  item={item}
+                  onSelect={() => {
+                    if (item.id === 'home') model.openHome();
+                    else if (!item.disabled) model.setActiveView(item.id);
+                  }}
+                />
+              ))}
+            </nav>
           </div>
         </SidebarHeader>
 
         <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              {/* Only the current view spells itself out; the rest stay icons.
-                  The row reads as one control that way, and the label is the
-                  thing that says where you are. */}
-              <nav aria-label="Primary" className="flex items-center gap-1">
-                {NAV_ITEMS.map((item) => (
-                  <PrimaryNavItem
-                    key={item.id}
-                    active={model.activeView === item.id}
-                    item={item}
-                    onSelect={() => {
-                      if (item.id === 'home') model.openHome();
-                      else if (!item.disabled) model.setActiveView(item.id);
-                    }}
-                  />
-                ))}
-              </nav>
-            </SidebarGroupContent>
-          </SidebarGroup>
-
           {recentEntries.length > 0 && (
             <SidebarGroup>
               <SidebarGroupLabel>Recents</SidebarGroupLabel>

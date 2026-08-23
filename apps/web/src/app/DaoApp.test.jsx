@@ -91,19 +91,28 @@ describe('DaoApp shell', () => {
   it('labels only the current view in the primary navigation', () => {
     render(<DaoApp />);
 
-    const nav = within(screen.getByRole('navigation', { name: 'Primary' }));
+    const navElement = screen.getByRole('navigation', { name: 'Primary' });
+    const nav = within(navElement);
+
+    // It sits with the workspace switcher in the header, which is outside the
+    // scrolling region — moving it back under SidebarContent would make it
+    // scroll away with the tree.
+    expect(navElement.closest('[data-slot=sidebar-header]')).not.toBeNull();
+    expect(navElement.closest('[data-slot=sidebar-content]')).toBeNull();
 
     // The label is what says where you are, so exactly one item carries text.
     const current = nav.getByRole('button', { name: 'Home' });
     expect(current).toHaveTextContent('Home');
     expect(current).toHaveAttribute('aria-current', 'page');
 
-    // The rest are icons, which are not names — they stay reachable by name for
-    // keyboard and screen reader users even with nothing rendered to read.
+    // The rest read as icons. Their labels stay mounted so the pill can animate
+    // between the two states, but text clipped to zero width is not something
+    // anyone can perceive, so it is hidden from assistive technology too — the
+    // name comes from aria-label either way.
     for (const label of ['Tasks', 'Chats', 'Search']) {
       const item = nav.getByRole('button', { name: label });
-      expect(item).toHaveTextContent('');
       expect(item).not.toHaveAttribute('aria-current');
+      expect(within(item).getByText(label)).toHaveAttribute('aria-hidden', 'true');
     }
   });
 

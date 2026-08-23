@@ -3,14 +3,15 @@
 Plans produced by `improve-animations`. Each is self-contained: an executor with
 no context should be able to run one without further instruction.
 
-| # | Title | Severity | Status |
-| --- | --- | --- | --- |
-| [001](001-sidebar-peek-to-docked-material.md) | Ease the sidebar's material and shadow between peeked and docked | MEDIUM | DONE (deviated) |
+| #   | Title                                                           | Severity | Status          |
+| --- | --------------------------------------------------------------- | -------- | --------------- |
+| [001](001-sidebar-peek-to-docked-material.md) | Ease the sidebar's material and shadow between peeked and docked | MEDIUM | DONE (deviated) |
+| [002](002-primary-nav-pill-morph.md) | Morph the primary nav pill instead of swapping it | MEDIUM | DONE (deviated) |
 
 ## Execution order
 
-001 stands alone — no dependencies. It shipped with a deviation; the plan
-records what changed and why.
+Both stand alone — no dependencies between them. 001 shipped with a deviation;
+the plan records what changed and why.
 
 ## Motion conventions in this repo
 
