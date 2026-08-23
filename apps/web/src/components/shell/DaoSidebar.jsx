@@ -75,19 +75,32 @@ const NAV_ITEMS = [
 // anywhere else, and lets a drop target check the payload during dragover —
 // where getData() is deliberately blank.
 const NOTE_DRAG_TYPE = 'application/x-dao-note-id';
+const FOLDER_DRAG_TYPE = 'application/x-dao-folder-id';
 
 /**
- * Wiring for a row that accepts a dropped note. `onDropNote` receives the note
- * id; the caller decides which folder that means.
+ * Wiring for a row that accepts a dropped note or folder. The callbacks receive
+ * the dragged id; the caller decides which destination folder that means.
+ *
+ * `selfId` is the folder doing the accepting, so it can refuse itself — the
+ * service rejects a folder moved inside itself, but the row should not invite
+ * the gesture in the first place.
  */
-function useNoteDropTarget(onDropNote) {
+function useTreeDropTarget({ selfId, onDropNote, onDropFolder }) {
   const [over, setOver] = useState(false);
+
+  const accepts = (event) => {
+    const { types } = event.dataTransfer;
+    if (types.includes(NOTE_DRAG_TYPE)) return true;
+    // getData is blank during dragover, so a folder cannot be identified yet —
+    // only whether one is being dragged at all.
+    return Boolean(onDropFolder) && types.includes(FOLDER_DRAG_TYPE);
+  };
 
   return {
     over,
     props: {
       onDragEnter: (event) => {
-        if (!event.dataTransfer.types.includes(NOTE_DRAG_TYPE)) return;
+        if (!accepts(event)) return;
         event.preventDefault();
         setOver(true);
       },
@@ -98,16 +111,31 @@ function useNoteDropTarget(onDropNote) {
         setOver(false);
       },
       onDragOver: (event) => {
-        if (!event.dataTransfer.types.includes(NOTE_DRAG_TYPE)) return;
+        if (!accepts(event)) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
       },
       onDrop: (event) => {
-        const noteId = event.dataTransfer.getData(NOTE_DRAG_TYPE);
         setOver(false);
-        if (!noteId) return;
+
+        // Rows nest, and drop bubbles. Whichever row is innermost owns the
+        // drop; without stopping it here every ancestor would handle the same
+        // drop too and the item would land in the outermost one.
+        const noteId = event.dataTransfer.getData(NOTE_DRAG_TYPE);
+        if (noteId) {
+          event.preventDefault();
+          event.stopPropagation();
+          onDropNote(noteId);
+          return;
+        }
+
+        const folderId = event.dataTransfer.getData(FOLDER_DRAG_TYPE);
+        if (!folderId || !onDropFolder) return;
         event.preventDefault();
-        onDropNote(noteId);
+        event.stopPropagation();
+        // Dropping a folder on itself is a no-op, not a move to its parent.
+        if (folderId === selfId) return;
+        onDropFolder(folderId);
       },
     },
   };
@@ -256,6 +284,7 @@ function ProjectFolder({
   onRename,
   onRenameNote,
   onDeleteNote,
+  onDropFolder,
   onDropNote,
 }) {
   const revealed = revealedProjectId === project.id;
@@ -265,7 +294,21 @@ function ProjectFolder({
   const [renameOpen, setRenameOpen] = useState(false);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const drop = useNoteDropTarget((noteId) => onDropNote(noteId, project.id));
+  const drop = useTreeDropTarget({
+    selfId: project.id,
+    onDropNote: (noteId) => onDropNote(noteId, project.id),
+    onDropFolder: (folderId) => onDropFolder(folderId, project.id),
+  });
+  const dragProps = {
+    draggable: true,
+    onDragStart: (event) => {
+      // A folder drag must not also read as a drag of the rows inside it.
+      event.stopPropagation();
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData(FOLDER_DRAG_TYPE, project.id);
+      event.dataTransfer.setData('text/plain', project.name);
+    },
+  };
   const isEmpty = projectNotes.length === 0 && childFolders.length === 0;
 
   return (
@@ -279,6 +322,7 @@ function ProjectFolder({
                   <SidebarMenuButton
                     className={cn(drop.over && 'bg-sidebar-accent ring-2 ring-sidebar-ring')}
                     isActive={revealed}
+                    render={<button type="button" {...dragProps} />}
                     {...drop.props}
                   />
                 }
@@ -327,6 +371,7 @@ function ProjectFolder({
                   onCreateNote={onCreateNote}
                   onDelete={onDelete}
                   onDeleteNote={onDeleteNote}
+                  onDropFolder={onDropFolder}
                   onDropNote={onDropNote}
                   onOpenNote={onOpenNote}
                   onRename={onRename}
@@ -483,7 +528,15 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
     const note = model.notes.find((item) => item.id === noteId);
     if (note) model.moveNote(note, projectId);
   };
-  const rootDrop = useNoteDropTarget((noteId) => moveNoteById(noteId, null));
+  const moveFolderById = (folderId, parentId) => {
+    const folder = model.projects.find((item) => item.id === folderId);
+    if (folder) model.moveProject(folder, parentId);
+  };
+  const rootDrop = useTreeDropTarget({
+    selfId: null,
+    onDropNote: (noteId) => moveNoteById(noteId, null),
+    onDropFolder: (folderId) => moveFolderById(folderId, null),
+  });
   const activeNoteId = model.selectedEntity?.type === 'note' ? model.selectedEntity.id : '';
 
   return (
@@ -627,6 +680,7 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
                     onCreateNote={(projectId) => model.addNote({ projectId })}
                     onDelete={model.removeProject}
                     onDeleteNote={model.removeNote}
+                    onDropFolder={moveFolderById}
                     onDropNote={moveNoteById}
                     onOpenNote={model.openEntity}
                     onRename={model.renameProject}

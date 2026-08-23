@@ -226,6 +226,24 @@ export function useDaoWorkspace() {
     return project;
   }
 
+  // parentId is null for the workspace root, so it is passed through as-is.
+  // The whole set is refetched because moving a folder moves every path
+  // underneath it, not just this row.
+  async function moveProject(project, parentId) {
+    if ((project.parentId ?? null) === parentId) return;
+    try {
+      await updateProject(project.id, { parentId });
+      await refreshData();
+      if (parentId) setRevealedProjectId(parentId);
+    } catch (moveError) {
+      toastManager.add({
+        type: 'error',
+        title: 'Could not move folder',
+        description: messageFrom(moveError, 'The folder was left where it was.'),
+      });
+    }
+  }
+
   async function renameProject(project, name) {
     const updated = await updateProject(project.id, { name });
     setProjects((current) => current.map((item) => (item.id === updated.id ? updated : item)));
@@ -381,6 +399,7 @@ export function useDaoWorkspace() {
     revealSearchResult,
     addProject,
     renameProject,
+    moveProject,
     removeProject,
     addNote,
     renameNote,

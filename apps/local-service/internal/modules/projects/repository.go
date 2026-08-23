@@ -19,6 +19,10 @@ import (
 // folder, which both surface as sql.ErrNoRows otherwise.
 var ErrParentNotFound = errors.New("parent project not found")
 
+// ErrParentCycle guards the one move that cannot be represented on disk: a
+// folder cannot be placed inside itself or inside its own descendant.
+var ErrParentCycle = errors.New("project cannot be moved inside itself")
+
 type Repository struct {
 	db       *sql.DB
 	indexer  search.Indexer
@@ -186,11 +190,33 @@ func (r *Repository) Update(id string, req UpdateProjectRequest) (Project, error
 		project.Description = *req.Description
 	}
 
-	// The name is the directory name, so renaming a folder has to move it. One
-	// os.Rename carries every descendant file with it; only the paths recorded
-	// for those descendants have to be caught up afterwards.
+	// The name is the directory name and the parent is the directory it sits
+	// in, so renaming and reparenting are the same operation: recompute the
+	// path. One os.Rename carries every descendant file with it; only the paths
+	// recorded for those descendants have to be caught up afterwards.
 	previousPath := project.FolderPath
-	nextPath := files.ProjectFolderPath(filepath.Dir(previousPath), project.Name, project.ID)
+	parentDir := filepath.Dir(previousPath)
+
+	if req.ParentID.Set {
+		if req.ParentID.Value != nil && *req.ParentID.Value == project.ID {
+			return Project{}, ErrParentCycle
+		}
+
+		project.ParentID = req.ParentID.Value
+
+		parentDir, err = r.folderParentPath(project.WorkspaceID, project.ParentID)
+		if err != nil {
+			return Project{}, err
+		}
+
+		// Comparing paths catches a move into any descendant, not just a direct
+		// child, without walking the tree.
+		if parentDir == previousPath || strings.HasPrefix(parentDir, previousPath+string(os.PathSeparator)) {
+			return Project{}, ErrParentCycle
+		}
+	}
+
+	nextPath := files.ProjectFolderPath(parentDir, project.Name, project.ID)
 	moved := nextPath != previousPath
 
 	if moved {
@@ -216,9 +242,9 @@ func (r *Repository) Update(id string, req UpdateProjectRequest) (Project, error
 
 	result, err := tx.Exec(`
 		UPDATE projects
-		SET name = ?, description = ?, folder_path = ?, updated_at = ?, version = version + 1, sync_status = 'local'
+		SET name = ?, description = ?, parent_id = ?, folder_path = ?, updated_at = ?, version = version + 1, sync_status = 'local'
 		WHERE id = ? AND deleted_at IS NULL
-	`, project.Name, project.Description, project.FolderPath, now, id)
+	`, project.Name, project.Description, project.ParentID, project.FolderPath, now, id)
 	if err != nil {
 		return Project{}, err
 	}

@@ -176,6 +176,79 @@ func TestRepositoryUpdateMovesFolderAndCatchesUpDescendantPaths(t *testing.T) {
 	}
 }
 
+func TestRepositoryUpdateReparentsFolderAndRejectsCycles(t *testing.T) {
+	db := openProjectsTestDB(t)
+	workspaceRoot := t.TempDir()
+	insertProjectsTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, search.NewRepository(db), activities.NewRepository(db))
+
+	outer, err := repo.Create(CreateProjectRequest{WorkspaceID: "workspace-1", Name: "Compiler"})
+	if err != nil {
+		t.Fatalf("create outer: %v", err)
+	}
+
+	inner, err := repo.Create(CreateProjectRequest{
+		WorkspaceID: "workspace-1",
+		ParentID:    &outer.ID,
+		Name:        "Parser",
+	})
+	if err != nil {
+		t.Fatalf("create inner: %v", err)
+	}
+
+	loose, err := repo.Create(CreateProjectRequest{WorkspaceID: "workspace-1", Name: "Notes"})
+	if err != nil {
+		t.Fatalf("create loose: %v", err)
+	}
+
+	moved, err := repo.Update(loose.ID, UpdateProjectRequest{
+		ParentID: OptionalParentID{Set: true, Value: &inner.ID},
+	})
+	if err != nil {
+		t.Fatalf("move folder: %v", err)
+	}
+
+	if filepath.Dir(moved.FolderPath) != inner.FolderPath {
+		t.Fatalf("dir = %q, want %q", filepath.Dir(moved.FolderPath), inner.FolderPath)
+	}
+
+	if _, err := os.Stat(loose.FolderPath); !os.IsNotExist(err) {
+		t.Fatalf("old folder left behind at %q, stat err = %v", loose.FolderPath, err)
+	}
+
+	// An explicit null takes it back out to the workspace root.
+	atRoot, err := repo.Update(loose.ID, UpdateProjectRequest{
+		ParentID: OptionalParentID{Set: true, Value: nil},
+	})
+	if err != nil {
+		t.Fatalf("move folder to root: %v", err)
+	}
+
+	if filepath.Dir(atRoot.FolderPath) != workspaceRoot {
+		t.Fatalf("dir = %q, want %q", filepath.Dir(atRoot.FolderPath), workspaceRoot)
+	}
+
+	// Into itself.
+	if _, err := repo.Update(outer.ID, UpdateProjectRequest{
+		ParentID: OptionalParentID{Set: true, Value: &outer.ID},
+	}); !errors.Is(err, ErrParentCycle) {
+		t.Fatalf("self-move err = %v, want ErrParentCycle", err)
+	}
+
+	// Into its own descendant, which is the case a direct-child check misses.
+	if _, err := repo.Update(outer.ID, UpdateProjectRequest{
+		ParentID: OptionalParentID{Set: true, Value: &inner.ID},
+	}); !errors.Is(err, ErrParentCycle) {
+		t.Fatalf("descendant-move err = %v, want ErrParentCycle", err)
+	}
+
+	// A rejected move must leave the folder exactly where it was.
+	if _, err := os.Stat(outer.FolderPath); err != nil {
+		t.Fatalf("outer folder disturbed at %q: %v", outer.FolderPath, err)
+	}
+}
+
 func TestRepositoryCreateRejectsUnknownParent(t *testing.T) {
 	db := openProjectsTestDB(t)
 	insertProjectsTestWorkspace(t, db, "workspace-1", t.TempDir())

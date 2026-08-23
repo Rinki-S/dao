@@ -29,6 +29,9 @@ export const CreateProjectInputSchema = z.object({
 export const UpdateProjectInputSchema = z.object({
   name: z.string().trim().min(1, { error: 'Project name is required' }).optional(),
   description: z.string().trim().optional(),
+  // null moves the folder to the workspace root, so it has to stay
+  // distinguishable from the key being absent.
+  parentId: z.string().min(1, { error: 'Project parentId is required' }).nullable().optional(),
 });
 
 export const DeleteProjectInputSchema = z.object({

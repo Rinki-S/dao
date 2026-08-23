@@ -59,6 +59,7 @@ const mocks = vi.hoisted(() => ({
     openEntity: vi.fn(),
     addProject: vi.fn(),
     renameProject: vi.fn(),
+    moveProject: vi.fn(),
     removeProject: vi.fn(),
     addNote: vi.fn(),
     renameNote: vi.fn(),
@@ -118,6 +119,9 @@ describe('DaoApp shell', () => {
     fireEvent.dragOver(folder, { dataTransfer });
     fireEvent.drop(folder, { dataTransfer });
 
+    // Exactly once: rows nest, so a drop that bubbled would be handled again
+    // by every ancestor row and the note would land in the outermost one.
+    expect(mocks.model.moveNote).toHaveBeenCalledTimes(1);
     expect(mocks.model.moveNote).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'note-1' }),
       'project-1',
@@ -137,6 +141,40 @@ describe('DaoApp shell', () => {
     await user.click(child);
 
     expect(screen.getByRole('button', { name: 'Recovery' })).toBeInTheDocument();
+  });
+
+  it('moves a folder into the folder it is dropped on, but never into itself', () => {
+    render(<DaoApp />);
+
+    const parent = screen.getByRole('button', { name: 'Compiler Lab' });
+    const child = screen.getByRole('button', { name: 'Parser' });
+
+    const carried = new Map();
+    const dataTransfer = {
+      effectAllowed: '',
+      dropEffect: '',
+      get types() {
+        return [...carried.keys()];
+      },
+      setData: (type, value) => carried.set(type, value),
+      getData: (type) => carried.get(type) ?? '',
+    };
+
+    fireEvent.dragStart(child, { dataTransfer });
+    fireEvent.drop(parent, { dataTransfer });
+
+    expect(mocks.model.moveProject).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'project-2' }),
+      'project-1',
+    );
+
+    // Dropping a folder on itself is refused by the row, so the service never
+    // has to answer for a move it would reject anyway.
+    mocks.model.moveProject.mockClear();
+    fireEvent.dragStart(child, { dataTransfer });
+    fireEvent.drop(child, { dataTransfer });
+
+    expect(mocks.model.moveProject).not.toHaveBeenCalled();
   });
 
   it('treats project rows as folders and routes Tasks through primary navigation', async () => {
