@@ -10,7 +10,11 @@ const mocks = vi.hoisted(() => ({
     workingDirectory: { configured: true, path: '/tmp/dao' },
     workspaces: [{ id: 'workspace-1', name: 'Personal', rootPath: '/tmp/dao/personal' }],
     currentWorkspace: { id: 'workspace-1', name: 'Personal', rootPath: '/tmp/dao/personal' },
-    projects: [{ id: 'project-1', workspaceId: 'workspace-1', name: 'Compiler Lab' }],
+    projects: [
+      { id: 'project-1', workspaceId: 'workspace-1', parentId: null, name: 'Compiler Lab' },
+      { id: 'project-2', workspaceId: 'workspace-1', parentId: 'project-1', name: 'Parser' },
+      { id: 'project-3', workspaceId: 'workspace-1', parentId: 'project-2', name: 'Recovery' },
+    ],
     notes: [
       {
         id: 'note-1',
@@ -118,6 +122,21 @@ describe('DaoApp shell', () => {
       expect.objectContaining({ id: 'note-1' }),
       'project-1',
     );
+  });
+
+  it('nests folders inside their parent to any depth', async () => {
+    const user = userEvent.setup();
+    render(<DaoApp />);
+
+    // The first folder opens by default, so its child folder is already there.
+    const child = screen.getByRole('button', { name: 'Parser' });
+    expect(screen.queryByRole('button', { name: 'Recovery' })).not.toBeInTheDocument();
+
+    // Opening it reveals a third level, which only happens if a folder row
+    // renders folder rows itself rather than stopping at a fixed depth.
+    await user.click(child);
+
+    expect(screen.getByRole('button', { name: 'Recovery' })).toBeInTheDocument();
   });
 
   it('treats project rows as folders and routes Tasks through primary navigation', async () => {

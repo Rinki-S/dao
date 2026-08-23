@@ -243,10 +243,13 @@ function NoteRow({ active, nested = false, note, onOpen, onRename, onDelete }) {
 
 function ProjectFolder({
   activeNoteId,
+  childFolders,
   defaultOpen,
+  notesByProject,
   project,
   projectNotes,
-  revealed,
+  revealedProjectId,
+  onCreateFolder,
   onCreateNote,
   onDelete,
   onOpenNote,
@@ -255,12 +258,15 @@ function ProjectFolder({
   onDeleteNote,
   onDropNote,
 }) {
+  const revealed = revealedProjectId === project.id;
   const [open, setOpen] = useState(
     defaultOpen || revealed || projectNotes.some((note) => note.id === activeNoteId),
   );
   const [renameOpen, setRenameOpen] = useState(false);
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const drop = useNoteDropTarget((noteId) => onDropNote(noteId, project.id));
+  const isEmpty = projectNotes.length === 0 && childFolders.length === 0;
 
   return (
     <>
@@ -291,6 +297,10 @@ function ProjectFolder({
                 <IconPlus aria-hidden="true" />
                 New note
               </ContextMenuItem>
+              <ContextMenuItem onClick={() => setNewFolderOpen(true)}>
+                <IconFolderPlus aria-hidden="true" />
+                New folder
+              </ContextMenuItem>
               <ContextMenuItem onClick={() => setRenameOpen(true)}>Rename folder</ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
@@ -301,6 +311,28 @@ function ProjectFolder({
           </ContextMenu>
           <CollapsiblePanel>
             <SidebarMenuSub>
+              {/* Folders before notes, and folders render themselves, so depth
+                  is whatever the data says rather than a fixed two levels. */}
+              {childFolders.map((child) => (
+                <ProjectFolder
+                  key={child.id}
+                  activeNoteId={activeNoteId}
+                  childFolders={child.children}
+                  defaultOpen={false}
+                  notesByProject={notesByProject}
+                  project={child}
+                  projectNotes={notesByProject.get(child.id) ?? []}
+                  revealedProjectId={revealedProjectId}
+                  onCreateFolder={onCreateFolder}
+                  onCreateNote={onCreateNote}
+                  onDelete={onDelete}
+                  onDeleteNote={onDeleteNote}
+                  onDropNote={onDropNote}
+                  onOpenNote={onOpenNote}
+                  onRename={onRename}
+                  onRenameNote={onRenameNote}
+                />
+              ))}
               {projectNotes.map((note) => (
                 <NoteRow
                   key={note.id}
@@ -312,7 +344,7 @@ function ProjectFolder({
                   onRename={onRenameNote}
                 />
               ))}
-              {projectNotes.length === 0 ? (
+              {isEmpty ? (
                 <SidebarMenuSubItem>
                   <SidebarMenuSubButton
                     render={<button type="button" />}
@@ -327,6 +359,13 @@ function ProjectFolder({
           </CollapsiblePanel>
         </SidebarMenuItem>
       </Collapsible>
+      <NameDialog
+        label="Folder name"
+        open={newFolderOpen}
+        title={`New folder in ${project.name}`}
+        onOpenChange={setNewFolderOpen}
+        onSubmit={(name) => onCreateFolder(name, project.id)}
+      />
       <NameDialog
         initialValue={project.name}
         label="Folder name"
@@ -390,6 +429,28 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
     return map;
   }, [model.notes, model.projects]);
   const rootNotes = model.notes.filter((note) => note.projectId === null);
+  // Folders arrive flat with a parentId; the tree is assembled once here so
+  // every level renders from the same shape.
+  const folderTree = useMemo(() => {
+    const children = new Map();
+    for (const project of model.projects) children.set(project.id, []);
+
+    const roots = [];
+    for (const project of model.projects) {
+      const siblings = children.get(project.parentId);
+      // A folder whose parent is missing would otherwise vanish from the tree,
+      // so it falls back to the root rather than being dropped.
+      if (project.parentId && siblings) siblings.push(project);
+      else roots.push(project);
+    }
+
+    const attach = (project) => ({
+      ...project,
+      children: (children.get(project.id) ?? []).map(attach),
+    });
+
+    return roots.map(attach);
+  }, [model.projects]);
   // Resolved up front: an entry whose entity is gone must not count towards the
   // five shown, and must not leave the group rendering an empty list. What is
   // open is dropped too — it is already on screen and marked in the tree, so
@@ -552,14 +613,17 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
               {...rootDrop.props}
             >
               <SidebarMenu>
-                {model.projects.map((project, index) => (
+                {folderTree.map((project, index) => (
                   <ProjectFolder
                     key={project.id}
                     activeNoteId={activeNoteId}
+                    childFolders={project.children}
                     defaultOpen={index === 0}
+                    notesByProject={notesByProject}
                     project={project}
                     projectNotes={notesByProject.get(project.id) ?? []}
-                    revealed={model.revealedProjectId === project.id}
+                    revealedProjectId={model.revealedProjectId}
+                    onCreateFolder={(name, parentId) => model.addProject({ name, parentId })}
                     onCreateNote={(projectId) => model.addNote({ projectId })}
                     onDelete={model.removeProject}
                     onDeleteNote={model.removeNote}

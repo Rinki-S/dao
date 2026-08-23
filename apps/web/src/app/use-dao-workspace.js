@@ -216,6 +216,7 @@ export function useDaoWorkspace() {
   async function addProject(input) {
     const project = await createProject({
       workspaceId: currentWorkspace.id,
+      parentId: input.parentId ?? null,
       name: input.name,
       description: input.description ?? '',
     });

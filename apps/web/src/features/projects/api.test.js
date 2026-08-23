@@ -5,6 +5,7 @@ function projectResponse(overrides = {}) {
   return {
     id: 'project-1',
     workspaceId: 'workspace-1',
+    parentId: null,
     name: 'Dao Project',
     description: '',
     folderPath: '/tmp/dao-test/dao-project',
