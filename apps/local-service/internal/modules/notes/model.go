@@ -1,5 +1,7 @@
 package notes
 
+import "encoding/json"
+
 type Note struct {
 	ID          string  `json:"id"`
 	WorkspaceID string  `json:"workspaceId"`
@@ -30,6 +32,20 @@ type UpdateNoteContentRequest struct {
 }
 
 type UpdateNoteRequest struct {
-	Title    *string `json:"title"`
-	NoteType *string `json:"noteType"`
+	Title     *string           `json:"title"`
+	NoteType  *string           `json:"noteType"`
+	ProjectID OptionalProjectID `json:"projectId"`
+}
+
+// OptionalProjectID tells "leave the folder alone" apart from "move to the
+// workspace root", which a *string cannot: both arrive as nil.
+type OptionalProjectID struct {
+	Set   bool
+	Value *string
+}
+
+func (o *OptionalProjectID) UnmarshalJSON(data []byte) error {
+	o.Set = true
+
+	return json.Unmarshal(data, &o.Value)
 }

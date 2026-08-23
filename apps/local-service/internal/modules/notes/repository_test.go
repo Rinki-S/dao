@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -279,6 +280,107 @@ func TestRepositoryUpdateMovesMarkdownFileWhenTitleChanges(t *testing.T) {
 	if storedPath != wantPath {
 		t.Fatalf("stored file_path = %q, want %q", storedPath, wantPath)
 	}
+}
+
+func TestRepositoryUpdateMovesMarkdownFileIntoAndOutOfAFolder(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+	projectRoot := filepath.Join(workspaceRoot, "dao-project-project-1")
+
+	if err := os.MkdirAll(projectRoot, 0755); err != nil {
+		t.Fatalf("create project root: %v", err)
+	}
+
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+	insertNotesTestProject(t, db, "project-1", "workspace-1", projectRoot)
+
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+
+	createdNote, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		Title:       "Loose Note",
+		Content:     "Markdown body",
+		ContentType: "markdown",
+		NoteType:    "general",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	projectID := "project-1"
+	inFolder, err := repo.Update(createdNote.ID, UpdateNoteRequest{
+		ProjectID: OptionalProjectID{Set: true, Value: &projectID},
+	})
+	if err != nil {
+		t.Fatalf("move note into folder: %v", err)
+	}
+
+	if filepath.Dir(inFolder.FilePath) != projectRoot {
+		t.Fatalf("FilePath dir = %q, want %q", filepath.Dir(inFolder.FilePath), projectRoot)
+	}
+
+	if inFolder.ProjectID == nil || *inFolder.ProjectID != "project-1" {
+		t.Fatalf("ProjectID = %v, want project-1", inFolder.ProjectID)
+	}
+
+	if _, err := os.Stat(createdNote.FilePath); !os.IsNotExist(err) {
+		t.Fatalf("file left behind at %q, stat err = %v", createdNote.FilePath, err)
+	}
+
+	assertFileContent(t, inFolder.FilePath, "Markdown body")
+
+	// An explicit null moves it back out — the case a plain *string could not
+	// express, since an absent field arrives the same way.
+	atRoot, err := repo.Update(createdNote.ID, UpdateNoteRequest{
+		ProjectID: OptionalProjectID{Set: true, Value: nil},
+	})
+	if err != nil {
+		t.Fatalf("move note to workspace root: %v", err)
+	}
+
+	if filepath.Dir(atRoot.FilePath) != workspaceRoot {
+		t.Fatalf("FilePath dir = %q, want %q", filepath.Dir(atRoot.FilePath), workspaceRoot)
+	}
+
+	if atRoot.ProjectID != nil {
+		t.Fatalf("ProjectID = %v, want nil", *atRoot.ProjectID)
+	}
+
+	if _, err := os.Stat(inFolder.FilePath); !os.IsNotExist(err) {
+		t.Fatalf("file left behind at %q, stat err = %v", inFolder.FilePath, err)
+	}
+
+	assertFileContent(t, atRoot.FilePath, "Markdown body")
+}
+
+func TestRepositoryUpdateRejectsUnknownFolder(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+
+	createdNote, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		Title:       "Loose Note",
+		Content:     "Markdown body",
+		ContentType: "markdown",
+		NoteType:    "general",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	missing := "project-does-not-exist"
+	if _, err := repo.Update(createdNote.ID, UpdateNoteRequest{
+		ProjectID: OptionalProjectID{Set: true, Value: &missing},
+	}); !errors.Is(err, ErrProjectNotFound) {
+		t.Fatalf("err = %v, want ErrProjectNotFound", err)
+	}
+
+	// The note must be untouched, not half-moved.
+	assertFileContent(t, createdNote.FilePath, "Markdown body")
 }
 
 func TestRepositoryUpdateKeepsFilePathWhenTitleIsUnchanged(t *testing.T) {
