@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DaoApp } from './DaoApp.jsx';
@@ -86,6 +86,25 @@ describe('DaoApp shell', () => {
     expect(screen.getByText('Editor note-1')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Home' })).not.toBeInTheDocument();
+  });
+
+  it('labels only the current view in the primary navigation', () => {
+    render(<DaoApp />);
+
+    const nav = within(screen.getByRole('navigation', { name: 'Primary' }));
+
+    // The label is what says where you are, so exactly one item carries text.
+    const current = nav.getByRole('button', { name: 'Home' });
+    expect(current).toHaveTextContent('Home');
+    expect(current).toHaveAttribute('aria-current', 'page');
+
+    // The rest are icons, which are not names — they stay reachable by name for
+    // keyboard and screen reader users even with nothing rendered to read.
+    for (const label of ['Tasks', 'Chats', 'Search']) {
+      const item = nav.getByRole('button', { name: label });
+      expect(item).toHaveTextContent('');
+      expect(item).not.toHaveAttribute('aria-current');
+    }
   });
 
   it('keeps the open note out of Recents so only the tree marks it', () => {

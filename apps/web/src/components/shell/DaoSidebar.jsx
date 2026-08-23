@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog.jsx';
 import { Button } from '@/components/ui/button.jsx';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@/components/ui/tooltip.jsx';
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from '@/components/ui/collapsible.jsx';
 import {
   ContextMenu,
@@ -168,6 +169,43 @@ function WorkspaceDropRegion({ children, onDropFolder, onDropNote }) {
     >
       {children}
     </SidebarGroupContent>
+  );
+}
+
+/**
+ * One entry in the primary navigation. The current view is a pill carrying its
+ * label; the others are bare icons, so the row shows where you are without
+ * repeating four names.
+ *
+ * An icon on its own is not a name, so every item keeps `aria-label`, and the
+ * ones without a visible label get a tooltip too — except when disabled, which
+ * takes the button out of the hover and focus path entirely.
+ */
+function PrimaryNavItem({ active, item, onSelect }) {
+  const button = (
+    <Button
+      aria-current={active ? 'page' : undefined}
+      aria-label={item.label}
+      // rounded-full has to reach the inset ring as well, or the pill keeps a
+      // rectangular highlight inside a round border.
+      className="rounded-full before:rounded-full"
+      disabled={item.disabled}
+      size={active ? 'sm' : 'icon-sm'}
+      variant={active ? 'secondary' : 'ghost'}
+      onClick={onSelect}
+    >
+      <item.icon aria-hidden="true" />
+      {active ? <span>{item.label}</span> : null}
+    </Button>
+  );
+
+  if (active || item.disabled) return button;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger delay={300} render={button} />
+      <TooltipPopup>{item.label}</TooltipPopup>
+    </Tooltip>
   );
 }
 
@@ -649,24 +687,22 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupContent>
-              <SidebarMenu>
+              {/* Only the current view spells itself out; the rest stay icons.
+                  The row reads as one control that way, and the label is the
+                  thing that says where you are. */}
+              <nav aria-label="Primary" className="flex items-center gap-1">
                 {NAV_ITEMS.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      disabled={item.disabled}
-                      isActive={model.activeView === item.id}
-                      tooltip={item.disabled ? `${item.label} · Coming later` : item.label}
-                      onClick={() => {
-                        if (item.id === 'home') model.openHome();
-                        else if (!item.disabled) model.setActiveView(item.id);
-                      }}
-                    >
-                      <item.icon aria-hidden="true" />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <PrimaryNavItem
+                    key={item.id}
+                    active={model.activeView === item.id}
+                    item={item}
+                    onSelect={() => {
+                      if (item.id === 'home') model.openHome();
+                      else if (!item.disabled) model.setActiveView(item.id);
+                    }}
+                  />
                 ))}
-              </SidebarMenu>
+              </nav>
             </SidebarGroupContent>
           </SidebarGroup>
 
