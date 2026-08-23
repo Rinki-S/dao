@@ -186,12 +186,19 @@ function PrimaryNavItem({ active, item, onSelect }) {
     <Button
       aria-current={active ? 'page' : undefined}
       aria-label={item.label}
-      // rounded-full has to reach the inset ring as well, or the pill keeps a
-      // rectangular highlight inside a round border.
-      className="rounded-full before:rounded-full"
+      className={cn(
+        // rounded-full has to reach the inset ring as well, or the pill keeps a
+        // rectangular highlight inside a round border.
+        'rounded-full before:rounded-full',
+        // The sidebar colours its own selection and hover, and this row sits in
+        // it: --secondary belongs to the workspace surface and reads as a
+        // different material here.
+        'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+        active && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground',
+      )}
       disabled={item.disabled}
       size={active ? 'sm' : 'icon-sm'}
-      variant={active ? 'secondary' : 'ghost'}
+      variant="ghost"
       onClick={onSelect}
     >
       <item.icon aria-hidden="true" />
