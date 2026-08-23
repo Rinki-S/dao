@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -183,6 +186,28 @@ func (r *Repository) Update(id string, req UpdateProjectRequest) (Project, error
 		project.Description = *req.Description
 	}
 
+	// The name is the directory name, so renaming a folder has to move it. One
+	// os.Rename carries every descendant file with it; only the paths recorded
+	// for those descendants have to be caught up afterwards.
+	previousPath := project.FolderPath
+	nextPath := files.ProjectFolderPath(filepath.Dir(previousPath), project.Name, project.ID)
+	moved := nextPath != previousPath
+
+	if moved {
+		if err := os.Rename(previousPath, nextPath); err != nil {
+			return Project{}, err
+		}
+
+		project.FolderPath = nextPath
+	}
+
+	committed := false
+	defer func() {
+		if moved && !committed {
+			_ = os.Rename(nextPath, previousPath)
+		}
+	}()
+
 	tx, err := r.db.Begin()
 	if err != nil {
 		return Project{}, err
@@ -191,9 +216,9 @@ func (r *Repository) Update(id string, req UpdateProjectRequest) (Project, error
 
 	result, err := tx.Exec(`
 		UPDATE projects
-		SET name = ?, description = ?, updated_at = ?, version = version + 1, sync_status = 'local'
+		SET name = ?, description = ?, folder_path = ?, updated_at = ?, version = version + 1, sync_status = 'local'
 		WHERE id = ? AND deleted_at IS NULL
-	`, project.Name, project.Description, now, id)
+	`, project.Name, project.Description, project.FolderPath, now, id)
 	if err != nil {
 		return Project{}, err
 	}
@@ -224,11 +249,86 @@ func (r *Repository) Update(id string, req UpdateProjectRequest) (Project, error
 		return Project{}, err
 	}
 
+	if moved {
+		if err := rewriteDescendantPaths(tx, project.WorkspaceID, previousPath, nextPath); err != nil {
+			return Project{}, err
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return Project{}, err
 	}
 
+	committed = true
+
 	return project, nil
+}
+
+// rewriteDescendantPaths moves every stored path that lived under previousPath
+// to the same position under nextPath. The directory itself has already been
+// moved by a single os.Rename, so the files are in place and only the rows are
+// behind.
+//
+// The prefix match is done in Go rather than with SQL LIKE because a folder
+// name is user input: a '%' or '_' in a path would silently widen the pattern.
+func rewriteDescendantPaths(tx *sql.Tx, workspaceID string, previousPath string, nextPath string) error {
+	prefix := previousPath + string(os.PathSeparator)
+
+	rewrite := func(table string, column string) error {
+		rows, err := tx.Query(
+			`SELECT id, `+column+` FROM `+table+` WHERE workspace_id = ? AND deleted_at IS NULL`,
+			workspaceID,
+		)
+		if err != nil {
+			return err
+		}
+
+		type move struct {
+			id   string
+			path string
+		}
+
+		moves := []move{}
+
+		for rows.Next() {
+			var id string
+			var path string
+			if err := rows.Scan(&id, &path); err != nil {
+				rows.Close()
+				return err
+			}
+
+			if strings.HasPrefix(path, prefix) {
+				moves = append(moves, move{id: id, path: nextPath + path[len(previousPath):]})
+			}
+		}
+
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return err
+		}
+
+		// Collected first: SQLite will not take writes on this connection while
+		// the read cursor is still open.
+		rows.Close()
+
+		for _, item := range moves {
+			if _, err := tx.Exec(
+				`UPDATE `+table+` SET `+column+` = ? WHERE id = ?`,
+				item.path, item.id,
+			); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	if err := rewrite("projects", "folder_path"); err != nil {
+		return err
+	}
+
+	return rewrite("notes", "file_path")
 }
 
 func (r *Repository) Delete(id string, req DeleteProjectRequest) error {

@@ -103,6 +103,79 @@ func TestRepositoryCreateNestsFolderInsideItsParent(t *testing.T) {
 	}
 }
 
+func TestRepositoryUpdateMovesFolderAndCatchesUpDescendantPaths(t *testing.T) {
+	db := openProjectsTestDB(t)
+	workspaceRoot := t.TempDir()
+	insertProjectsTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, search.NewRepository(db), activities.NewRepository(db))
+
+	parent, err := repo.Create(CreateProjectRequest{WorkspaceID: "workspace-1", Name: "Compiler"})
+	if err != nil {
+		t.Fatalf("create parent: %v", err)
+	}
+
+	child, err := repo.Create(CreateProjectRequest{
+		WorkspaceID: "workspace-1",
+		ParentID:    &parent.ID,
+		Name:        "Parser",
+	})
+	if err != nil {
+		t.Fatalf("create child: %v", err)
+	}
+
+	// A note two levels down: its recorded path has to follow the move even
+	// though nothing touches the note itself.
+	notePath := filepath.Join(child.FolderPath, "notes-note-1.md")
+	if err := os.WriteFile(notePath, []byte("body"), 0644); err != nil {
+		t.Fatalf("write note file: %v", err)
+	}
+	insertProjectsTestNoteAt(t, db, "note-1", "workspace-1", child.ID, "Notes", notePath)
+
+	name := "Compiler Lab"
+	renamed, err := repo.Update(parent.ID, UpdateProjectRequest{Name: &name})
+	if err != nil {
+		t.Fatalf("rename parent: %v", err)
+	}
+
+	if renamed.FolderPath == parent.FolderPath {
+		t.Fatalf("FolderPath unchanged at %q", renamed.FolderPath)
+	}
+
+	if filepath.Base(renamed.FolderPath) != "compiler-lab-"+parent.ID {
+		t.Fatalf("FolderPath base = %q", filepath.Base(renamed.FolderPath))
+	}
+
+	if _, err := os.Stat(parent.FolderPath); !os.IsNotExist(err) {
+		t.Fatalf("old folder left behind at %q, stat err = %v", parent.FolderPath, err)
+	}
+
+	var childPath string
+	if err := db.QueryRow(`SELECT folder_path FROM projects WHERE id = ?`, child.ID).Scan(&childPath); err != nil {
+		t.Fatalf("select child folder_path: %v", err)
+	}
+
+	wantChild := filepath.Join(renamed.FolderPath, filepath.Base(child.FolderPath))
+	if childPath != wantChild {
+		t.Fatalf("child folder_path = %q, want %q", childPath, wantChild)
+	}
+
+	var storedNotePath string
+	if err := db.QueryRow(`SELECT file_path FROM notes WHERE id = 'note-1'`).Scan(&storedNotePath); err != nil {
+		t.Fatalf("select note file_path: %v", err)
+	}
+
+	wantNote := filepath.Join(wantChild, "notes-note-1.md")
+	if storedNotePath != wantNote {
+		t.Fatalf("note file_path = %q, want %q", storedNotePath, wantNote)
+	}
+
+	// The rows are only correct if they point at files that are really there.
+	if _, err := os.Stat(storedNotePath); err != nil {
+		t.Fatalf("note file missing at recorded path %q: %v", storedNotePath, err)
+	}
+}
+
 func TestRepositoryCreateRejectsUnknownParent(t *testing.T) {
 	db := openProjectsTestDB(t)
 	insertProjectsTestWorkspace(t, db, "workspace-1", t.TempDir())
@@ -344,10 +417,16 @@ func insertProjectsTestWorkspace(t *testing.T, db *sql.DB, id string, rootPath s
 func insertProjectsTestProject(t *testing.T, db *sql.DB, id string, workspaceID string, name string, description string) {
 	t.Helper()
 
+	// A real directory, because renaming a folder now moves it.
+	folderPath := filepath.Join(t.TempDir(), id)
+	if err := os.MkdirAll(folderPath, 0755); err != nil {
+		t.Fatalf("create project folder: %v", err)
+	}
+
 	_, err := db.Exec(`
 		INSERT INTO projects (id, workspace_id, name, description, folder_path, status, started_at, ended_at, created_at, updated_at, deleted_at, version, sync_status)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, id, workspaceID, name, description, "/tmp/"+id, "active", nil, nil, "2026-05-26T00:00:00Z", "2026-05-26T00:00:00Z", nil, 1, "local")
+	`, id, workspaceID, name, description, folderPath, "active", nil, nil, "2026-05-26T00:00:00Z", "2026-05-26T00:00:00Z", nil, 1, "local")
 	if err != nil {
 		t.Fatalf("insert project: %v", err)
 	}
@@ -358,6 +437,17 @@ func insertProjectsTestProject(t *testing.T, db *sql.DB, id string, workspaceID 
 	`, id, workspaceID, id, name, description)
 	if err != nil {
 		t.Fatalf("insert project search row: %v", err)
+	}
+}
+
+func insertProjectsTestNoteAt(t *testing.T, db *sql.DB, id string, workspaceID string, projectID string, title string, filePath string) {
+	t.Helper()
+
+	if _, err := db.Exec(`
+		INSERT INTO notes (id, workspace_id, project_id, title, file_path, content_type, note_type, created_at, updated_at, deleted_at, version, sync_status)
+		VALUES (?, ?, ?, ?, ?, 'markdown', 'project', '2026-05-26T00:00:00Z', '2026-05-26T00:00:00Z', NULL, 1, 'local')
+	`, id, workspaceID, projectID, title, filePath); err != nil {
+		t.Fatalf("insert note: %v", err)
 	}
 }
 
