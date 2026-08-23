@@ -190,16 +190,19 @@ function PrimaryNavItem({ active, item, onSelect }) {
         // rounded-full has to reach the inset ring as well, or the pill keeps a
         // rectangular highlight inside a round border.
         'rounded-full before:rounded-full',
-        // gap-0 so a collapsed label contributes no width at all; the spacing
-        // it needs when open lives inside it instead.
-        'gap-0 transition-[padding,background-color,color] duration-200 ease-shell',
+        // The gap is what spaces the label, and it animates to zero with it.
+        // Padding on the label instead would not collapse: a grid item in a 0fr
+        // track still occupies its own padding, which left the button 6px wider
+        // than tall — an oval hover, an off-centre icon, and a strip of
+        // clickable nothing beside it.
+        'transition-[padding,gap,background-color,color] duration-200 ease-shell',
         // The sidebar colours its own selection and hover, and this row sits in
         // it: --secondary belongs to the workspace surface and reads as a
         // different material here.
         'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
         active
-          ? 'bg-sidebar-accent px-[calc(--spacing(2.5)-1px)] font-medium text-sidebar-accent-foreground'
-          : 'px-[calc(--spacing(1.5)-1px)]',
+          ? 'gap-1.5 bg-sidebar-accent px-[calc(--spacing(2.5)-1px)] font-medium text-sidebar-accent-foreground'
+          : 'gap-0 px-[calc(--spacing(1.5)-1px)]',
       )}
       disabled={item.disabled}
       size="sm"
@@ -219,7 +222,7 @@ function PrimaryNavItem({ active, item, onSelect }) {
             leaves the accessibility tree too — aria-label carries the name. */}
         <span
           aria-hidden={active ? undefined : 'true'}
-          className="overflow-hidden whitespace-nowrap ps-1.5"
+          className="overflow-hidden whitespace-nowrap"
         >
           {item.label}
         </span>
@@ -227,12 +230,16 @@ function PrimaryNavItem({ active, item, onSelect }) {
     </Button>
   );
 
-  if (active || item.disabled) return button;
-
+  // The wrapper is unconditional: returning a bare Button for the current view
+  // and a Tooltip for the others changes the element type at this position, so
+  // React would tear the button down and build a new one on every switch. A
+  // fresh node starts at its final style, which is why nothing could animate.
   return (
     <Tooltip>
       <TooltipTrigger delay={300} render={button} />
-      <TooltipPopup>{item.label}</TooltipPopup>
+      {/* Only the popup is conditional. The current view already shows its
+          label, and a disabled item never gets the hover that opens this. */}
+      {!active && !item.disabled ? <TooltipPopup>{item.label}</TooltipPopup> : null}
     </Tooltip>
   );
 }

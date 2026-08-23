@@ -79,7 +79,12 @@ vi.mock('@/features/notes/components/NoteEditorPanel.jsx', () => ({
 }));
 
 describe('DaoApp shell', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // A test that drives a view change edits this, so it is reset rather than
+    // left for whichever test runs next.
+    mocks.model.activeView = 'home';
+  });
 
   it('starts on the most recent note without a standalone home dashboard', () => {
     render(<DaoApp />);
@@ -114,6 +119,23 @@ describe('DaoApp shell', () => {
       expect(item).not.toHaveAttribute('aria-current');
       expect(within(item).getByText(label)).toHaveAttribute('aria-hidden', 'true');
     }
+  });
+
+  it('keeps the same nav button across a view change so it can animate', () => {
+    const { rerender } = render(<DaoApp />);
+
+    const home = screen.getByRole('button', { name: 'Home' });
+    const tasks = screen.getByRole('button', { name: 'Tasks' });
+
+    mocks.model.activeView = 'tasks';
+    rerender(<DaoApp />);
+
+    // Wrapping only the inactive items in a Tooltip would change the element
+    // type at this position, and React would replace the button rather than
+    // update it. A new node starts at its final style, so the pill would jump
+    // however the transition is written.
+    expect(screen.getByRole('button', { name: 'Home' })).toBe(home);
+    expect(screen.getByRole('button', { name: 'Tasks' })).toBe(tasks);
   });
 
   it('keeps the open note out of Recents so only the tree marks it', () => {
