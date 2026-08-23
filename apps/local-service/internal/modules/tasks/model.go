@@ -1,42 +1,15 @@
 package tasks
 
-type Task struct {
-	ID          string  `json:"id"`
-	WorkspaceID string  `json:"workspaceId"`
-	ProjectID   *string `json:"projectId"`
-	ParentID    *string `json:"parentId"`
-	Title       string  `json:"title"`
-	Description string  `json:"description"`
-	Status      string  `json:"status"`
-	Priority    string  `json:"priority"`
-	DueDate     *string `json:"dueDate"`
-	CreatedAt   string  `json:"createdAt"`
-	UpdatedAt   string  `json:"updatedAt"`
-	DeletedAt   *string `json:"deletedAt"`
-	Version     int64   `json:"version"`
-	SyncStatus  string  `json:"syncStatus"`
+// Document is a workspace's whole task list: one Markdown file, edited as
+// text. There is no per-task record — a task is a checkbox line, a subtask is
+// an indented one, and both live only in the file.
+type Document struct {
+	WorkspaceID string `json:"workspaceId"`
+	Content     string `json:"content"`
+	FilePath    string `json:"filePath"`
+	UpdatedAt   string `json:"updatedAt"`
 }
 
-type CreateTaskRequest struct {
-	WorkspaceID string  `json:"workspaceId"`
-	ProjectID   *string `json:"projectId"`
-	ParentID    *string `json:"parentId"`
-	Title       string  `json:"title"`
-	Description string  `json:"description"`
-	Priority    string  `json:"priority"`
-	DueDate     *string `json:"dueDate"`
-}
-
-type UpdateTaskStatusRequest struct {
-	Status string `json:"status"`
-}
-
-type UpdateTaskRequest struct {
-	ProjectID    *string `json:"projectId"`
-	Title        *string `json:"title"`
-	Description  *string `json:"description"`
-	Priority     *string `json:"priority"`
-	DueDate      *string `json:"dueDate"`
-	ProjectIDSet bool    `json:"-"`
-	DueDateSet   bool    `json:"-"`
+type UpdateDocumentRequest struct {
+	Content string `json:"content"`
 }

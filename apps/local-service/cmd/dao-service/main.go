@@ -65,6 +65,12 @@ func main() {
 	taskHandler := tasks.NewHandler(taskRepo)
 	taskHandler.RegisterRoutes(apiMux)
 
+	// Tasks used to be table rows. Their destination is a file, which SQL
+	// cannot write, so this runs here rather than as a goose migration.
+	if err := tasks.MigrateRowsToDocuments(db, taskRepo); err != nil {
+		log.Fatal(err)
+	}
+
 	noteRepo := notes.NewRepository(db, searchRepo, activityRepo)
 	noteHandler := notes.NewHandler(noteRepo)
 	noteHandler.RegisterRoutes(apiMux)
