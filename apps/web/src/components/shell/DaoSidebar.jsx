@@ -150,6 +150,27 @@ function useTreeDropTarget({ id, onDropNote, onDropFolder }) {
   };
 }
 
+/**
+ * The workspace root as a drop region: dropping here is what takes a note or
+ * folder back out of whatever folder it was in.
+ *
+ * It is a component rather than a hook call in DaoSidebar because DaoSidebar
+ * is what provides TreeDropContext, and a component cannot read a context it
+ * provides itself — it would see the default value.
+ */
+function WorkspaceDropRegion({ children, onDropFolder, onDropNote }) {
+  const drop = useTreeDropTarget({ id: null, onDropFolder, onDropNote });
+
+  return (
+    <SidebarGroupContent
+      className={cn('rounded-lg', drop.over && 'bg-sidebar-accent/40')}
+      {...drop.props}
+    >
+      {children}
+    </SidebarGroupContent>
+  );
+}
+
 function noteFileName(note) {
   return note.title.toLowerCase().endsWith('.md') ? note.title : `${note.title}.md`;
 }
@@ -550,11 +571,6 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
     const folder = model.projects.find((item) => item.id === folderId);
     if (folder) model.moveProject(folder, parentId);
   };
-  const rootDrop = useTreeDropTarget({
-    id: null,
-    onDropNote: (noteId) => moveNoteById(noteId, null),
-    onDropFolder: (folderId) => moveFolderById(folderId, null),
-  });
   const activeNoteId = model.selectedEntity?.type === 'note' ? model.selectedEntity.id : '';
 
   // A drag can end without a drop — Escape, or released outside the window —
@@ -687,9 +703,9 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
             </SidebarGroupAction>
             {/* Dropping on the group itself, rather than on any folder, is
                 what takes a note back out to the workspace root. */}
-            <SidebarGroupContent
-              className={cn('rounded-lg', rootDrop.over && 'bg-sidebar-accent/40')}
-              {...rootDrop.props}
+            <WorkspaceDropRegion
+              onDropFolder={(folderId) => moveFolderById(folderId, null)}
+              onDropNote={(noteId) => moveNoteById(noteId, null)}
             >
               <SidebarMenu>
                 {folderTree.map((project, index) => (
@@ -737,7 +753,7 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
-            </SidebarGroupContent>
+            </WorkspaceDropRegion>
           </SidebarGroup>
         </SidebarContent>
 

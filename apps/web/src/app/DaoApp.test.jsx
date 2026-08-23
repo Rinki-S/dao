@@ -175,9 +175,20 @@ describe('DaoApp shell', () => {
     expect(lit(childRegion)).toBe(true);
     expect(lit(parentRegion)).toBe(false);
 
+    // Leaving every folder falls back to the workspace root, which has to light
+    // up too: an unlit tree is how a drag says the drop would do nothing.
+    const rootRegion = screen
+      .getByRole('button', { name: 'New note' })
+      .closest('[data-slot=sidebar-group-content]');
+
+    fireEvent.dragLeave(childRegion, { dataTransfer, relatedTarget: rootRegion });
+    fireEvent.dragOver(rootRegion, { dataTransfer });
+    expect(lit(rootRegion)).toBe(true);
+    expect(lit(childRegion)).toBe(false);
+
     // A drag abandoned without a drop must not leave the tree lit.
     fireEvent.dragEnd(note, { dataTransfer });
-    expect(lit(childRegion)).toBe(false);
+    expect(lit(rootRegion)).toBe(false);
   });
 
   it('moves a folder into the folder it is dropped on, but never into itself', () => {
