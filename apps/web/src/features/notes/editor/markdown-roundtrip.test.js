@@ -111,6 +111,27 @@ const path = '道';
     expect(output).toContain('![Dao icon](./dao.png "Logo")');
   });
 
+  it('preserves nested tasks and the indentation that expresses them', () => {
+    // The task file writes subtasks as two-space indentation, and everything
+    // downstream reads nesting from it. A serializer that re-indents would
+    // rewrite the whole file on the first keystroke.
+    const source = `- [ ] Fix parser recovery @due(2026-08-25) !high
+  - [x] Add error fixtures
+  - [ ] Handle nested errors
+    - [ ] Deeper still
+- [ ] Ship v2
+`;
+
+    const output = roundTrip(source);
+
+    expect(output).toContain('- [ ] Fix parser recovery @due(2026-08-25) !high');
+    expect(output).toContain('  - [x] Add error fixtures');
+    expect(output).toContain('    - [ ] Deeper still');
+
+    // Idempotent, or the file churns every time it is opened and edited.
+    expect(roundTrip(output)).toBe(output);
+  });
+
   it('keeps toolbar-safe destinations and optional titles idempotent', () => {
     const firstOutput = roundTrip(`[Dao docs](https://example.com/docs%20%28draft%29 "Draft docs")
 
