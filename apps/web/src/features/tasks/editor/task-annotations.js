@@ -21,6 +21,23 @@ export function localToday(now = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+/** The calendar day `days` after `date`, both as `YYYY-MM-DD`. */
+export function shiftDate(date, days) {
+  const [year, month, day] = date.split('-').map(Number);
+  // UTC so a daylight-saving change cannot land the result on the wrong day.
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return shifted.toISOString().slice(0, 10);
+}
+
+/** The annotation text a date or a priority is written as. */
+export function formatDueAnnotation(date) {
+  return `@due(${date})`;
+}
+
+export function formatPriorityAnnotation(level) {
+  return `!${level}`;
+}
+
 // `2026-02-30` parses as March 2nd. Round-tripping through Date catches the
 // overflow, and an unreal date is left as plain text so the typo stays visible.
 function isRealDate(year, month, day) {
@@ -28,6 +45,25 @@ function isRealDate(year, month, day) {
   return (
     date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
   );
+}
+
+// Deliberately laxer than the rendering pattern: setting a due date should
+// replace one that is already there even when its date is a typo, rather than
+// leaving the broken one behind and adding a second.
+const RANGE_PATTERNS = {
+  due: /(?<=^|\s)@due\([^)\s]*\)(?=\s|$)/,
+  priority: /(?<=^|\s)!(?:high|medium|low)(?=\s|$)/,
+};
+
+/**
+ * Where a line already carries an annotation of this kind, if anywhere.
+ *
+ * @returns {{ from: number, to: number } | null}
+ */
+export function findAnnotationRange(text, kind) {
+  const match = RANGE_PATTERNS[kind]?.exec(text);
+  if (!match) return null;
+  return { from: match.index, to: match.index + match[0].length };
 }
 
 // ISO dates sort as strings, so no parsing is needed to compare two days.
