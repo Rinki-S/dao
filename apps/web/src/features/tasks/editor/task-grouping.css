@@ -1,33 +1,10 @@
-/* Finished tasks sink to the bottom of the top-level list. This is layout
-   only: the document order is untouched, so the file still reads the way it
-   was written. Nested lists are left alone — a done subtask stays under the
-   parent that is still open. */
-.dao-task-grouped > ul[data-type='taskList'] {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3em;
-}
-
-/* The list spaces itself with gap now, so the sibling margin would double it. */
-.dao-task-grouped > ul[data-type='taskList'] > li + li {
-  margin-top: 0;
-}
-
-.dao-task-grouped > ul[data-type='taskList'] > li {
-  order: 0;
-}
-
-.dao-task-grouped > ul[data-type='taskList'] > li[data-checked='true'] {
-  order: 2;
-}
-
-/* Sits between the two groups wherever the widget happens to land in the DOM. */
+/* Marks where the finished tasks begin. The grouping itself is in the
+   document — this only labels the seam, so it stays out of the file. */
 .dao-task-group-divider {
   display: flex;
-  order: 1;
   align-items: center;
   gap: 0.5em;
-  margin-top: 0.6em;
+  margin: 0.9em 0 0.6em;
   color: var(--muted-foreground);
   font-size: 0.75em;
   letter-spacing: 0.02em;
