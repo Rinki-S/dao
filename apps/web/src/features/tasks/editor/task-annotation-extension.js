@@ -67,25 +67,42 @@ function buildDecorations(doc, today) {
   return DecorationSet.create(doc, decorations);
 }
 
-// Annotations are written into the line's own text, so an offset in that string
-// has to be a document position too. That holds only while the block contains
-// nothing but text — an inline image would shift everything after it.
-function annotationTarget(state) {
-  const { $from } = state.selection;
-  const block = $from.parent;
+/**
+ * Every task line the selection touches — one per task, whether the selection
+ * covers the whole line or a single character of it. A caret yields the one
+ * task it sits in, so acting on many tasks and acting on one are the same code
+ * path with the same result.
+ */
+export function annotationTargets(state) {
+  const { from, to } = state.selection;
+  const targets = [];
 
-  if (!block.isTextblock) return null;
-  if (block.content.size !== block.textContent.length) return null;
+  state.doc.nodesBetween(from, to, (node, pos) => {
+    if (node.type.name !== 'taskItem') return true;
 
-  return { start: $from.start(), text: block.textContent };
+    const line = node.firstChild;
+    // Annotations are written into the line's own text, so an offset in that
+    // string has to be a document position too. That holds only while the line
+    // is nothing but text — an inline image would shift everything after it.
+    if (!line?.isTextblock || line.content.size !== line.textContent.length) return true;
+
+    // nodesBetween reports ancestors too, so a caret in a subtask arrives here
+    // once for that subtask and again for every task above it. Only the tasks
+    // whose own line the selection reaches are being acted on.
+    const lineFrom = pos + 2;
+    const lineTo = lineFrom + line.content.size;
+    if (from > lineTo || to < lineFrom) return true;
+
+    targets.push({ start: lineFrom, text: line.textContent });
+    // Keep descending: subtasks inside the selection are tasks in it too.
+    return true;
+  });
+
+  return targets;
 }
 
-function annotationTransaction(state, kind, replacement) {
-  const target = annotationTarget(state);
-  if (!target) return null;
-
+function applyAnnotation(transaction, target, kind, replacement) {
   const range = findAnnotationRange(target.text, kind);
-  const transaction = state.tr;
 
   if (range) {
     const from = target.start + range.from;
@@ -93,24 +110,37 @@ function annotationTransaction(state, kind, replacement) {
 
     if (replacement) {
       transaction.insertText(replacement, from, to);
-    } else {
-      // Take the separating space along, or removing a date leaves a gap in
-      // the middle of the sentence.
-      const eatsSpace = range.from > 0 && target.text[range.from - 1] === ' ';
-      transaction.delete(eatsSpace ? from - 1 : from, to);
+      return;
     }
 
-    return transaction;
+    // Take the separating space along, or removing a date leaves a gap in the
+    // middle of the sentence.
+    const eatsSpace = range.from > 0 && target.text[range.from - 1] === ' ';
+    transaction.delete(eatsSpace ? from - 1 : from, to);
+    return;
   }
 
   // Nothing to clear is not a failure — the line is already how it was asked to be.
-  if (!replacement) return transaction;
+  if (!replacement) return;
 
   const needsSpace = target.text.length > 0 && !/\s$/.test(target.text);
   transaction.insertText(
     needsSpace ? ` ${replacement}` : replacement,
     target.start + target.text.length,
   );
+}
+
+function annotationTransaction(state, kind, replacement) {
+  const targets = annotationTargets(state);
+  if (targets.length === 0) return null;
+
+  const transaction = state.tr;
+
+  // Back to front: editing an earlier line shifts every position after it, and
+  // the positions were all read from the document as it is now.
+  for (const target of targets.toReversed()) {
+    applyAnnotation(transaction, target, kind, replacement);
+  }
 
   return transaction;
 }

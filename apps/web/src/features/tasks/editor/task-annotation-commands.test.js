@@ -134,6 +134,90 @@ describe('task annotation commands', () => {
   });
 });
 
+describe('task annotation commands over a selection', () => {
+  // Select from inside the first word of `from` to inside the first word of
+  // `to`, the way dragging across several tasks would.
+  function selectAcross(from, to) {
+    const positions = {};
+
+    editor.state.doc.descendants((node, pos) => {
+      if (!node.isText) return true;
+      for (const word of [from, to]) {
+        if (positions[word] === undefined && node.text.includes(word)) {
+          positions[word] = pos + node.text.indexOf(word) + 1;
+        }
+      }
+      return true;
+    });
+
+    editor.commands.setTextSelection({ from: positions[from], to: positions[to] });
+  }
+
+  it('stamps every task the selection reaches', () => {
+    openOn('- [ ] First\n- [ ] Second\n- [ ] Third\n');
+    selectAcross('First', 'Second');
+
+    editor.commands.setTaskPriority('high');
+
+    expect(getDurableMarkdown(editor).trimEnd()).toBe(
+      '- [ ] First !high\n- [ ] Second !high\n- [ ] Third',
+    );
+  });
+
+  it('reaches subtasks inside the selection', () => {
+    openOn(`- [ ] Ship v2
+  - [ ] Write the changelog
+  - [ ] Tag the release
+`);
+    selectAcross('Ship', 'Tag');
+
+    editor.commands.setTaskDue('2026-08-25');
+
+    expect(getDurableMarkdown(editor).trimEnd()).toBe(
+      `- [ ] Ship v2 @due(2026-08-25)
+  - [ ] Write the changelog @due(2026-08-25)
+  - [ ] Tag the release @due(2026-08-25)`,
+    );
+  });
+
+  it('leaves a parent alone when only its subtask is selected', () => {
+    // nodesBetween walks ancestors as well, so this is the case that decides
+    // whether a caret in a subtask quietly stamps everything above it.
+    openOn(`- [ ] Ship v2
+  - [ ] Write the changelog
+`);
+    caretOn('changelog');
+
+    editor.commands.setTaskPriority('low');
+
+    expect(getDurableMarkdown(editor).trimEnd()).toBe(
+      '- [ ] Ship v2\n  - [ ] Write the changelog !low',
+    );
+  });
+
+  it('clears an annotation from every task at once', () => {
+    openOn('- [ ] First !high\n- [ ] Second !low\n');
+    selectAcross('First', 'Second');
+
+    editor.commands.setTaskPriority(null);
+
+    expect(getDurableMarkdown(editor).trimEnd()).toBe('- [ ] First\n- [ ] Second');
+  });
+
+  it('replaces and appends in the same pass', () => {
+    // The first task already has a date, the second does not. One is rewritten
+    // in place and the other grows one; the edits must not shift each other.
+    openOn('- [ ] First @due(2026-01-01)\n- [ ] Second\n');
+    selectAcross('First', 'Second');
+
+    editor.commands.setTaskDue('2026-08-25');
+
+    expect(getDurableMarkdown(editor).trimEnd()).toBe(
+      '- [ ] First @due(2026-08-25)\n- [ ] Second @due(2026-08-25)',
+    );
+  });
+});
+
 describe('shiftDate', () => {
   it.each([
     ['2026-08-24', 1, '2026-08-25'],
