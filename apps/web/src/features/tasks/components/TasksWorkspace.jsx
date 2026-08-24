@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner.jsx';
 import { enqueueNoteSave } from '@/features/notes/note-save-queue.js';
 import { getTaskDocument, updateTaskDocument } from '../api.js';
 import { TaskAnnotations } from '../editor/task-annotation-extension.js';
+import { TasksEditorToolbar } from '../editor/TasksEditorToolbar.jsx';
 
 const AUTOSAVE_DELAY_MS = 800;
 // Built once: Tiptap reads the extension list when it builds the editor, and a
@@ -171,6 +172,7 @@ export function TasksWorkspace({ model }) {
           extraExtensions={TASK_EDITOR_EXTENSIONS}
           initialMarkdown={content}
           placeholder="Add a task…"
+          renderToolbar={(props) => <TasksEditorToolbar {...props} />}
           saveStatus={saveStatus}
           saveStatusLabel={saveStatusLabelFor(saveStatus)}
           onMarkdownChange={scheduleSave}

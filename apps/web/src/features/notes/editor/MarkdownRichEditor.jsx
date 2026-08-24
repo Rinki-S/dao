@@ -49,6 +49,7 @@ function TiptapMarkdownEditor({
   initialMarkdown,
   onMarkdownChange,
   placeholder,
+  renderToolbar,
   saveStatus,
   saveStatusLabel,
 }) {
@@ -72,11 +73,7 @@ function TiptapMarkdownEditor({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <MarkdownEditorToolbar
-        editor={editor}
-        saveStatus={saveStatus}
-        saveStatusLabel={saveStatusLabel}
-      />
+      {renderToolbar({ editor, saveStatus, saveStatusLabel })}
       <EditorContent className="min-h-0 flex-1 overflow-auto" editor={editor} />
     </div>
   );
@@ -88,7 +85,7 @@ function TiptapMarkdownEditor({
  *
  * `extraExtensions` lets a surface add behaviour of its own — Tasks decorates
  * its due dates with it. Keep the array stable: Tiptap reads it once, when the
- * editor is built.
+ * editor is built. `renderToolbar` lets it replace the controls entirely.
  */
 export function MarkdownRichEditor({
   initialMarkdown,
@@ -96,6 +93,7 @@ export function MarkdownRichEditor({
   ariaLabel = 'Markdown note content',
   extraExtensions = [],
   placeholder,
+  renderToolbar = (props) => <MarkdownEditorToolbar {...props} />,
   saveStatus,
   saveStatusLabel,
 }) {
@@ -118,6 +116,7 @@ export function MarkdownRichEditor({
       extraExtensions={extraExtensions}
       initialMarkdown={initialMarkdown}
       placeholder={placeholder}
+      renderToolbar={renderToolbar}
       onMarkdownChange={onMarkdownChange}
       saveStatus={saveStatus}
       saveStatusLabel={saveStatusLabel}
