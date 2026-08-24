@@ -9,8 +9,12 @@ import {
 import { Spinner } from '@/components/ui/spinner.jsx';
 import { enqueueNoteSave } from '@/features/notes/note-save-queue.js';
 import { getTaskDocument, updateTaskDocument } from '../api.js';
+import { TaskAnnotations } from '../editor/task-annotation-extension.js';
 
 const AUTOSAVE_DELAY_MS = 800;
+// Built once: Tiptap reads the extension list when it builds the editor, and a
+// fresh array every render would rebuild it and lose the caret.
+const TASK_EDITOR_EXTENSIONS = [TaskAnnotations];
 const MarkdownRichEditor = lazy(() =>
   import('@/features/notes/editor/MarkdownRichEditor.jsx').then((module) => ({
     default: module.MarkdownRichEditor,
@@ -164,7 +168,9 @@ export function TasksWorkspace({ model }) {
         <MarkdownRichEditor
           key={workspaceId}
           ariaLabel="Task list"
+          extraExtensions={TASK_EDITOR_EXTENSIONS}
           initialMarkdown={content}
+          placeholder="Add a task…"
           saveStatus={saveStatus}
           saveStatusLabel={saveStatusLabelFor(saveStatus)}
           onMarkdownChange={scheduleSave}

@@ -8,8 +8,10 @@ import StarterKit from '@tiptap/starter-kit';
 /**
  * Build a fresh extension array for each editor instance. Markdown remains the
  * external value; Tiptap's ProseMirror document exists only while editing.
+ *
+ * @param {{ placeholder?: string }} [options]
  */
-export function createMarkdownEditorExtensions() {
+export function createMarkdownEditorExtensions({ placeholder = 'Write a note…' } = {}) {
   return [
     StarterKit.configure({
       codeBlock: {
@@ -40,7 +42,7 @@ export function createMarkdownEditorExtensions() {
       inline: false,
     }),
     Placeholder.configure({
-      placeholder: 'Write a note…',
+      placeholder,
       showOnlyCurrent: true,
     }),
     Markdown.configure({

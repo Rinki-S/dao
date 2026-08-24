@@ -45,8 +45,10 @@ function MarkdownSourceFallback({ ariaLabel, initialMarkdown, onMarkdownChange, 
 
 function TiptapMarkdownEditor({
   ariaLabel,
+  extraExtensions,
   initialMarkdown,
   onMarkdownChange,
+  placeholder,
   saveStatus,
   saveStatusLabel,
 }) {
@@ -62,7 +64,7 @@ function TiptapMarkdownEditor({
         spellcheck: 'true',
       },
     },
-    extensions: createMarkdownEditorExtensions(),
+    extensions: [...createMarkdownEditorExtensions({ placeholder }), ...extraExtensions],
     onUpdate: ({ editor: currentEditor }) => {
       onMarkdownChange(getDurableMarkdown(currentEditor));
     },
@@ -83,11 +85,17 @@ function TiptapMarkdownEditor({
 /**
  * Rich Markdown editor boundary. The caller owns persistence and should key
  * this component by note id so each note receives a fresh editor/history.
+ *
+ * `extraExtensions` lets a surface add behaviour of its own — Tasks decorates
+ * its due dates with it. Keep the array stable: Tiptap reads it once, when the
+ * editor is built.
  */
 export function MarkdownRichEditor({
   initialMarkdown,
   onMarkdownChange,
   ariaLabel = 'Markdown note content',
+  extraExtensions = [],
+  placeholder,
   saveStatus,
   saveStatusLabel,
 }) {
@@ -107,7 +115,9 @@ export function MarkdownRichEditor({
   return (
     <TiptapMarkdownEditor
       ariaLabel={ariaLabel}
+      extraExtensions={extraExtensions}
       initialMarkdown={initialMarkdown}
+      placeholder={placeholder}
       onMarkdownChange={onMarkdownChange}
       saveStatus={saveStatus}
       saveStatusLabel={saveStatusLabel}

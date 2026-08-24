@@ -1,0 +1,39 @@
+/* Chips for `@due(...)` and `!high`. The text underneath is unchanged — the
+   caret still walks through it character by character — so the chip stays
+   inline and keeps the line's rhythm rather than becoming a block of its own. */
+
+.dao-task-annotation {
+  border-radius: var(--radius-sm);
+  padding: 0.05em 0.3em;
+  font-size: 0.875em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  -electron-corner-smoothing: var(--dao-corner-smoothing);
+}
+
+.dao-task-annotation--due-upcoming,
+.dao-task-annotation--priority-medium,
+.dao-task-annotation--priority-low {
+  background: color-mix(in oklab, var(--muted-foreground) 12%, transparent);
+  color: var(--muted-foreground);
+}
+
+.dao-task-annotation--due-today {
+  background: color-mix(in oklab, var(--warning) 18%, transparent);
+  color: var(--warning-foreground);
+}
+
+.dao-task-annotation--due-overdue,
+.dao-task-annotation--priority-high {
+  background: color-mix(in oklab, var(--destructive) 14%, transparent);
+  color: var(--destructive);
+  font-weight: 500;
+}
+
+/* A finished task keeps its chips legible but stops competing for attention:
+   whatever the date was, it is no longer something to act on. */
+.dao-task-annotation--done {
+  background: color-mix(in oklab, var(--muted-foreground) 10%, transparent);
+  color: var(--muted-foreground);
+  font-weight: inherit;
+}
