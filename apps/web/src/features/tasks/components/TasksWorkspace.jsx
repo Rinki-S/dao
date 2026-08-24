@@ -11,12 +11,13 @@ import { enqueueNoteSave } from '@/features/notes/note-save-queue.js';
 import { getTaskDocument, updateTaskDocument } from '../api.js';
 import { TaskAnnotations } from '../editor/task-annotation-extension.js';
 import { TaskFolding } from '../editor/task-folding-extension.js';
+import { TaskGrouping } from '../editor/task-grouping-extension.js';
 import { TasksEditorToolbar } from '../editor/TasksEditorToolbar.jsx';
 
 const AUTOSAVE_DELAY_MS = 800;
 // Built once: Tiptap reads the extension list when it builds the editor, and a
 // fresh array every render would rebuild it and lose the caret.
-const TASK_EDITOR_EXTENSIONS = [TaskAnnotations, TaskFolding];
+const TASK_EDITOR_EXTENSIONS = [TaskAnnotations, TaskFolding, TaskGrouping];
 const MarkdownRichEditor = lazy(() =>
   import('@/features/notes/editor/MarkdownRichEditor.jsx').then((module) => ({
     default: module.MarkdownRichEditor,
