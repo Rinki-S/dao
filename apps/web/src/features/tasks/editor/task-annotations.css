@@ -2,13 +2,15 @@
    caret still walks through it character by character — so the chip stays
    inline and keeps the line's rhythm rather than becoming a block of its own. */
 
+/* A capsule, not a rounded rectangle: the chip is a token on a line of prose,
+   and the fully round ends keep it from reading as a block of its own. Corner
+   smoothing has nothing to do at this radius. */
 .dao-task-annotation {
-  border-radius: var(--radius-sm);
-  padding: 0.05em 0.3em;
+  border-radius: 999px;
+  padding: 0.05em 0.5em;
   font-size: 0.875em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  -electron-corner-smoothing: var(--dao-corner-smoothing);
 }
 
 /* A pseudo-element rather than a node: a decoration wraps text, and inserting
