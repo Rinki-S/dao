@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select.jsx';
 import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs.jsx';
+import { AiProviderSettings } from '@/features/ai/components/AiProviderSettings.jsx';
 import { waitForAllPendingNoteSaves } from '@/features/notes/note-save-queue.js';
 import { APPEARANCES, APPEARANCE_LABELS } from '@/lib/appearance.js';
 
@@ -70,6 +71,7 @@ export function SettingsDialog({
             <TabsList className="w-40 shrink-0 self-start" variant="underline">
               <TabsTab value="general">General</TabsTab>
               <TabsTab value="appearance">Appearance</TabsTab>
+              <TabsTab value="ai">AI</TabsTab>
               <TabsTab value="advanced">Advanced</TabsTab>
             </TabsList>
             <div className="min-h-56 min-w-0 flex-1">
@@ -106,6 +108,12 @@ export function SettingsDialog({
                     </SelectPopup>
                   </Select>
                 </SettingRow>
+              </TabsPanel>
+              {/* A hidden panel unmounts, so this reads the current settings
+                  each time the tab is opened rather than showing what they
+                  were when the dialog was first built. */}
+              <TabsPanel value="ai">
+                <AiProviderSettings />
               </TabsPanel>
               <TabsPanel value="advanced">
                 <SettingRow
