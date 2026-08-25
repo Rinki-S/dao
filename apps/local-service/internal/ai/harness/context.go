@@ -47,10 +47,10 @@ type Day struct {
 // of a day should be able to say so — otherwise the reader takes it for an
 // account of the whole day.
 type Included struct {
-	Notes         int
-	NotesDropped  int
-	TasksIncluded bool
-	Truncated     bool
+	Notes         int  `json:"notes"`
+	NotesDropped  int  `json:"notesDropped"`
+	TasksIncluded bool `json:"tasksIncluded"`
+	Truncated     bool `json:"truncated"`
 }
 
 func (i Included) Empty() bool {

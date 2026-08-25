@@ -14,7 +14,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/oklog/ulid/v2"
 	"github.com/pressly/goose/v3"
+	"github.com/rinki-s/dao/apps/local-service/internal/ai/harness"
+	"github.com/rinki-s/dao/apps/local-service/internal/ai/trace"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/ai"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/notes"
@@ -63,7 +66,6 @@ func main() {
 
 	aiRepo := ai.NewRepository(db)
 	aiHandler := ai.NewHandler(aiRepo, modelAPIKey)
-	aiHandler.RegisterRoutes(apiMux)
 
 	workspaceRepo := workspaces.NewRepository(db, activityRepo, settingsRepo)
 	workspaceHandler := workspaces.NewHandler(workspaceRepo)
@@ -89,6 +91,23 @@ func main() {
 
 	searchHandler := search.NewHandler(searchRepo)
 	searchHandler.RegisterRoutes(apiMux)
+
+	// Registered last: the harness reads notes and tasks, so it is wired once
+	// the repositories that own them exist.
+	aiHandler.WithHarness(
+		harness.NewGatherer(db, func(workspaceID string) (string, time.Time, error) {
+			document, err := taskRepo.Get(workspaceID)
+			if err != nil {
+				return "", time.Time{}, err
+			}
+			updatedAt, err := time.Parse(time.RFC3339, document.UpdatedAt)
+			if err != nil {
+				return "", time.Time{}, err
+			}
+			return document.Content, updatedAt, nil
+		}),
+		trace.NewRepository(db, func() string { return ulid.Make().String() }),
+	).RegisterRoutes(apiMux)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", requireToken(*token, apiMux))
