@@ -9,6 +9,7 @@ import {
   localToday,
   parseTaskAnnotations,
 } from './task-annotations.js';
+import { selectedTaskItems } from './task-selection.js';
 import './task-annotations.css';
 
 const taskAnnotationPluginKey = new PluginKey('taskAnnotations');
@@ -68,37 +69,16 @@ function buildDecorations(doc, today) {
 }
 
 /**
- * Every task line the selection touches — one per task, whether the selection
- * covers the whole line or a single character of it. A caret yields the one
- * task it sits in, so acting on many tasks and acting on one are the same code
- * path with the same result.
+ * The task lines a selection writes annotations into.
+ *
+ * Annotations are written into the line's own text, so an offset in that
+ * string has to be a document position too. That holds only while the line is
+ * nothing but text — an inline image would shift everything after it.
  */
-export function annotationTargets(state) {
-  const { from, to } = state.selection;
-  const targets = [];
-
-  state.doc.nodesBetween(from, to, (node, pos) => {
-    if (node.type.name !== 'taskItem') return true;
-
-    const line = node.firstChild;
-    // Annotations are written into the line's own text, so an offset in that
-    // string has to be a document position too. That holds only while the line
-    // is nothing but text — an inline image would shift everything after it.
-    if (!line?.isTextblock || line.content.size !== line.textContent.length) return true;
-
-    // nodesBetween reports ancestors too, so a caret in a subtask arrives here
-    // once for that subtask and again for every task above it. Only the tasks
-    // whose own line the selection reaches are being acted on.
-    const lineFrom = pos + 2;
-    const lineTo = lineFrom + line.content.size;
-    if (from > lineTo || to < lineFrom) return true;
-
-    targets.push({ start: lineFrom, text: line.textContent });
-    // Keep descending: subtasks inside the selection are tasks in it too.
-    return true;
-  });
-
-  return targets;
+function annotationTargets(state) {
+  return selectedTaskItems(state)
+    .filter(({ line }) => line.content.size === line.textContent.length)
+    .map(({ line, lineFrom }) => ({ start: lineFrom, text: line.textContent }));
 }
 
 function applyAnnotation(transaction, target, kind, replacement) {
