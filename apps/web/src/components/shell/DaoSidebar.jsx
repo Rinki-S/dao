@@ -11,6 +11,7 @@ import {
   IconMessageCircle,
   IconPlus,
   IconSearch,
+  IconSparkles,
   IconSettings,
   IconTrash,
 } from '@tabler/icons-react';
@@ -67,6 +68,7 @@ import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: IconHome },
+  { id: 'today', label: 'Today', icon: IconSparkles },
   { id: 'tasks', label: 'Tasks', icon: IconCircleCheck },
   { id: 'chats', label: 'Chats', icon: IconMessageCircle, disabled: true },
   { id: 'search', label: 'Search', icon: IconSearch },

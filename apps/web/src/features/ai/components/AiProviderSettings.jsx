@@ -142,6 +142,16 @@ export function AiProviderSettings() {
   }
 
   if (!settings) {
+    // Anything but a successful read leaves the panel with nothing to edit,
+    // and saying so beats a spinner that never resolves.
+    if (status === 'error') {
+      return (
+        <p className="py-4 text-destructive text-sm" role="alert">
+          {message}
+        </p>
+      );
+    }
+
     return <p className="py-4 text-muted-foreground text-sm">Loading…</p>;
   }
 

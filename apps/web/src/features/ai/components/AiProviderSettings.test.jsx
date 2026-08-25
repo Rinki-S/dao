@@ -134,6 +134,25 @@ describe('AiProviderSettings', () => {
     await waitFor(() => expect(bridge.clearModelApiKey).toHaveBeenCalled());
   });
 
+  it('does not strand the panel when the key probe rejects', async () => {
+    // A status probe failing is not a reason to show a spinner for ever.
+    bridge.getModelKeyStatus.mockRejectedValue(new Error('no such handler'));
+
+    await open();
+
+    expect(screen.getByLabelText('Base URL')).toBeInTheDocument();
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
+  });
+
+  it('says what went wrong when the settings cannot be read', async () => {
+    apiFetch.mockResolvedValue({ ok: false, status: 500, text: async () => 'boom' });
+
+    render(<AiProviderSettings />);
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
+  });
+
   it('says so when the system cannot store a secret at all', async () => {
     bridge.getModelKeyStatus.mockResolvedValue({ available: false, present: false });
 

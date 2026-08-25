@@ -113,12 +113,19 @@ export async function saveSummaryAsNote(traceId) {
 // OS keychain, and the bridge has no getter — these three are the whole of
 // what the renderer can do with it.
 
+// A probe, and probes do not fail. Outside the desktop app there is no bridge;
+// inside it, an IPC call can still reject. Either way the answer is "no key
+// here", and a rejection must not be able to strand the settings panel.
 export async function getModelKeyStatus() {
-  if (!window.dao?.getModelKeyStatus) {
+  try {
+    if (!window.dao?.getModelKeyStatus) {
+      return { available: false, present: false };
+    }
+
+    return ModelKeyStatusSchema.parse(await window.dao.getModelKeyStatus());
+  } catch {
     return { available: false, present: false };
   }
-
-  return ModelKeyStatusSchema.parse(await window.dao.getModelKeyStatus());
 }
 
 export async function saveModelApiKey(key) {

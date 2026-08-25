@@ -24,18 +24,26 @@ import { TasksWorkspace } from '@/features/tasks/components/TasksWorkspace.jsx';
 import { useAppearance } from '@/hooks/use-appearance.js';
 import { useDaoWorkspace } from './use-dao-workspace.js';
 
-function EmptyHome({ model, onOpenSettings }) {
+function EmptyHome({ model }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-8 overflow-auto p-6">
-      <Empty className="p-0">
-        <EmptyHeader>
-          <EmptyTitle>No recent work</EmptyTitle>
-          <EmptyDescription>Create a note to begin this workspace.</EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>
-          <Button onClick={() => model.addNote()}>Create note</Button>
-        </EmptyContent>
-      </Empty>
+    <Empty>
+      <EmptyHeader>
+        <EmptyTitle>No recent work</EmptyTitle>
+        <EmptyDescription>Create a note to begin this workspace.</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button onClick={() => model.addNote()}>Create note</Button>
+      </EmptyContent>
+    </Empty>
+  );
+}
+
+// A surface of its own rather than a card on Home: Home means the note you
+// were last writing, and a card that only appears when there is no such note
+// would be out of reach exactly when there is a day worth summarising.
+function TodayView({ model, onOpenSettings }) {
+  return (
+    <div className="flex h-full items-start justify-center overflow-auto p-6">
       <TodaySummaryCard
         workspaceId={model.currentWorkspace?.id ?? ''}
         onOpenSettings={onOpenSettings}
@@ -97,8 +105,10 @@ export function DaoApp() {
       return model.selectedNote ? (
         <NoteEditorPanel noteId={model.selectedNote.id} />
       ) : (
-        <EmptyHome model={model} onOpenSettings={() => setSettingsOpen(true)} />
+        <EmptyHome model={model} />
       );
+    if (model.activeView === 'today')
+      return <TodayView model={model} onOpenSettings={() => setSettingsOpen(true)} />;
     if (model.activeView === 'tasks') return <TasksWorkspace model={model} />;
     if (model.activeView === 'search') return <SearchWorkspace model={model} />;
     return (
