@@ -32,6 +32,29 @@ export const UpdateProviderSettingsInputSchema = z.object({
   model: z.string().trim().min(1, { error: 'Model is required' }),
 });
 
+// Mirrors the harness's own checks. Validating here too is not redundant: the
+// service and the renderer are separate programs, and this one should not
+// render whatever the other happens to send.
+export const DaySummarySchema = z.object({
+  headline: z.string().min(1),
+  highlights: z.array(z.string().min(1)).min(1).max(6),
+  focus: z.string(),
+});
+
+export const IncludedSchema = z.object({
+  notes: z.number(),
+  notesDropped: z.number(),
+  tasksIncluded: z.boolean(),
+  truncated: z.boolean(),
+});
+
+export const SummaryResultSchema = z.object({
+  traceId: z.string(),
+  date: z.string(),
+  summary: DaySummarySchema,
+  included: IncludedSchema,
+});
+
 export const ModelKeyStatusSchema = z.object({
   available: z.boolean(),
   present: z.boolean(),

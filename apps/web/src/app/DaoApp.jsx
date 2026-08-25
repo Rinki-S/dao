@@ -17,23 +17,30 @@ import { TitlebarPeekContext } from '@/components/shell/use-titlebar-inset.js';
 import { Spinner } from '@/components/ui/spinner.jsx';
 import { CommandPalette } from '@/features/command-palette/components/CommandPalette.jsx';
 import { NoteEditorPanel } from '@/features/notes/components/NoteEditorPanel.jsx';
+import { TodaySummaryCard } from '@/features/ai/components/TodaySummaryCard.jsx';
 import { SearchWorkspace } from '@/features/search/components/SearchWorkspace.jsx';
 import { SettingsDialog } from '@/features/settings/components/SettingsDialog.jsx';
 import { TasksWorkspace } from '@/features/tasks/components/TasksWorkspace.jsx';
 import { useAppearance } from '@/hooks/use-appearance.js';
 import { useDaoWorkspace } from './use-dao-workspace.js';
 
-function EmptyHome({ model }) {
+function EmptyHome({ model, onOpenSettings }) {
   return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyTitle>No recent work</EmptyTitle>
-        <EmptyDescription>Create a note to begin this workspace.</EmptyDescription>
-      </EmptyHeader>
-      <EmptyContent>
-        <Button onClick={() => model.addNote()}>Create note</Button>
-      </EmptyContent>
-    </Empty>
+    <div className="flex h-full flex-col items-center justify-center gap-8 overflow-auto p-6">
+      <Empty className="p-0">
+        <EmptyHeader>
+          <EmptyTitle>No recent work</EmptyTitle>
+          <EmptyDescription>Create a note to begin this workspace.</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button onClick={() => model.addNote()}>Create note</Button>
+        </EmptyContent>
+      </Empty>
+      <TodaySummaryCard
+        workspaceId={model.currentWorkspace?.id ?? ''}
+        onOpenSettings={onOpenSettings}
+      />
+    </div>
   );
 }
 
@@ -90,7 +97,7 @@ export function DaoApp() {
       return model.selectedNote ? (
         <NoteEditorPanel noteId={model.selectedNote.id} />
       ) : (
-        <EmptyHome model={model} />
+        <EmptyHome model={model} onOpenSettings={() => setSettingsOpen(true)} />
       );
     if (model.activeView === 'tasks') return <TasksWorkspace model={model} />;
     if (model.activeView === 'search') return <SearchWorkspace model={model} />;

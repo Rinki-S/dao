@@ -3,6 +3,7 @@ import {
   KeyMutationResultSchema,
   ModelKeyStatusSchema,
   ProviderSettingsSchema,
+  SummaryResultSchema,
   UpdateProviderSettingsInputSchema,
 } from './schemas.js';
 
@@ -33,6 +34,58 @@ export async function updateProviderSettings(input) {
   }
 
   return ProviderSettingsSchema.parse(await response.json());
+}
+
+// The reasons a summary can fail to arrive, each needing a different thing
+// from the reader. A single "AI failed" would leave them guessing which.
+export const SUMMARY_OUTCOMES = {
+  nothingToday: 'nothingToday',
+  notConfigured: 'notConfigured',
+  keyRejected: 'keyRejected',
+  rateLimited: 'rateLimited',
+  failed: 'failed',
+};
+
+export class SummaryError extends Error {
+  constructor(outcome, message) {
+    super(message);
+    this.name = 'SummaryError';
+    this.outcome = outcome;
+  }
+}
+
+function outcomeFor(status) {
+  switch (status) {
+    case 428:
+      return SUMMARY_OUTCOMES.notConfigured;
+    case 401:
+    case 403:
+      return SUMMARY_OUTCOMES.keyRejected;
+    case 429:
+      return SUMMARY_OUTCOMES.rateLimited;
+    default:
+      return SUMMARY_OUTCOMES.failed;
+  }
+}
+
+export async function summarizeToday(workspaceId) {
+  const response = await apiFetch(
+    `/api/ai/summarize-today?workspaceId=${encodeURIComponent(workspaceId)}`,
+    { method: 'POST' },
+  );
+
+  // A day with nothing in it: the service says so without a body, and without
+  // having spent anything to find out.
+  if (response.status === 204) {
+    throw new SummaryError(SUMMARY_OUTCOMES.nothingToday, 'Nothing was touched today');
+  }
+
+  if (!response.ok) {
+    const message = (await response.text()) || `Request failed: ${response.status}`;
+    throw new SummaryError(outcomeFor(response.status), message);
+  }
+
+  return SummaryResultSchema.parse(await response.json());
 }
 
 // The key never travels over HTTP. It goes through the desktop bridge to the
