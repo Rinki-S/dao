@@ -7,12 +7,21 @@ import {
   IconIndentDecrease,
   IconIndentIncrease,
   IconListCheck,
+  IconSquareCheck,
 } from '@tabler/icons-react';
 import { useEditorState } from '@tiptap/react';
 import { useState } from 'react';
 
+import { Badge } from '@/components/ui/badge.jsx';
 import { Button } from '@/components/ui/button.jsx';
-import { Menu, MenuGroup, MenuItem, MenuPopup, MenuTrigger } from '@/components/ui/menu.jsx';
+import {
+  Menu,
+  MenuGroup,
+  MenuItem,
+  MenuPopup,
+  MenuSeparator,
+  MenuTrigger,
+} from '@/components/ui/menu.jsx';
 import {
   Toolbar,
   ToolbarButton,
@@ -24,6 +33,7 @@ import {
   EditorToolbarShell,
 } from '@/features/notes/editor/EditorToolbarShell.jsx';
 import { findAnnotationRange, localToday, shiftDate } from './task-annotations.js';
+import { selectedTaskItems } from './task-selection.js';
 
 // Relative offsets rather than fixed dates: "tomorrow" has to stay tomorrow in
 // a window that has been open since yesterday.
@@ -84,6 +94,7 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
     selector: ({ editor: current }) => {
       if (!current || current.isDestroyed || !current.view) {
         return {
+          canClearCompleted: false,
           canOutdent: false,
           canIndent: false,
           canRedo: false,
@@ -91,12 +102,14 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
           hasDue: false,
           hasPriority: false,
           isTaskList: false,
+          selectedCount: 0,
         };
       }
 
       const line = currentLineText(current);
 
       return {
+        canClearCompleted: current.can().clearCompletedTasks(),
         canOutdent: current.can().liftListItem('taskItem'),
         canIndent: current.can().sinkListItem('taskItem'),
         canRedo: current.can().chain().redo().run(),
@@ -104,12 +117,15 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
         hasDue: findAnnotationRange(line, 'due') !== null,
         hasPriority: findAnnotationRange(line, 'priority') !== null,
         isTaskList: current.isActive('taskList'),
+        selectedCount: selectedTaskItems(current.state).length,
       };
     },
   });
 
   const setDue = (date) => editor.chain().focus().setTaskDue(date).run();
   const setPriority = (level) => editor.chain().focus().setTaskPriority(level).run();
+  const setChecked = (checked) => editor.chain().focus().setTasksChecked(checked).run();
+  const isBatch = state.selectedCount > 1;
 
   return (
     <EditorToolbarShell saveStatus={saveStatus} saveStatusLabel={saveStatusLabel}>
@@ -167,7 +183,28 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
               None
             </MenuItem>
           </MenuControl>
+          <MenuControl icon={IconSquareCheck} label="Status">
+            <MenuItem onClick={() => setChecked(true)}>Mark done</MenuItem>
+            <MenuItem onClick={() => setChecked(false)}>Mark not done</MenuItem>
+            <MenuSeparator />
+            {/* Named for the list, not the selection: unlike everything above
+                it, this one reaches past what is selected. */}
+            <MenuItem
+              disabled={!state.canClearCompleted}
+              variant="destructive"
+              onClick={() => editor.chain().focus().clearCompletedTasks().run()}
+            >
+              Delete finished tasks
+            </MenuItem>
+          </MenuControl>
         </ToolbarGroup>
+        {/* Batch actions look identical to single ones, so the count is the
+            only thing saying how far the next click reaches. */}
+        {isBatch ? (
+          <Badge aria-live="polite" variant="secondary">
+            {state.selectedCount} tasks
+          </Badge>
+        ) : null}
         <ToolbarSeparator />
         <ToolbarGroup>
           <EditorToolbarButton
