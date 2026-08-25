@@ -16,4 +16,9 @@ contextBridge.exposeInMainWorld('dao', {
     selectWorkingDirectory: () => ipcRenderer.invoke('dao:select-working-directory'),
     setAppearance: (source) => ipcRenderer.invoke('dao:set-appearance', source),
     restartLocalService: () => ipcRenderer.invoke('dao:restart-local-service'),
+    // Write-only by design. There is no getter: the renderer can learn that a
+    // key exists, never what it is.
+    getModelKeyStatus: () => ipcRenderer.invoke('dao:get-model-key-status'),
+    setModelApiKey: (key) => ipcRenderer.invoke('dao:set-model-api-key', key),
+    clearModelApiKey: () => ipcRenderer.invoke('dao:clear-model-api-key'),
 })

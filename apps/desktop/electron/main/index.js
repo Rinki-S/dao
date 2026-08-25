@@ -8,6 +8,13 @@ import {
     waitForLocalServiceExit,
     waitForServiceHealth,
 } from './service-manager.js'
+import {
+    clearModelApiKey,
+    hasModelApiKey,
+    isKeyStorageAvailable,
+    readModelApiKey,
+    writeModelApiKey,
+} from './model-key.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -82,6 +89,32 @@ ipcMain.handle('dao:set-appearance', (_event, source) => {
     return { ok: true, error: '' }
 })
 
+ipcMain.handle('dao:get-model-key-status', () => ({
+    available: isKeyStorageAvailable(),
+    present: hasModelApiKey(),
+}))
+
+// Saving the key restarts the service, because the service is handed the key
+// once at startup. Restarting is how the new one takes effect, and it is the
+// same path the working-directory change already uses.
+ipcMain.handle('dao:set-model-api-key', async (_event, key) => {
+    const result = writeModelApiKey(key)
+    if (!result.ok) {
+        return result
+    }
+
+    return restartWithCurrentKey()
+})
+
+ipcMain.handle('dao:clear-model-api-key', async () => {
+    const result = clearModelApiKey()
+    if (!result.ok) {
+        return result
+    }
+
+    return restartWithCurrentKey()
+})
+
 ipcMain.handle('dao:restart-local-service', async () => {
     if (!serviceConfig) {
         return { ok: false, error: 'Local service is not configured' }
@@ -107,7 +140,7 @@ app.whenReady().then(async () => {
         app.dock.setIcon(appIconPath)
     }
 
-    serviceConfig = createServiceConfig()
+    serviceConfig = createServiceConfig(readModelApiKey())
     localService = startLocalService(serviceConfig)
 
     await waitForServiceHealth(serviceConfig.baseUrl)
@@ -148,6 +181,26 @@ async function restartLocalService() {
 
     localService = startLocalService(serviceConfig)
     await waitForServiceHealth(serviceConfig.baseUrl)
+}
+
+// The port and session token stay as they are — the renderer already holds
+// them and cannot be handed new ones without a reload. Only the key changes.
+async function restartWithCurrentKey() {
+    if (!serviceConfig) {
+        return { ok: false, error: 'Local service is not configured' }
+    }
+
+    serviceConfig = { ...serviceConfig, modelApiKey: readModelApiKey() }
+
+    try {
+        await restartLocalService()
+        return { ok: true, error: '' }
+    } catch (error) {
+        return {
+            ok: false,
+            error: error instanceof Error ? error.message : 'Failed to restart local service',
+        }
+    }
 }
 
 process.on('exit', stopServiceOnce)

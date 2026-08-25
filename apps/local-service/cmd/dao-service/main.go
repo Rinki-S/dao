@@ -30,11 +30,14 @@ import (
 func main() {
 	port := flag.String("port", "3766", "local service port")
 	token := flag.String("token", "", "local session token")
-	// Handed over at startup rather than read from disk here: the key is kept
-	// encrypted by the desktop app, and this process only ever holds it in
-	// memory for as long as it runs.
-	modelAPIKey := flag.String("model-api-key", "", "API key for the configured model provider")
 	flag.Parse()
+
+	// From the environment rather than a flag: a process's arguments are
+	// readable by every user on the machine through ps, and this is a
+	// credential for a paid third-party account. The desktop app keeps it
+	// encrypted and hands it over at startup; this process only ever holds it
+	// in memory, for as long as it runs.
+	modelAPIKey := os.Getenv("DAO_MODEL_API_KEY")
 
 	db, err := openDatabase()
 	if err != nil {
@@ -59,7 +62,7 @@ func main() {
 	settingsHandler.RegisterRoutes(apiMux)
 
 	aiRepo := ai.NewRepository(db)
-	aiHandler := ai.NewHandler(aiRepo, *modelAPIKey)
+	aiHandler := ai.NewHandler(aiRepo, modelAPIKey)
 	aiHandler.RegisterRoutes(apiMux)
 
 	workspaceRepo := workspaces.NewRepository(db, activityRepo, settingsRepo)
