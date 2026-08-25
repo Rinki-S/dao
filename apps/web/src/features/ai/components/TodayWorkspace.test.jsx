@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { TodaySummaryCard } from './TodaySummaryCard.jsx';
+import { TodayWorkspace } from './TodayWorkspace.jsx';
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/api-client.js', () => ({ apiFetch }));
@@ -31,14 +31,16 @@ function failWith(status, message = 'nope') {
   apiFetch.mockResolvedValue({ ok: false, status, text: async () => message });
 }
 
+const model = { currentWorkspace: { id: 'workspace-1' } };
+
 async function summarise() {
-  render(<TodaySummaryCard workspaceId="workspace-1" onOpenSettings={vi.fn()} />);
+  render(<TodayWorkspace model={model} onOpenSettings={vi.fn()} />);
   await userEvent.click(screen.getByRole('button', { name: 'Summarise today' }));
 }
 
-describe('TodaySummaryCard', () => {
+describe('TodayWorkspace', () => {
   it('asks nothing until told to', () => {
-    render(<TodaySummaryCard workspaceId="workspace-1" onOpenSettings={vi.fn()} />);
+    render(<TodayWorkspace model={model} onOpenSettings={vi.fn()} />);
 
     // Sending a workspace to a third party is not something to do on render.
     expect(apiFetch).not.toHaveBeenCalled();
@@ -126,7 +128,8 @@ describe('TodaySummaryCard', () => {
     // recorded, so what is saved is what was shown.
     expect(save[1].body).toBeUndefined();
 
-    expect(await screen.findByText(/Saved as/)).toBeInTheDocument();
+    expect(await screen.findByText('Kept as a note')).toBeInTheDocument();
+    expect(screen.getByText('Summary 2026-08-25')).toBeInTheDocument();
   });
 
   it('stops offering to keep a summary once it is kept', async () => {
@@ -141,7 +144,7 @@ describe('TodaySummaryCard', () => {
     });
     await userEvent.click(screen.getByRole('button', { name: 'Keep as note' }));
 
-    await screen.findByText(/Saved as/);
+    await screen.findByText('Kept as a note');
     expect(screen.queryByRole('button', { name: 'Keep as note' })).not.toBeInTheDocument();
   });
 

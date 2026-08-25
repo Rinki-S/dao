@@ -17,7 +17,7 @@ import { TitlebarPeekContext } from '@/components/shell/use-titlebar-inset.js';
 import { Spinner } from '@/components/ui/spinner.jsx';
 import { CommandPalette } from '@/features/command-palette/components/CommandPalette.jsx';
 import { NoteEditorPanel } from '@/features/notes/components/NoteEditorPanel.jsx';
-import { TodaySummaryCard } from '@/features/ai/components/TodaySummaryCard.jsx';
+import { TodayWorkspace } from '@/features/ai/components/TodayWorkspace.jsx';
 import { SearchWorkspace } from '@/features/search/components/SearchWorkspace.jsx';
 import { SettingsDialog } from '@/features/settings/components/SettingsDialog.jsx';
 import { TasksWorkspace } from '@/features/tasks/components/TasksWorkspace.jsx';
@@ -35,20 +35,6 @@ function EmptyHome({ model }) {
         <Button onClick={() => model.addNote()}>Create note</Button>
       </EmptyContent>
     </Empty>
-  );
-}
-
-// A surface of its own rather than a card on Home: Home means the note you
-// were last writing, and a card that only appears when there is no such note
-// would be out of reach exactly when there is a day worth summarising.
-function TodayView({ model, onOpenSettings }) {
-  return (
-    <div className="flex h-full items-start justify-center overflow-auto p-6">
-      <TodaySummaryCard
-        workspaceId={model.currentWorkspace?.id ?? ''}
-        onOpenSettings={onOpenSettings}
-      />
-    </div>
   );
 }
 
@@ -108,7 +94,7 @@ export function DaoApp() {
         <EmptyHome model={model} />
       );
     if (model.activeView === 'today')
-      return <TodayView model={model} onOpenSettings={() => setSettingsOpen(true)} />;
+      return <TodayWorkspace model={model} onOpenSettings={() => setSettingsOpen(true)} />;
     if (model.activeView === 'tasks') return <TasksWorkspace model={model} />;
     if (model.activeView === 'search') return <SearchWorkspace model={model} />;
     return (
