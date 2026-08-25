@@ -51,7 +51,7 @@
 }
 
 .dao-markdown-editor__prose :where(p, ul, ol, blockquote, pre, table) {
-  margin: 0 0 1em;
+  margin: 0 0 0.5em;
 }
 
 .dao-markdown-editor__prose :where(ul, ol) {
@@ -66,8 +66,23 @@
   list-style: decimal;
 }
 
-.dao-markdown-editor__prose li > p {
+/* A list item's paragraph is the item — the spacing around it belongs to the
+   list. Descendant rather than child: a task item wraps its paragraph in a
+   div, so `li > p` never matched one and every task carried a block gap. */
+.dao-markdown-editor__prose li p {
   margin: 0;
+}
+
+/* A nested list is part of the item above it, not a block after it — but its
+   first child is a row like any other, so it opens with the same gap. */
+.dao-markdown-editor__prose li :where(ul, ol) {
+  margin: 0.3em 0 0;
+}
+
+/* One gap between every row in a list, whether the next one is a sibling or a
+   subtask, so nesting reads as structure rather than as tighter spacing. */
+.dao-markdown-editor__prose li + li {
+  margin-top: 0.3em;
 }
 
 .dao-markdown-editor__prose ul[data-type='taskList'] {

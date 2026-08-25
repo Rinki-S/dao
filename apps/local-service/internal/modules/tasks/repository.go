@@ -2,14 +2,27 @@ package tasks
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"time"
 
-	"github.com/oklog/ulid/v2"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
+
+// DocumentFileName is fixed rather than derived from a title, because this file
+// is not something the app lets you rename: there is exactly one per workspace
+// and the workspace already names it.
+const DocumentFileName = "tasks.md"
+
+// The heading is what a new file opens with, so the editor is never a blank
+// page and the file explains itself when opened outside the app.
+const emptyDocument = "# Tasks\n\n"
+
+// ErrWorkspaceNotFound separates an unknown workspace from a missing file,
+// which both surface as an error from the same call otherwise.
+var ErrWorkspaceNotFound = errors.New("workspace not found")
 
 type Repository struct {
 	db       *sql.DB
@@ -17,549 +30,128 @@ type Repository struct {
 	activity *activities.Repository
 }
 
-var ErrInvalidParentTask = errors.New("invalid parent task")
-
-func (r *Repository) Update(id string, req UpdateTaskRequest) (Task, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-
-	tx, err := r.db.Begin()
-	if err != nil {
-		return Task{}, err
-	}
-	defer tx.Rollback()
-
-	task, err := scanTaskRow(tx.QueryRow(`
-		SELECT
-			id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
-			created_at, updated_at, deleted_at, version, sync_status
-		FROM tasks
-		WHERE id = ? AND deleted_at IS NULL
-	`, id))
-	if err != nil {
-		return Task{}, err
-	}
-
-	if req.ProjectIDSet {
-		task.ProjectID = req.ProjectID
-	}
-	if req.Title != nil {
-		task.Title = *req.Title
-	}
-	if req.Description != nil {
-		task.Description = *req.Description
-	}
-	if req.Priority != nil {
-		task.Priority = *req.Priority
-	}
-	if req.DueDateSet {
-		task.DueDate = req.DueDate
-	}
-
-	result, err := tx.Exec(`
-		UPDATE tasks
-		SET project_id = ?, title = ?, description = ?, priority = ?, due_date = ?,
-			updated_at = ?, version = version + 1, sync_status = 'local'
-		WHERE id = ? AND deleted_at IS NULL
-	`, task.ProjectID, task.Title, task.Description, task.Priority, task.DueDate, now, id)
-	if err != nil {
-		return Task{}, err
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return Task{}, err
-	}
-	if rowsAffected == 0 {
-		return Task{}, sql.ErrNoRows
-	}
-
-	task.UpdatedAt = now
-	task.Version += 1
-	task.SyncStatus = "local"
-
-	if err := r.indexer.ReplaceTx(tx, search.IndexEntry{
-		EntityType:  "task",
-		EntityID:    task.ID,
-		WorkspaceID: task.WorkspaceID,
-		ProjectID:   task.ProjectID,
-		Title:       task.Title,
-		Body:        task.Description,
-		CreatedAt:   task.CreatedAt,
-		UpdatedAt:   task.UpdatedAt,
-	}); err != nil {
-		return Task{}, err
-	}
-
-	metadata, err := json.Marshal(map[string]string{
-		"title":    task.Title,
-		"priority": task.Priority,
-	})
-	if err != nil {
-		return Task{}, err
-	}
-
-	if _, err := r.activity.CreateTx(tx, activities.CreateActivityRequest{
-		WorkspaceID:  task.WorkspaceID,
-		ProjectID:    task.ProjectID,
-		EntityType:   "task",
-		EntityID:     task.ID,
-		Action:       "updated",
-		MetadataJSON: string(metadata),
-	}); err != nil {
-		return Task{}, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return Task{}, err
-	}
-
-	return task, nil
-}
-
-func (r *Repository) Delete(id string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	task, err := scanTaskRow(tx.QueryRow(`
-		SELECT
-			id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
-			created_at, updated_at, deleted_at, version, sync_status
-		FROM tasks
-		WHERE id = ? AND deleted_at IS NULL
-	`, id))
-	if err != nil {
-		return err
-	}
-
-	idsToDelete := []string{task.ID}
-	if task.ParentID == nil {
-		childRows, err := tx.Query(`
-			SELECT id
-			FROM tasks
-			WHERE parent_id = ? AND deleted_at IS NULL
-		`, task.ID)
-		if err != nil {
-			return err
-		}
-
-		for childRows.Next() {
-			var childID string
-			if err := childRows.Scan(&childID); err != nil {
-				childRows.Close()
-				return err
-			}
-			idsToDelete = append(idsToDelete, childID)
-		}
-		if err := childRows.Close(); err != nil {
-			return err
-		}
-		if err := childRows.Err(); err != nil {
-			return err
-		}
-	}
-
-	for _, taskID := range idsToDelete {
-		result, err := tx.Exec(`
-			UPDATE tasks
-			SET deleted_at = ?, updated_at = ?, version = version + 1, sync_status = 'local'
-			WHERE id = ? AND deleted_at IS NULL
-		`, now, now, taskID)
-		if err != nil {
-			return err
-		}
-
-		rowsAffected, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rowsAffected == 0 {
-			return sql.ErrNoRows
-		}
-
-		if err := r.indexer.DeleteTx(tx, "task", taskID); err != nil {
-			return err
-		}
-	}
-
-	metadata, err := json.Marshal(map[string]string{
-		"title": task.Title,
-	})
-	if err != nil {
-		return err
-	}
-
-	if _, err := r.activity.CreateTx(tx, activities.CreateActivityRequest{
-		WorkspaceID:  task.WorkspaceID,
-		ProjectID:    task.ProjectID,
-		EntityType:   "task",
-		EntityID:     task.ID,
-		Action:       "deleted",
-		MetadataJSON: string(metadata),
-	}); err != nil {
-		return err
-	}
-
-	if task.ParentID != nil {
-		if err := r.recalculateParentStatusTx(tx, *task.ParentID, now); err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit()
-}
-
-func (r *Repository) UpdateStatus(id string, req UpdateTaskStatusRequest) (Task, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-
-	tx, err := r.db.Begin()
-	if err != nil {
-		return Task{}, err
-	}
-	defer tx.Rollback()
-
-	task, err := scanTaskRow(tx.QueryRow(`
-		SELECT
-			id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
-			created_at, updated_at, deleted_at, version, sync_status
-		FROM tasks
-		WHERE id = ? AND deleted_at IS NULL
-	`, id))
-	if err != nil {
-		return Task{}, err
-	}
-
-	if task.ParentID == nil {
-		if err := r.updateParentStatusTx(tx, task.ID, req.Status, now); err != nil {
-			return Task{}, err
-		}
-	} else {
-		if err := r.updateSingleTaskStatusTx(tx, task.ID, req.Status, now); err != nil {
-			return Task{}, err
-		}
-
-		if err := r.recalculateParentStatusTx(tx, *task.ParentID, now); err != nil {
-			return Task{}, err
-		}
-	}
-
-	updatedTask, err := scanTaskRow(tx.QueryRow(`
-		SELECT
-			id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
-			created_at, updated_at, deleted_at, version, sync_status
-		FROM tasks
-		WHERE id = ?
-	`, id))
-	if err != nil {
-		return Task{}, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return Task{}, err
-	}
-
-	return updatedTask, nil
-}
-
-func (r *Repository) updateParentStatusTx(tx *sql.Tx, id string, status string, now string) error {
-	childCount, err := r.countChildrenTx(tx, id)
-	if err != nil {
-		return err
-	}
-
-	if childCount == 0 {
-		return r.updateSingleTaskStatusTx(tx, id, status, now)
-	}
-
-	childStatus := "todo"
-	parentStatus := "todo"
-	if status == "done" {
-		childStatus = "done"
-		parentStatus = "done"
-	}
-
-	if err := r.updateChildrenStatusTx(tx, id, childStatus, now); err != nil {
-		return err
-	}
-
-	return r.updateSingleTaskStatusTx(tx, id, parentStatus, now)
-}
-
-func (r *Repository) updateSingleTaskStatusTx(tx *sql.Tx, id string, status string, now string) error {
-	result, err := tx.Exec(`
-		UPDATE tasks
-		SET status = ?, updated_at = ?, version = version + 1, sync_status = 'local'
-		WHERE id = ? AND deleted_at IS NULL
-	`, status, now, id)
-	if err != nil {
-		return err
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
-		return sql.ErrNoRows
-	}
-
-	return nil
-}
-
-func (r *Repository) updateChildrenStatusTx(tx *sql.Tx, parentID string, status string, now string) error {
-	_, err := tx.Exec(`
-		UPDATE tasks
-		SET status = ?, updated_at = ?, version = version + 1, sync_status = 'local'
-		WHERE parent_id = ? AND deleted_at IS NULL
-	`, status, now, parentID)
-
-	return err
-}
-
-func (r *Repository) recalculateParentStatusTx(tx *sql.Tx, parentID string, now string) error {
-	var totalCount int
-	var doneCount int
-
-	if err := tx.QueryRow(`
-		SELECT COUNT(*), COALESCE(SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END), 0)
-		FROM tasks
-		WHERE parent_id = ? AND deleted_at IS NULL
-	`, parentID).Scan(&totalCount, &doneCount); err != nil {
-		return err
-	}
-
-	if totalCount == 0 {
-		return nil
-	}
-
-	nextStatus := "doing"
-	if doneCount == 0 {
-		nextStatus = "todo"
-	} else if doneCount == totalCount {
-		nextStatus = "done"
-	}
-
-	return r.updateSingleTaskStatusTx(tx, parentID, nextStatus, now)
-}
-
-func (r *Repository) countChildrenTx(tx *sql.Tx, parentID string) (int, error) {
-	var count int
-
-	err := tx.QueryRow(`
-		SELECT COUNT(*)
-		FROM tasks
-		WHERE parent_id = ? AND deleted_at IS NULL
-	`, parentID).Scan(&count)
-
-	return count, err
-}
-
-type taskScanner interface {
-	Scan(dest ...any) error
-}
-
-func scanTaskRow(row taskScanner) (Task, error) {
-	var task Task
-
-	if err := row.Scan(
-		&task.ID,
-		&task.WorkspaceID,
-		&task.ProjectID,
-		&task.ParentID,
-		&task.Title,
-		&task.Description,
-		&task.Status,
-		&task.Priority,
-		&task.DueDate,
-		&task.CreatedAt,
-		&task.UpdatedAt,
-		&task.DeletedAt,
-		&task.Version,
-		&task.SyncStatus,
-	); err != nil {
-		return Task{}, err
-	}
-
-	return task, nil
-}
-
 func NewRepository(db *sql.DB, indexer search.Indexer, activity *activities.Repository) *Repository {
-	return &Repository{db: db, indexer: indexer, activity: activity}
+	return &Repository{activity: activity, db: db, indexer: indexer}
 }
 
-func (r *Repository) List() ([]Task, error) {
-	rows, err := r.db.Query(`
-		SELECT
-			id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
-			created_at, updated_at, deleted_at, version, sync_status
-		FROM tasks
-		WHERE deleted_at IS NULL
-		ORDER BY created_at DESC
-	`)
+// Get returns the workspace's task document, creating the file the first time
+// it is asked for. Opening Tasks should never fail because nobody has written
+// a task yet.
+func (r *Repository) Get(workspaceID string) (Document, error) {
+	filePath, err := r.documentPath(workspaceID)
 	if err != nil {
-		return nil, err
+		return Document{}, err
 	}
-	defer rows.Close()
 
-	tasks := []Task{}
-
-	for rows.Next() {
-		var task Task
-
-		if err := rows.Scan(
-			&task.ID,
-			&task.WorkspaceID,
-			&task.ProjectID,
-			&task.ParentID,
-			&task.Title,
-			&task.Description,
-			&task.Status,
-			&task.Priority,
-			&task.DueDate,
-			&task.CreatedAt,
-			&task.UpdatedAt,
-			&task.DeletedAt,
-			&task.Version,
-			&task.SyncStatus,
-		); err != nil {
-			return nil, err
+	content, err := os.ReadFile(filePath)
+	if errors.Is(err, os.ErrNotExist) {
+		if err := os.WriteFile(filePath, []byte(emptyDocument), 0644); err != nil {
+			return Document{}, err
 		}
 
-		tasks = append(tasks, task)
+		content = []byte(emptyDocument)
+	} else if err != nil {
+		return Document{}, err
 	}
 
-	return tasks, rows.Err()
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return Document{}, err
+	}
+
+	return Document{
+		Content:     string(content),
+		FilePath:    filePath,
+		UpdatedAt:   info.ModTime().UTC().Format(time.RFC3339),
+		WorkspaceID: workspaceID,
+	}, nil
 }
 
-func (r *Repository) Create(req CreateTaskRequest) (Task, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	priority := req.Priority
-	if priority == "" {
-		priority = "medium"
+// Update replaces the document. The previous content is restored if indexing
+// fails, so the file and the index cannot disagree about what was saved.
+func (r *Repository) Update(workspaceID string, content string) (Document, error) {
+	filePath, err := r.documentPath(workspaceID)
+	if err != nil {
+		return Document{}, err
 	}
 
-	task := Task{
-		ID:          ulid.Make().String(),
-		WorkspaceID: req.WorkspaceID,
-		ProjectID:   req.ProjectID,
-		ParentID:    req.ParentID,
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      "todo",
-		Priority:    priority,
-		DueDate:     req.DueDate,
-		CreatedAt:   now,
-		UpdatedAt:   now,
-		DeletedAt:   nil,
-		Version:     1,
-		SyncStatus:  "local",
+	previous, readErr := os.ReadFile(filePath)
+	existed := readErr == nil
+	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
+		return Document{}, readErr
 	}
+
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return Document{}, err
+	}
+
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+
+		if existed {
+			_ = os.WriteFile(filePath, previous, 0644)
+		} else {
+			_ = os.Remove(filePath)
+		}
+	}()
+
+	now := time.Now().UTC().Format(time.RFC3339)
 
 	tx, err := r.db.Begin()
 	if err != nil {
-		return Task{}, err
+		return Document{}, err
 	}
 	defer tx.Rollback()
 
-	if task.ParentID != nil {
-		parent, err := scanTaskRow(tx.QueryRow(`
-			SELECT
-				id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
-				created_at, updated_at, deleted_at, version, sync_status
-			FROM tasks
-			WHERE id = ? AND deleted_at IS NULL
-		`, *task.ParentID))
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return Task{}, ErrInvalidParentTask
-			}
-
-			return Task{}, err
-		}
-
-		if parent.WorkspaceID != task.WorkspaceID || parent.ParentID != nil {
-			return Task{}, ErrInvalidParentTask
-		}
-
-		if task.ProjectID == nil {
-			task.ProjectID = parent.ProjectID
-		}
-	}
-
-	_, err = tx.Exec(`
-		INSERT INTO tasks (
-			id, workspace_id, project_id, parent_id, title, description, status, priority, due_date,
-			created_at, updated_at, deleted_at, version, sync_status
-		)
-		VALUES (
-			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-		)
-	`,
-		task.ID,
-		task.WorkspaceID,
-		task.ProjectID,
-		task.ParentID,
-		task.Title,
-		task.Description,
-		task.Status,
-		task.Priority,
-		task.DueDate,
-		task.CreatedAt,
-		task.UpdatedAt,
-		task.DeletedAt,
-		task.Version,
-		task.SyncStatus,
-	)
-	if err != nil {
-		return Task{}, err
-	}
-
-	if err := r.indexer.IndexTx(tx, search.IndexEntry{
-		EntityType:  "task",
-		EntityID:    task.ID,
-		WorkspaceID: task.WorkspaceID,
-		ProjectID:   task.ProjectID,
-		Title:       task.Title,
-		Body:        task.Description,
-		CreatedAt:   task.CreatedAt,
-		UpdatedAt:   task.UpdatedAt,
-	}); err != nil {
-		return Task{}, err
-	}
-
-	metadata, err := json.Marshal(map[string]string{
-		"title":    task.Title,
-		"priority": task.Priority,
-	})
-	if err != nil {
-		return Task{}, err
-	}
-
-	if _, err := r.activity.CreateTx(tx, activities.CreateActivityRequest{
-		WorkspaceID:  task.WorkspaceID,
-		ProjectID:    task.ProjectID,
-		EntityType:   "task",
-		EntityID:     task.ID,
-		Action:       "created",
-		MetadataJSON: string(metadata),
-	}); err != nil {
-		return Task{}, err
-	}
-
-	if task.ParentID != nil {
-		if err := r.recalculateParentStatusTx(tx, *task.ParentID, now); err != nil {
-			return Task{}, err
-		}
+	if err := r.indexDocumentTx(tx, workspaceID, content, now); err != nil {
+		return Document{}, err
 	}
 
 	if err := tx.Commit(); err != nil {
-		return Task{}, err
+		return Document{}, err
 	}
 
-	return task, nil
+	committed = true
+
+	return Document{
+		Content:     content,
+		FilePath:    filePath,
+		UpdatedAt:   now,
+		WorkspaceID: workspaceID,
+	}, nil
+}
+
+// The document is one search entry per workspace rather than one per task:
+// a task has no id to index by any more, and the whole file is what a hit
+// opens.
+func (r *Repository) indexDocumentTx(tx *sql.Tx, workspaceID string, content string, now string) error {
+	return r.indexer.ReplaceTx(tx, search.IndexEntry{
+		Body:        content,
+		CreatedAt:   now,
+		EntityID:    workspaceID,
+		EntityType:  "task",
+		Title:       "Tasks",
+		UpdatedAt:   now,
+		WorkspaceID: workspaceID,
+	})
+}
+
+func (r *Repository) documentPath(workspaceID string) (string, error) {
+	var rootPath string
+	if err := r.db.QueryRow(`
+		SELECT root_path
+		FROM workspaces
+		WHERE id = ? AND deleted_at IS NULL
+	`, workspaceID).Scan(&rootPath); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrWorkspaceNotFound
+		}
+
+		return "", err
+	}
+
+	return filepath.Join(rootPath, DocumentFileName), nil
 }

@@ -30,7 +30,6 @@ describe('extension registry', () => {
     expect(commands.map((command) => command.id)).toEqual([
       'create-workspace',
       'switch-workspace',
-      'create-task',
       'open-tasks',
       'open-search',
       'open-settings',

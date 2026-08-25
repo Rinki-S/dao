@@ -70,7 +70,14 @@ describe('NoteEditorPanel Tiptap autosave integration', () => {
 
     render(<NoteEditorPanel noteId="note-1" />);
 
-    const editor = await screen.findByRole('textbox', { name: 'Markdown note content' });
+    // The editor is behind a dynamic import that pulls in Tiptap, ProseMirror
+    // and the Markdown parser. On a loaded machine resolving it takes longer
+    // than findBy's default second — nothing this test is asserting.
+    const editor = await screen.findByRole(
+      'textbox',
+      { name: 'Markdown note content' },
+      { timeout: 10_000 },
+    );
     await user.click(editor);
     await user.type(editor, 'Updated through Tiptap');
 

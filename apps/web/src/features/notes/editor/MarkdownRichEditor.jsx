@@ -45,8 +45,11 @@ function MarkdownSourceFallback({ ariaLabel, initialMarkdown, onMarkdownChange, 
 
 function TiptapMarkdownEditor({
   ariaLabel,
+  extraExtensions,
   initialMarkdown,
   onMarkdownChange,
+  placeholder,
+  renderToolbar,
   saveStatus,
   saveStatusLabel,
 }) {
@@ -62,7 +65,7 @@ function TiptapMarkdownEditor({
         spellcheck: 'true',
       },
     },
-    extensions: createMarkdownEditorExtensions(),
+    extensions: [...createMarkdownEditorExtensions({ placeholder }), ...extraExtensions],
     onUpdate: ({ editor: currentEditor }) => {
       onMarkdownChange(getDurableMarkdown(currentEditor));
     },
@@ -70,11 +73,7 @@ function TiptapMarkdownEditor({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <MarkdownEditorToolbar
-        editor={editor}
-        saveStatus={saveStatus}
-        saveStatusLabel={saveStatusLabel}
-      />
+      {renderToolbar({ editor, saveStatus, saveStatusLabel })}
       <EditorContent className="min-h-0 flex-1 overflow-auto" editor={editor} />
     </div>
   );
@@ -83,11 +82,18 @@ function TiptapMarkdownEditor({
 /**
  * Rich Markdown editor boundary. The caller owns persistence and should key
  * this component by note id so each note receives a fresh editor/history.
+ *
+ * `extraExtensions` lets a surface add behaviour of its own — Tasks decorates
+ * its due dates with it. Keep the array stable: Tiptap reads it once, when the
+ * editor is built. `renderToolbar` lets it replace the controls entirely.
  */
 export function MarkdownRichEditor({
   initialMarkdown,
   onMarkdownChange,
   ariaLabel = 'Markdown note content',
+  extraExtensions = [],
+  placeholder,
+  renderToolbar = (props) => <MarkdownEditorToolbar {...props} />,
   saveStatus,
   saveStatusLabel,
 }) {
@@ -107,7 +113,10 @@ export function MarkdownRichEditor({
   return (
     <TiptapMarkdownEditor
       ariaLabel={ariaLabel}
+      extraExtensions={extraExtensions}
       initialMarkdown={initialMarkdown}
+      placeholder={placeholder}
+      renderToolbar={renderToolbar}
       onMarkdownChange={onMarkdownChange}
       saveStatus={saveStatus}
       saveStatusLabel={saveStatusLabel}

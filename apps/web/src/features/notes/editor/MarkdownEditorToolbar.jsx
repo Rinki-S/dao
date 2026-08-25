@@ -2,7 +2,6 @@ import {
   IconArrowBackUp,
   IconArrowForwardUp,
   IconBold,
-  IconCircleCheck,
   IconCode,
   IconItalic,
   IconList,
@@ -10,48 +9,12 @@ import {
   IconListNumbers,
 } from '@tabler/icons-react';
 import { useEditorState } from '@tiptap/react';
-import { Badge } from '@/components/ui/badge.jsx';
-import { Button } from '@/components/ui/button.jsx';
-import {
-  Toolbar,
-  ToolbarButton,
-  ToolbarGroup,
-  ToolbarSeparator,
-} from '@/components/ui/toolbar.jsx';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@/components/ui/tooltip.jsx';
+import { Toolbar, ToolbarGroup, ToolbarSeparator } from '@/components/ui/toolbar.jsx';
+import { EditorToolbarButton, EditorToolbarShell } from './EditorToolbarShell.jsx';
 import { MarkdownBlockTypeControl } from './MarkdownBlockTypeControl.jsx';
 import { MarkdownLinkControl } from './MarkdownLinkControl.jsx';
-import { useTitlebarInset } from '@/components/shell/use-titlebar-inset.js';
-import { cn } from '@/lib/utils';
-
-function EditorButton({ disabled = false, editor, icon: Icon, isActive = false, label, onClick }) {
-  const button = (
-    <ToolbarButton
-      render={
-        <Button
-          aria-label={label}
-          aria-pressed={isActive || undefined}
-          disabled={disabled}
-          size="icon-sm"
-          type="button"
-          variant={isActive ? 'secondary' : 'ghost'}
-          onClick={() => onClick(editor)}
-        />
-      }
-    >
-      <Icon aria-hidden="true" />
-    </ToolbarButton>
-  );
-  return (
-    <Tooltip>
-      <TooltipTrigger delay={300} render={button} />
-      <TooltipPopup>{label}</TooltipPopup>
-    </Tooltip>
-  );
-}
 
 function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
-  const titlebarInset = useTitlebarInset();
   const state = useEditorState({
     editor,
     selector: ({ editor: current }) => {
@@ -85,27 +48,21 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
   });
 
   return (
-    <div className="flex h-12 items-center gap-2 border-b px-2">
-      {/* Equal-flex rails on both sides keep the toolbar centred in the bar no
-          matter how wide the save status gets; the leading one also reserves
-          room for the window controls while the sidebar is hidden. */}
-      <div aria-hidden="true" className={cn('flex self-stretch', titlebarInset.rail)}>
-        <div className={cn(titlebarInset.drag, 'flex-1', titlebarInset.controlsOffset)} />
-      </div>
+    <EditorToolbarShell saveStatus={saveStatus} saveStatusLabel={saveStatusLabel}>
       <Toolbar aria-label="Markdown formatting">
         <ToolbarGroup>
           <MarkdownBlockTypeControl disabled={state.isInTable} editor={editor} />
         </ToolbarGroup>
         <ToolbarSeparator />
         <ToolbarGroup>
-          <EditorButton
+          <EditorToolbarButton
             editor={editor}
             icon={IconBold}
             isActive={state.isBold}
             label="Bold"
             onClick={(current) => current.chain().focus().toggleBold().run()}
           />
-          <EditorButton
+          <EditorToolbarButton
             editor={editor}
             icon={IconItalic}
             isActive={state.isItalic}
@@ -115,7 +72,7 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
         </ToolbarGroup>
         <ToolbarSeparator />
         <ToolbarGroup>
-          <EditorButton
+          <EditorToolbarButton
             disabled={state.isInTable}
             editor={editor}
             icon={IconList}
@@ -123,7 +80,7 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
             label="Bullet list"
             onClick={(current) => current.chain().focus().toggleBulletList().run()}
           />
-          <EditorButton
+          <EditorToolbarButton
             disabled={state.isInTable}
             editor={editor}
             icon={IconListNumbers}
@@ -131,7 +88,7 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
             label="Ordered list"
             onClick={(current) => current.chain().focus().toggleOrderedList().run()}
           />
-          <EditorButton
+          <EditorToolbarButton
             disabled={state.isInTable}
             editor={editor}
             icon={IconListCheck}
@@ -139,7 +96,7 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
             label="Task list"
             onClick={(current) => current.chain().focus().toggleTaskList().run()}
           />
-          <EditorButton
+          <EditorToolbarButton
             editor={editor}
             icon={IconCode}
             isActive={state.isCode}
@@ -150,14 +107,14 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
         </ToolbarGroup>
         <ToolbarSeparator />
         <ToolbarGroup>
-          <EditorButton
+          <EditorToolbarButton
             disabled={!state.canUndo}
             editor={editor}
             icon={IconArrowBackUp}
             label="Undo"
             onClick={(current) => current.chain().focus().undo().run()}
           />
-          <EditorButton
+          <EditorToolbarButton
             disabled={!state.canRedo}
             editor={editor}
             icon={IconArrowForwardUp}
@@ -166,28 +123,7 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
           />
         </ToolbarGroup>
       </Toolbar>
-      {/* Drag lives here rather than on the bar: an app-region ancestor swallows
-          clicks for the fixed window trigger overlapping it, and the trigger is
-          not a descendant of this bar. */}
-      <div
-        className={cn(
-          titlebarInset.drag,
-          'flex min-w-0 flex-1 items-center justify-end self-stretch',
-        )}
-      >
-        {saveStatusLabel ? (
-          <Badge
-            aria-live="polite"
-            variant={
-              saveStatus === 'failed' ? 'error' : saveStatus === 'saved' ? 'success' : 'secondary'
-            }
-          >
-            <IconCircleCheck aria-hidden="true" />
-            {saveStatusLabel}
-          </Badge>
-        ) : null}
-      </div>
-    </div>
+    </EditorToolbarShell>
   );
 }
 

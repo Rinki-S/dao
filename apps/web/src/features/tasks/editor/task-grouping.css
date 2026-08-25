@@ -1,0 +1,21 @@
+/* Marks where the finished tasks begin. The grouping itself is in the
+   document — this only labels the seam, so it stays out of the file. */
+.dao-task-group-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  /* Lines up with the checkboxes rather than hanging out in the gutter the
+     fold arrows live in — it labels the tasks below it, not the column. */
+  margin: 0.9em 0 0.6em;
+  padding-left: 1.25rem;
+  color: var(--muted-foreground);
+  font-size: 0.75em;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+.dao-task-group-divider::after {
+  flex: 1;
+  border-top: 1px solid var(--border);
+  content: '';
+}

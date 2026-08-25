@@ -1,54 +1,17 @@
 import { z } from 'zod';
 
-export const TaskSchema = z.object({
-  id: z.string(),
+/**
+ * A workspace's whole task list is one Markdown file. There is no per-task
+ * record: a task is a checkbox line, a subtask is an indented one, a due date
+ * is `@due(2026-08-25)` and a priority is `!high`.
+ */
+export const TaskDocumentSchema = z.object({
   workspaceId: z.string(),
-  projectId: z.string().nullable(),
-  parentId: z.string().nullable(),
-  title: z.string(),
-  description: z.string(),
-  status: z.enum(['todo', 'doing', 'done', 'archived']),
-  priority: z.enum(['low', 'medium', 'high']),
-  dueDate: z.string().nullable(),
-  createdAt: z.string(),
+  content: z.string(),
+  filePath: z.string(),
   updatedAt: z.string(),
-  deletedAt: z.string().nullable(),
-  version: z.number(),
-  syncStatus: z.string(),
 });
 
-export const TaskListSchema = z.array(TaskSchema);
-
-export const CreateTaskInputSchema = z.object({
-  workspaceId: z.string().trim().min(1, { error: 'Workspace is required' }),
-  projectId: z.string().trim().nullable(),
-  parentId: z.string().trim().nullable().default(null),
-  title: z.string().trim().min(1, { error: 'Task title is required' }),
-  description: z.string().trim(),
-  priority: z.enum(['low', 'medium', 'high']).default('medium'),
-  dueDate: z.string().trim().nullable(),
+export const UpdateTaskDocumentInputSchema = z.object({
+  content: z.string(),
 });
-
-export const UpdateTaskStatusInputSchema = z.object({
-  status: z.enum(['todo', 'done']),
-});
-
-export const UpdateTaskInputSchema = z
-  .object({
-    projectId: z.string().trim().nullable().optional(),
-    title: z.string().trim().min(1, { error: 'Task title is required' }).optional(),
-    description: z.string().trim().optional(),
-    priority: z.enum(['low', 'medium', 'high']).optional(),
-    dueDate: z.string().trim().nullable().optional(),
-  })
-  .refine(
-    (input) =>
-      input.projectId !== undefined ||
-      input.title !== undefined ||
-      input.description !== undefined ||
-      input.priority !== undefined ||
-      input.dueDate !== undefined,
-    {
-      error: 'Task update payload is required',
-    },
-  );

@@ -1,28 +1,22 @@
 import { apiFetch } from '../../lib/api-client.js';
-import {
-  CreateTaskInputSchema,
-  TaskListSchema,
-  TaskSchema,
-  UpdateTaskInputSchema,
-  UpdateTaskStatusInputSchema,
-} from './schemas.js';
+import { TaskDocumentSchema, UpdateTaskDocumentInputSchema } from './schemas.js';
 
-export async function listTasks() {
-  const response = await apiFetch('/api/tasks');
+export async function getTaskDocument(workspaceId) {
+  const response = await apiFetch(`/api/tasks?workspaceId=${encodeURIComponent(workspaceId)}`);
 
   if (!response.ok) {
-    throw new Error(`Failed to list tasks: ${response.status}`);
+    throw new Error(`Failed to read tasks: ${response.status}`);
   }
 
   const data = await response.json();
-  return TaskListSchema.parse(data);
+  return TaskDocumentSchema.parse(data);
 }
 
-export async function createTask(input) {
-  const payload = CreateTaskInputSchema.parse(input);
+export async function updateTaskDocument(workspaceId, input) {
+  const payload = UpdateTaskDocumentInputSchema.parse(input);
 
-  const response = await apiFetch('/api/tasks', {
-    method: 'POST',
+  const response = await apiFetch(`/api/tasks?workspaceId=${encodeURIComponent(workspaceId)}`, {
+    method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -30,57 +24,9 @@ export async function createTask(input) {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create task: ${response.status}`);
+    throw new Error(`Failed to save tasks: ${response.status}`);
   }
 
   const data = await response.json();
-  return TaskSchema.parse(data);
-}
-
-export async function updateTaskStatus(taskId, input) {
-  const payload = UpdateTaskStatusInputSchema.parse(input);
-
-  const response = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/status`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to update task status: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return TaskSchema.parse(data);
-}
-
-export async function updateTask(taskId, input) {
-  const payload = UpdateTaskInputSchema.parse(input);
-
-  const response = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to update task: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return TaskSchema.parse(data);
-}
-
-export async function deleteTask(taskId) {
-  const response = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
-    method: 'DELETE',
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to delete task: ${response.status}`);
-  }
+  return TaskDocumentSchema.parse(data);
 }
