@@ -1,0 +1,102 @@
+package llm
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+)
+
+// Wire is the protocol an endpoint speaks. It is deliberately not a vendor
+// name: most vendors speak WireOpenAI, and choosing by protocol is what lets
+// one implementation serve all of them.
+type Wire string
+
+const (
+	WireAnthropic Wire = "anthropic"
+	WireOpenAI    Wire = "openai"
+)
+
+const defaultTimeout = 90 * time.Second
+
+var (
+	ErrNotConfigured = errors.New("no model provider is configured")
+	ErrUnknownWire   = errors.New("unknown provider format")
+)
+
+// Config is everything needed to reach a model. The key is passed in rather
+// than read from anywhere: it lives in the OS keychain and arrives as a
+// process flag, and this package should not know where it came from.
+type Config struct {
+	Wire    Wire
+	BaseURL string
+	APIKey  string
+	Model   string
+}
+
+func (c Config) Validate() error {
+	switch {
+	case c.BaseURL == "" || c.APIKey == "" || c.Model == "":
+		return ErrNotConfigured
+	case c.Wire != WireAnthropic && c.Wire != WireOpenAI:
+		return fmt.Errorf("%w: %q", ErrUnknownWire, c.Wire)
+	}
+	return nil
+}
+
+type Options struct {
+	// MaxTokens caps the answer. Every wire requires or accepts one, and a
+	// caller parsing structured output needs the ceiling high enough that a
+	// complete object fits.
+	MaxTokens int
+}
+
+// Client is the whole surface the rest of Dao sees. One method: no streaming,
+// because a response that is validated against a schema cannot be acted on
+// until it is complete. Streaming can be added beside it later without the
+// types above changing.
+type Client interface {
+	Complete(ctx context.Context, request Context, opts Options) (Response, error)
+}
+
+// New picks the implementation for the configured wire.
+func New(cfg Config, httpClient *http.Client) (Client, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: defaultTimeout}
+	}
+
+	base := strings.TrimSuffix(cfg.BaseURL, "/")
+
+	switch cfg.Wire {
+	case WireAnthropic:
+		return &anthropicClient{config: cfg, baseURL: base, http: httpClient}, nil
+	case WireOpenAI:
+		return &openAIClient{config: cfg, baseURL: base, http: httpClient}, nil
+	default:
+		return nil, fmt.Errorf("%w: %q", ErrUnknownWire, cfg.Wire)
+	}
+}
+
+// APIError is a refusal from the provider rather than a failure to reach it.
+// The status is kept so callers can tell an unusable key from a rate limit
+// from a request the endpoint did not understand, and report accordingly.
+type APIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("provider returned %d: %s", e.StatusCode, truncate(e.Body, 500))
+}
+
+func truncate(text string, limit int) string {
+	if len(text) <= limit {
+		return text
+	}
+	return text[:limit] + "…"
+}
