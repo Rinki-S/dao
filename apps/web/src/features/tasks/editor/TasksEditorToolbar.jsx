@@ -201,7 +201,10 @@ function ReadyToolbar({ editor, saveStatus, saveStatusLabel }) {
         {/* Batch actions look identical to single ones, so the count is the
             only thing saying how far the next click reaches. */}
         {isBatch ? (
-          <Badge aria-live="polite" variant="secondary">
+          // self-center because the toolbar aligns its children by stretching
+          // them, and a badge has a height of its own to stretch to — without
+          // this it sits at the top of the bar while every control is centred.
+          <Badge aria-live="polite" className="self-center" variant="secondary">
             {state.selectedCount} tasks
           </Badge>
         ) : null}
