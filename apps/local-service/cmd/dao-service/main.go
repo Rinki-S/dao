@@ -16,6 +16,7 @@ import (
 
 	"github.com/pressly/goose/v3"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/ai"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/notes"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/projects"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
@@ -29,6 +30,10 @@ import (
 func main() {
 	port := flag.String("port", "3766", "local service port")
 	token := flag.String("token", "", "local session token")
+	// Handed over at startup rather than read from disk here: the key is kept
+	// encrypted by the desktop app, and this process only ever holds it in
+	// memory for as long as it runs.
+	modelAPIKey := flag.String("model-api-key", "", "API key for the configured model provider")
 	flag.Parse()
 
 	db, err := openDatabase()
@@ -52,6 +57,10 @@ func main() {
 	settingsRepo := settings.NewRepository(db)
 	settingsHandler := settings.NewHandler(settingsRepo)
 	settingsHandler.RegisterRoutes(apiMux)
+
+	aiRepo := ai.NewRepository(db)
+	aiHandler := ai.NewHandler(aiRepo, *modelAPIKey)
+	aiHandler.RegisterRoutes(apiMux)
 
 	workspaceRepo := workspaces.NewRepository(db, activityRepo, settingsRepo)
 	workspaceHandler := workspaces.NewHandler(workspaceRepo)
