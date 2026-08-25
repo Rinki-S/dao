@@ -3,7 +3,7 @@ import { IconAlertTriangle, IconSparkles } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardDescription, CardHeader, CardPanel, CardTitle } from '@/components/ui/card.jsx';
 import { Spinner } from '@/components/ui/spinner.jsx';
-import { summarizeToday, SUMMARY_OUTCOMES } from '../api.js';
+import { saveSummaryAsNote, summarizeToday, SUMMARY_OUTCOMES } from '../api.js';
 
 // What the reader should do about each way this can fail. A single "AI
 // failed" would leave them guessing which of these it was.
@@ -59,6 +59,8 @@ export function TodaySummaryCard({ workspaceId, onOpenSettings }) {
   const [result, setResult] = useState(null);
   const [outcome, setOutcome] = useState(null);
   const [message, setMessage] = useState('');
+  const [saveStatus, setSaveStatus] = useState('idle');
+  const [saved, setSaved] = useState(null);
 
   async function run() {
     if (!workspaceId) return;
@@ -66,6 +68,10 @@ export function TodaySummaryCard({ workspaceId, onOpenSettings }) {
     setStatus('loading');
     setOutcome(null);
     setMessage('');
+    // A new run is a new thing to decide about, so the last decision does not
+    // carry over.
+    setSaveStatus('idle');
+    setSaved(null);
 
     try {
       setResult(await summarizeToday(workspaceId));
@@ -74,6 +80,23 @@ export function TodaySummaryCard({ workspaceId, onOpenSettings }) {
       setStatus('failed');
       setOutcome(error.outcome ?? SUMMARY_OUTCOMES.failed);
       setMessage(error.message);
+    }
+  }
+
+  // Keeping it is the confirmation step. Only the run's id is sent: the note
+  // is written from what the service recorded, so what is saved is what was
+  // shown above.
+  async function keep() {
+    if (!result) return;
+
+    setSaveStatus('saving');
+
+    try {
+      setSaved(await saveSummaryAsNote(result.traceId));
+      setSaveStatus('saved');
+    } catch (error) {
+      setSaveStatus('failed');
+      setMessage(error instanceof Error ? error.message : 'Could not save the note');
     }
   }
 
@@ -119,6 +142,16 @@ export function TodaySummaryCard({ workspaceId, onOpenSettings }) {
             {coverage(result.included) ? (
               <p className="text-muted-foreground text-xs">{coverage(result.included)}</p>
             ) : null}
+            {saveStatus === 'saved' && saved ? (
+              <p className="text-muted-foreground text-xs" role="status">
+                Saved as “{saved.title}”.
+              </p>
+            ) : null}
+            {saveStatus === 'failed' ? (
+              <p className="text-destructive text-xs" role="alert">
+                {message}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -136,6 +169,11 @@ export function TodaySummaryCard({ workspaceId, onOpenSettings }) {
         {outcome === SUMMARY_OUTCOMES.notConfigured || outcome === SUMMARY_OUTCOMES.keyRejected ? (
           <Button size="sm" variant="outline" onClick={onOpenSettings}>
             Open Settings
+          </Button>
+        ) : null}
+        {status === 'ready' && saveStatus !== 'saved' ? (
+          <Button loading={saveStatus === 'saving'} size="sm" variant="outline" onClick={keep}>
+            Keep as note
           </Button>
         ) : null}
         <Button disabled={!workspaceId} loading={status === 'loading'} size="sm" onClick={run}>

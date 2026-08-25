@@ -55,6 +55,12 @@ export const SummaryResultSchema = z.object({
   included: IncludedSchema,
 });
 
+export const AcceptedSchema = z.object({
+  traceId: z.string(),
+  noteId: z.string(),
+  title: z.string(),
+});
+
 export const ModelKeyStatusSchema = z.object({
   available: z.boolean(),
   present: z.boolean(),

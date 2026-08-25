@@ -108,6 +108,58 @@ describe('TodaySummaryCard', () => {
     expect(screen.queryByText(/^Next: /)).not.toBeInTheDocument();
   });
 
+  it('keeps a summary by sending only the run id', async () => {
+    respondWith(summary());
+    await summarise();
+    await screen.findByText('Reworked the parser recovery path');
+
+    apiFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ traceId: 'trace-1', noteId: 'note-1', title: 'Summary 2026-08-25' }),
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Keep as note' }));
+
+    const save = apiFetch.mock.calls.at(-1);
+    expect(save[0]).toBe('/api/ai/traces/trace-1/save-as-note');
+    // The summary itself is not posted back: the service writes what it
+    // recorded, so what is saved is what was shown.
+    expect(save[1].body).toBeUndefined();
+
+    expect(await screen.findByText(/Saved as/)).toBeInTheDocument();
+  });
+
+  it('stops offering to keep a summary once it is kept', async () => {
+    respondWith(summary());
+    await summarise();
+    await screen.findByText('Reworked the parser recovery path');
+
+    apiFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ traceId: 'trace-1', noteId: 'note-1', title: 'Summary 2026-08-25' }),
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Keep as note' }));
+
+    await screen.findByText(/Saved as/);
+    expect(screen.queryByRole('button', { name: 'Keep as note' })).not.toBeInTheDocument();
+  });
+
+  it('says when keeping it failed instead of claiming it saved', async () => {
+    respondWith(summary());
+    await summarise();
+    await screen.findByText('Reworked the parser recovery path');
+
+    apiFetch.mockResolvedValue({
+      ok: false,
+      status: 409,
+      text: async () => 'that run was already saved',
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Keep as note' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('already saved');
+  });
+
   it('refuses output that does not match the shape', async () => {
     // The service and the renderer are separate programs. This one should not
     // render whatever the other happens to send.

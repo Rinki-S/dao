@@ -1,5 +1,6 @@
 import { apiFetch } from '@/lib/api-client.js';
 import {
+  AcceptedSchema,
   KeyMutationResultSchema,
   ModelKeyStatusSchema,
   ProviderSettingsSchema,
@@ -86,6 +87,26 @@ export async function summarizeToday(workspaceId) {
   }
 
   return SummaryResultSchema.parse(await response.json());
+}
+
+/**
+ * Keep a summary as a note.
+ *
+ * Only the run's id is sent. Everything written comes from the trace the
+ * service already holds, so what is saved is the summary that was shown —
+ * a confirmation that posts back its own copy confirms nothing.
+ */
+export async function saveSummaryAsNote(traceId) {
+  const response = await apiFetch(`/api/ai/traces/${encodeURIComponent(traceId)}/save-as-note`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const message = (await response.text()) || `Request failed: ${response.status}`;
+    throw new Error(message);
+  }
+
+  return AcceptedSchema.parse(await response.json());
 }
 
 // The key never travels over HTTP. It goes through the desktop bridge to the

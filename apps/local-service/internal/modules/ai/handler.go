@@ -20,6 +20,7 @@ type Handler struct {
 	apiKey string
 	runner *harness.Runner
 	traces *trace.Repository
+	notes  harness.NoteWriter
 }
 
 func NewHandler(repo *Repository, apiKey string) *Handler {
@@ -28,8 +29,13 @@ func NewHandler(repo *Repository, apiKey string) *Handler {
 
 // WithHarness attaches the run machinery. It is set after construction because
 // the runner needs Client and Describe, which are methods on the handler.
-func (h *Handler) WithHarness(gather *harness.Gatherer, traces *trace.Repository) *Handler {
+func (h *Handler) WithHarness(
+	gather *harness.Gatherer,
+	traces *trace.Repository,
+	notes harness.NoteWriter,
+) *Handler {
 	h.traces = traces
+	h.notes = notes
 	h.runner = &harness.Runner{
 		Gather:    gather,
 		Traces:    traces,
@@ -46,6 +52,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/ai/provider", h.updateProvider)
 	mux.HandleFunc("POST /api/ai/summarize-today", h.summarizeToday)
 	mux.HandleFunc("GET /api/ai/traces", h.listTraces)
+	mux.HandleFunc("POST /api/ai/traces/{id}/save-as-note", h.saveAsNote)
 }
 
 // Describe reports where requests go, for the trace to record alongside them.
@@ -110,6 +117,37 @@ func summaryMessage(err error) string {
 	}
 
 	return err.Error()
+}
+
+// saveAsNote is the confirmation step: a human saw the summary and chose to
+// keep it.
+//
+// The request carries only the run's id. Everything written comes from the
+// trace, so the note is provably the summary that was shown rather than
+// something the renderer reassembled — a confirmation that trusts its own
+// payload confirms nothing.
+func (h *Handler) saveAsNote(w http.ResponseWriter, r *http.Request) {
+	if h.runner == nil || h.notes == nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "AI is not available")
+		return
+	}
+
+	accepted, err := h.runner.SaveSummaryAsNote(r.PathValue("id"), h.notes)
+	if err != nil {
+		switch {
+		case errors.Is(err, harness.ErrTraceNotFound):
+			httpx.Error(w, http.StatusNotFound, "no such run")
+		case errors.Is(err, harness.ErrAlreadyAccepted):
+			httpx.Error(w, http.StatusConflict, "that run was already saved")
+		case errors.Is(err, harness.ErrNothingToSave):
+			httpx.Error(w, http.StatusUnprocessableEntity, "that run produced nothing to save")
+		default:
+			httpx.Error(w, http.StatusInternalServerError, "failed to save the summary")
+		}
+		return
+	}
+
+	httpx.JSON(w, http.StatusOK, accepted)
 }
 
 func (h *Handler) listTraces(w http.ResponseWriter, r *http.Request) {

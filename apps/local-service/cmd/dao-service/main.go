@@ -107,6 +107,21 @@ func main() {
 			return document.Content, updatedAt, nil
 		}),
 		trace.NewRepository(db, func() string { return ulid.Make().String() }),
+		func(workspaceID, title, content string) (string, error) {
+			// At the workspace root, as a plain Markdown note. A saved summary
+			// is a note like any other once it exists.
+			note, err := noteRepo.Create(notes.CreateNoteRequest{
+				WorkspaceID: workspaceID,
+				Title:       title,
+				Content:     content,
+				ContentType: "markdown",
+				NoteType:    "general",
+			})
+			if err != nil {
+				return "", err
+			}
+			return note.ID, nil
+		},
 	).RegisterRoutes(apiMux)
 
 	mux := http.NewServeMux()
