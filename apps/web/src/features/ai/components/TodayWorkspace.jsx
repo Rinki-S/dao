@@ -137,12 +137,16 @@ export function TodayWorkspace({ model, onOpenSettings }) {
 
   return (
     <section aria-label="Today" className="flex h-full min-h-0 flex-col">
-      <header className={cn('flex items-center gap-3 border-b p-4', titlebarInset.padding)}>
-        <div className={cn(titlebarInset.drag, 'min-w-0 flex-1')}>
-          <h1 className="font-heading font-semibold text-xl">Today</h1>
-          <p className="text-muted-foreground text-sm">
-            {result ? result.date : 'A short account of what this day contained.'}
-          </p>
+      {/* h-12 and px-2 to match the note editor's toolbar: switching between a
+          note and this page should not move the line the window sits under. */}
+      <header
+        className={cn('flex h-12 shrink-0 items-center gap-2 border-b px-2', titlebarInset.padding)}
+      >
+        <div className={cn(titlebarInset.drag, 'flex min-w-0 flex-1 items-baseline gap-2')}>
+          <h1 className="font-heading font-semibold text-sm">Today</h1>
+          {result ? (
+            <span className="truncate text-muted-foreground text-sm">{result.date}</span>
+          ) : null}
         </div>
         {hasRun ? (
           <Button
