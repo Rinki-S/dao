@@ -4,7 +4,10 @@
   display: flex;
   align-items: center;
   gap: 0.5em;
+  /* Lines up with the checkboxes rather than hanging out in the gutter the
+     fold arrows live in — it labels the tasks below it, not the column. */
   margin: 0.9em 0 0.6em;
+  padding-left: 1.25rem;
   color: var(--muted-foreground);
   font-size: 0.75em;
   letter-spacing: 0.02em;
