@@ -45,12 +45,13 @@ export function SearchWorkspace({ model }) {
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <header className={cn('flex items-center border-b p-4', titlebarInset.padding)}>
-        <div className={cn(titlebarInset.drag, 'flex-1')}>
-          <h1 className="font-heading text-xl font-semibold">Search</h1>
-          <p className="text-muted-foreground text-sm">
-            Open notes, tasks, and folders without leaving your train of thought.
-          </p>
+      {/* h-12 and px-2, the same bar every other surface has: moving between
+          views should not shift the line the content starts under. */}
+      <header
+        className={cn('flex h-12 shrink-0 items-center gap-2 border-b px-2', titlebarInset.padding)}
+      >
+        <div className={cn(titlebarInset.drag, 'flex min-w-0 flex-1 items-baseline')}>
+          <h1 className="font-heading font-semibold text-sm">Search</h1>
         </div>
       </header>
       <ScrollArea className="min-h-0 flex-1" overscrollContain>
@@ -123,7 +124,9 @@ export function SearchWorkspace({ model }) {
                   <IconSearch aria-hidden="true" />
                 </EmptyMedia>
                 <EmptyTitle>Search your local workspace</EmptyTitle>
-                <EmptyDescription>Results come from Dao's SQLite full-text index.</EmptyDescription>
+                <EmptyDescription>
+                  Notes, tasks, and folders, from Dao's SQLite full-text index.
+                </EmptyDescription>
               </EmptyHeader>
             </Empty>
           ) : null}
