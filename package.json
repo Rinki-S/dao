@@ -1,4 +1,7 @@
 {
   "name": "dao",
-  "private": true
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @dao/desktop dev"
+  }
 }
