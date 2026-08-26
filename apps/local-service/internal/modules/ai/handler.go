@@ -19,9 +19,9 @@ import (
 type Handler struct {
 	repo        *Repository
 	credentials *Credentials
-	runner *harness.Runner
-	traces *trace.Repository
-	notes  harness.NoteWriter
+	runner      *harness.Runner
+	traces      *trace.Repository
+	notes       harness.NoteWriter
 }
 
 func NewHandler(repo *Repository, credentials *Credentials) *Handler {

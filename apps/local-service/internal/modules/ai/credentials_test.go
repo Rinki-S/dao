@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"sync"
 	"testing"
 
@@ -195,5 +196,64 @@ func TestUpdateCredentialEndpoint(t *testing.T) {
 				t.Errorf("held %q, want the previous credential untouched", secret)
 			}
 		})
+	}
+}
+
+// The link the endpoint exists for: a credential pushed at runtime has to
+// change what the next outgoing request carries. Everything else about the
+// push is bookkeeping if this does not hold.
+func TestAPushedCredentialChangesTheNextRequest(t *testing.T) {
+	var seen []string
+
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Header.Get("authorization"))
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}]}`))
+	}))
+	defer provider.Close()
+
+	repo := NewRepository(openTestDB(t))
+	if _, err := repo.Set(UpdateProviderSettingsRequest{
+		Wire: "openai", BaseURL: provider.URL, Model: "m",
+	}, true); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	credentials := NewCredentials(KindOAuthToken, "at-1")
+	handler := NewHandler(repo, credentials)
+
+	call := func() {
+		t.Helper()
+
+		client, err := handler.Client()
+		if err != nil {
+			t.Fatalf("Client: %v", err)
+		}
+		if _, err := client.Complete(t.Context(),
+			llm.Context{Messages: []llm.Message{llm.UserText("x")}},
+			llm.Options{MaxTokens: 16},
+		); err != nil {
+			t.Fatalf("Complete: %v", err)
+		}
+	}
+
+	call()
+
+	// What the desktop process does after renewing.
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, httptest.NewRequest(
+		http.MethodPut, "/api/ai/credential",
+		bytes.NewBufferString(`{"kind":"oauth-token","secret":"at-2"}`),
+	))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("push: status %d", recorder.Code)
+	}
+
+	call()
+
+	if want := []string{"Bearer at-1", "Bearer at-2"}; !slices.Equal(seen, want) {
+		t.Errorf("provider saw %v, want %v", seen, want)
 	}
 }
