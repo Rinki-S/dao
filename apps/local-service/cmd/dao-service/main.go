@@ -40,7 +40,13 @@ func main() {
 	// credential for a paid third-party account. The desktop app keeps it
 	// encrypted and hands it over at startup; this process only ever holds it
 	// in memory, for as long as it runs.
-	modelAPIKey := os.Getenv("DAO_MODEL_API_KEY")
+	// The kind travels beside it because the same string is presented
+	// differently depending on what it is: a key goes in the wire's own header,
+	// an access token always goes in an Authorization bearer header.
+	modelCredentials := ai.NewCredentials(
+		os.Getenv("DAO_MODEL_CREDENTIAL_KIND"),
+		os.Getenv("DAO_MODEL_API_KEY"),
+	)
 
 	db, err := openDatabase()
 	if err != nil {
@@ -65,7 +71,7 @@ func main() {
 	settingsHandler.RegisterRoutes(apiMux)
 
 	aiRepo := ai.NewRepository(db)
-	aiHandler := ai.NewHandler(aiRepo, modelAPIKey)
+	aiHandler := ai.NewHandler(aiRepo, modelCredentials)
 
 	workspaceRepo := workspaces.NewRepository(db, activityRepo, settingsRepo)
 	workspaceHandler := workspaces.NewHandler(workspaceRepo)

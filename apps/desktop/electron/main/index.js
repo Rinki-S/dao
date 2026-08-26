@@ -136,7 +136,8 @@ app.whenReady().then(async () => {
         app.dock.setIcon(appIconPath)
     }
 
-    serviceConfig = createServiceConfig(readServiceSecret().secret)
+    const startupCredential = readServiceSecret()
+    serviceConfig = createServiceConfig(startupCredential.secret, startupCredential.kind)
     localService = startLocalService(serviceConfig)
 
     await waitForServiceHealth(serviceConfig.baseUrl)
@@ -186,7 +187,12 @@ async function restartWithCurrentKey() {
         return { ok: false, error: 'Local service is not configured' }
     }
 
-    serviceConfig = { ...serviceConfig, modelApiKey: readServiceSecret().secret }
+    const current = readServiceSecret()
+    serviceConfig = {
+        ...serviceConfig,
+        modelApiKey: current.secret,
+        modelCredentialKind: current.kind,
+    }
 
     try {
         await restartLocalService()

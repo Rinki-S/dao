@@ -133,18 +133,22 @@ func (r *Repository) Set(request UpdateProviderSettingsRequest, keyPresent bool)
 	return r.Get(keyPresent)
 }
 
-// Config assembles what llm.New needs. The key arrives from the caller, so
-// this package never has to know where it was kept.
-func (r *Repository) Config(apiKey string) (llm.Config, error) {
-	settings, err := r.Get(apiKey != "")
+// Config assembles what llm.New needs. The credential arrives from the caller,
+// so this package never has to know where it was kept or what kind it is.
+func (r *Repository) Config(credentials *Credentials) (llm.Config, error) {
+	settings, err := r.Get(credentials.Present())
 	if err != nil {
 		return llm.Config{}, err
 	}
 
+	wire := llm.Wire(settings.Wire)
+
 	return llm.Config{
-		Wire:    llm.Wire(settings.Wire),
+		Wire:    wire,
 		BaseURL: settings.BaseURL,
-		APIKey:  apiKey,
 		Model:   settings.Model,
+		// Which header this ends up in, and whether it renews, is the
+		// credential's business rather than this one's.
+		Credential: credentials.Credential(wire),
 	}, nil
 }

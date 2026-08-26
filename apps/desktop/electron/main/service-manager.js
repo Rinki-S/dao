@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 
 const DEFAULT_PORT = '3766';
 
-export function createServiceConfig(modelApiKey = '') {
+export function createServiceConfig(modelApiKey = '', modelCredentialKind = '') {
     const port = process.env.DAO_SERVICE_PORT ?? DEFAULT_PORT;
     const sessionToken = crypto.randomBytes(32).toString('hex')
 
@@ -16,6 +16,9 @@ export function createServiceConfig(modelApiKey = '') {
         port,
         sessionToken,
         modelApiKey,
+        // Which kind it is decides how the service presents it: a key goes in
+        // the header its wire expects, an access token is always a bearer.
+        modelCredentialKind,
         baseUrl: `http://127.0.0.1:${port}`
     }
 }
@@ -35,7 +38,12 @@ export function startLocalService(config) {
             // and this one is a credential for a paid third-party account.
             env: {
                 ...process.env,
-                ...(config.modelApiKey ? { DAO_MODEL_API_KEY: config.modelApiKey } : {}),
+                ...(config.modelApiKey
+                    ? {
+                          DAO_MODEL_API_KEY: config.modelApiKey,
+                          DAO_MODEL_CREDENTIAL_KIND: config.modelCredentialKind ?? '',
+                      }
+                    : {}),
             },
         },
     )

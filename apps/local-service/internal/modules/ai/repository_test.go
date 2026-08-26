@@ -3,6 +3,8 @@ package ai
 import (
 	"database/sql"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
@@ -148,15 +150,24 @@ func TestConfigCarriesTheKeyWithoutStoringIt(t *testing.T) {
 		t.Fatalf("Set: %v", err)
 	}
 
-	config, err := repo.Config("secret-key")
+	config, err := repo.Config(NewCredentials(KindAPIKey, "secret-key"))
 	if err != nil {
 		t.Fatalf("Config: %v", err)
 	}
-	if config.APIKey != "secret-key" {
-		t.Errorf("APIKey = %q", config.APIKey)
-	}
 	if err := config.Validate(); err != nil {
 		t.Errorf("the assembled config is not usable: %v", err)
+	}
+
+	// The credential is opaque to this package now, so it is checked by what
+	// it does to a request rather than by reading a field off it.
+	request := httptest.NewRequest(http.MethodPost, "http://example.test", nil)
+	if err := config.Credential.Apply(t.Context(), request); err != nil {
+		t.Fatalf("apply credential: %v", err)
+	}
+	// These settings name the OpenAI wire, which carries a key as a bearer
+	// token; the Anthropic one would put the same string in x-api-key.
+	if got := request.Header.Get("authorization"); got != "Bearer secret-key" {
+		t.Errorf("authorization = %q, want the key as a bearer token", got)
 	}
 
 	// The key came from the caller, so nothing about it can have reached the
