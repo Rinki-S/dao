@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, powerMonitor, shell } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -11,9 +11,14 @@ import {
 import {
     clearCredential,
     credentialStatus,
+    readCredential,
     readServiceSecret,
     writeModelApiKey,
+    writeModelToken,
 } from './credential-store.js'
+import { createRefreshScheduler } from './refresh-scheduler.js'
+import { connect, refresh } from './oauth/flow.js'
+import { getProvider, listProviders } from './oauth/providers.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -90,16 +95,65 @@ ipcMain.handle('dao:set-appearance', (_event, source) => {
 
 ipcMain.handle('dao:get-model-key-status', () => credentialStatus())
 
-// Saving the key restarts the service, because the service is handed the key
-// once at startup. Restarting is how the new one takes effect, and it is the
-// same path the working-directory change already uses.
+ipcMain.handle('dao:list-oauth-providers', () => listProviders())
+
+/**
+ * Sign in to a provider and keep what it hands back.
+ *
+ * The browser is opened by this process because it is the only one that can:
+ * the loopback listener has to belong to whoever is going to read the code
+ * out of it.
+ */
+ipcMain.handle('dao:connect-provider', async (_event, providerId) => {
+    let provider
+    try {
+        provider = getProvider(providerId)
+    } catch (error) {
+        return { ok: false, error: error.message }
+    }
+
+    try {
+        const result = await connect({
+            provider,
+            openExternal: (url) => shell.openExternal(url),
+        })
+
+        const stored =
+            result.kind === 'api-key'
+                ? writeModelApiKey(result.key, provider.id)
+                : writeModelToken(result.token, provider.id)
+
+        if (!stored.ok) {
+            return stored
+        }
+
+        const pushed = await pushCurrentCredential()
+        // Only a token has a lifetime to schedule against; a key is left alone.
+        await refreshScheduler.start()
+
+        return pushed
+    } catch (error) {
+        return {
+            ok: false,
+            error: error instanceof Error ? error.message : 'Sign-in failed',
+        }
+    }
+})
+
+// Saving a credential pushes it to the running service rather than restarting
+// it. Restarting was how a startup-only value took effect; now that the
+// service can be handed a new one, there is nothing to restart for.
 ipcMain.handle('dao:set-model-api-key', async (_event, key) => {
     const result = writeModelApiKey(key)
     if (!result.ok) {
         return result
     }
 
-    return restartWithCurrentKey()
+    // A typed key has no expiry, so anything scheduled against a previous
+    // token no longer applies.
+    refreshScheduler.stop()
+
+    return pushCurrentCredential()
 })
 
 ipcMain.handle('dao:clear-model-api-key', async () => {
@@ -108,7 +162,9 @@ ipcMain.handle('dao:clear-model-api-key', async () => {
         return result
     }
 
-    return restartWithCurrentKey()
+    refreshScheduler.stop()
+
+    return pushCurrentCredential()
 })
 
 ipcMain.handle('dao:restart-local-service', async () => {
@@ -143,6 +199,15 @@ app.whenReady().then(async () => {
     await waitForServiceHealth(serviceConfig.baseUrl)
 
     createWindow()
+
+    await refreshScheduler.start()
+
+    // A timer does not run while the machine is asleep, so on waking its
+    // appointment has usually passed and the token is already dead. This is
+    // the tick that matters on a laptop.
+    powerMonitor.on('resume', () => {
+        void refreshScheduler.tick()
+    })
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
@@ -180,30 +245,63 @@ async function restartLocalService() {
     await waitForServiceHealth(serviceConfig.baseUrl)
 }
 
-// The port and session token stay as they are — the renderer already holds
-// them and cannot be handed new ones without a reload. Only the key changes.
-async function restartWithCurrentKey() {
+/**
+ * Hand the running service whatever credential is now stored.
+ *
+ * The config is updated too, so that a restart for some other reason starts
+ * the service with the same credential this pushed.
+ */
+async function pushCredentialToService(secret, kind) {
     if (!serviceConfig) {
-        return { ok: false, error: 'Local service is not configured' }
+        throw new Error('Local service is not configured')
     }
 
-    const current = readServiceSecret()
-    serviceConfig = {
-        ...serviceConfig,
-        modelApiKey: current.secret,
-        modelCredentialKind: current.kind,
-    }
+    serviceConfig = { ...serviceConfig, modelApiKey: secret, modelCredentialKind: kind }
 
+    const response = await fetch(`${serviceConfig.baseUrl}/api/ai/credential`, {
+        method: 'PUT',
+        headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${serviceConfig.sessionToken}`,
+        },
+        body: JSON.stringify({ kind, secret }),
+    })
+
+    if (!response.ok) {
+        throw new Error(`the local service refused the credential (${response.status})`)
+    }
+}
+
+async function pushCurrentCredential() {
     try {
-        await restartLocalService()
+        const current = readServiceSecret()
+        await pushCredentialToService(current.secret, current.kind)
         return { ok: true, error: '' }
     } catch (error) {
         return {
             ok: false,
-            error: error instanceof Error ? error.message : 'Failed to restart local service',
+            error: error instanceof Error ? error.message : 'Failed to update the credential',
         }
     }
 }
+
+// Renewal lives here rather than in the service because this is the process
+// holding the refresh token and the keychain, and it has to be — the
+// authorisation callback lands here. The service is handed access tokens and
+// uses them.
+const refreshScheduler = createRefreshScheduler({
+    readCredential,
+    writeToken: writeModelToken,
+    pushToService: pushCredentialToService,
+    refreshToken: (providerId, refreshTokenValue) =>
+        refresh({ provider: getProvider(providerId), refreshToken: refreshTokenValue }),
+    onEvent(event) {
+        if (event.type === 'needs-reconnect') {
+            console.warn(`dao: the model credential needs reconnecting — ${event.error}`)
+        }
+        mainWindow?.webContents.send('dao:credential-event', event)
+    },
+})
 
 process.on('exit', stopServiceOnce)
 process.on('SIGINT', () => {
