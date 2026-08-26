@@ -26,19 +26,39 @@ var (
 	ErrUnknownWire   = errors.New("unknown provider format")
 )
 
-// Config is everything needed to reach a model. The key is passed in rather
-// than read from anywhere: it lives in the OS keychain and arrives as a
-// process flag, and this package should not know where it came from.
+// Config is everything needed to reach a model. The credential is passed in
+// rather than read from anywhere: it lives in the OS keychain and arrives
+// through the process boundary, and this package should not know where it
+// came from.
 type Config struct {
 	Wire    Wire
 	BaseURL string
-	APIKey  string
 	Model   string
+
+	// APIKey is the common case, spelled as a plain field so a caller that
+	// only has a key does not have to construct anything.
+	APIKey string
+	// Credential is the general case. When set it wins over APIKey: an OAuth
+	// token renews itself, which a key cannot do.
+	Credential Credential
+}
+
+// credential is the one the request should actually use. Keeping this behind
+// a method is what lets APIKey stay a plain string for the callers that only
+// ever have one.
+func (c Config) credential() Credential {
+	if c.Credential != nil {
+		return c.Credential
+	}
+	return APIKey{Wire: c.Wire, Key: c.APIKey}
 }
 
 func (c Config) Validate() error {
 	switch {
-	case c.BaseURL == "" || c.APIKey == "" || c.Model == "":
+	case c.BaseURL == "" || c.Model == "":
+		return ErrNotConfigured
+	// Either shape of credential will do, but one of them must be there.
+	case c.APIKey == "" && c.Credential == nil:
 		return ErrNotConfigured
 	case c.Wire != WireAnthropic && c.Wire != WireOpenAI:
 		return fmt.Errorf("%w: %q", ErrUnknownWire, c.Wire)

@@ -85,8 +85,13 @@ func (c *anthropicClient) Complete(ctx context.Context, request Context, opts Op
 		return Response{}, fmt.Errorf("build request: %w", err)
 	}
 	httpRequest.Header.Set("content-type", "application/json")
-	httpRequest.Header.Set("x-api-key", c.config.APIKey)
 	httpRequest.Header.Set("anthropic-version", anthropicVersion)
+
+	// Authentication goes on last, and can fail: renewing an expired token is
+	// a network call, so this is the one header that is not just a string.
+	if err := c.config.credential().Apply(ctx, httpRequest); err != nil {
+		return Response{}, fmt.Errorf("authenticate request: %w", err)
+	}
 
 	response, err := c.http.Do(httpRequest)
 	if err != nil {
