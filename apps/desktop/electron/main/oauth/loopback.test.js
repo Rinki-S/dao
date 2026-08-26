@@ -152,3 +152,16 @@ describe('startCallbackReceiver', () => {
         await assert.rejects(fetch(redirectUri), /fetch failed/)
     })
 })
+
+// The redirect is delivered by a browser we do not control, and a provider
+// that redirects instantly can beat waitForCode to the listener. Dropping the
+// callback in that window would strand the flow until it timed out.
+test('accepts a callback that arrives before anyone is waiting', async (t) => {
+    const started = await startCallbackReceiver({ ports: [] })
+    t.after(() => started.close())
+    const state = createState()
+
+    await fetch(`${started.redirectUri}?code=early&state=${state}`)
+
+    assert.equal(await started.waitForCode({ expectedState: state, timeoutMs: 500 }), 'early')
+})

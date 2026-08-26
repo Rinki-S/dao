@@ -96,6 +96,11 @@ export function buildAuthorizeUrl({
     challenge,
     state,
     scope = '',
+    // Not every provider calls it `redirect_uri`. Sending the standard name to
+    // one that expects something else is not an error it reports — the
+    // parameter is simply ignored, and the flow fails later for a reason that
+    // has nothing to do with the actual cause.
+    redirectParam = 'redirect_uri',
     extra = {},
 }) {
     if (!authorizeUrl) throw new Error('authorizeUrl is required')
@@ -109,7 +114,7 @@ export function buildAuthorizeUrl({
         response_type: 'code',
         code_challenge: challenge,
         code_challenge_method: 'S256',
-        redirect_uri: redirectUri,
+        [redirectParam || 'redirect_uri']: redirectUri,
         state,
         ...(clientId ? { client_id: clientId } : {}),
         ...(scope ? { scope } : {}),

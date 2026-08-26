@@ -61,6 +61,22 @@ function listen(server, port) {
 export async function startCallbackReceiver({ path = '/callback', ports = PREFERRED_PORTS } = {}) {
     let settle = null
     let finished = false
+    // Where a callback goes when it arrives before anyone is waiting.
+    //
+    // The redirect is delivered by a browser we do not control, and nothing
+    // guarantees it lands after waitForCode has been called — a provider that
+    // redirects instantly, or a code already in the browser's cache, can beat
+    // us to it. Dropping it in that window would strand the flow until it
+    // timed out, with no sign of why.
+    let buffered = null
+
+    const deliver = (result) => {
+        if (settle) {
+            settle(result)
+            return
+        }
+        buffered = result
+    }
 
     const server = http.createServer((request, response) => {
         const url = new URL(request.url, 'http://127.0.0.1')
@@ -86,14 +102,14 @@ export async function startCallbackReceiver({ path = '/callback', ports = PREFER
         if (failure) {
             response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
             response.end(page('Sign-in failed', params.get('error_description') || failure))
-            settle?.({ error: new Error(`provider refused authorisation: ${failure}`) })
+            deliver({ error: new Error(`provider refused authorisation: ${failure}`) })
             return
         }
 
         response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
         response.end(page('Signed in', 'You can close this tab and return to Dao.'))
 
-        settle?.({
+        deliver({
             code: params.get('code') ?? '',
             state: params.get('state') ?? '',
         })
@@ -159,6 +175,15 @@ export async function startCallbackReceiver({ path = '/callback', ports = PREFER
                         return
                     }
                     finish(resolve, result.code)
+                }
+
+                // A callback that arrived before this wait existed is sitting
+                // in the buffer. Consume it rather than waiting for a second
+                // one that is never coming.
+                if (buffered) {
+                    const arrived = buffered
+                    buffered = null
+                    settle(arrived)
                 }
             })
         },
