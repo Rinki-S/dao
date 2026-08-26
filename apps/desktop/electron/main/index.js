@@ -9,12 +9,11 @@ import {
     waitForServiceHealth,
 } from './service-manager.js'
 import {
-    clearModelApiKey,
-    hasModelApiKey,
-    isKeyStorageAvailable,
-    readModelApiKey,
+    clearCredential,
+    credentialStatus,
+    readServiceSecret,
     writeModelApiKey,
-} from './model-key.js'
+} from './credential-store.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -89,10 +88,7 @@ ipcMain.handle('dao:set-appearance', (_event, source) => {
     return { ok: true, error: '' }
 })
 
-ipcMain.handle('dao:get-model-key-status', () => ({
-    available: isKeyStorageAvailable(),
-    present: hasModelApiKey(),
-}))
+ipcMain.handle('dao:get-model-key-status', () => credentialStatus())
 
 // Saving the key restarts the service, because the service is handed the key
 // once at startup. Restarting is how the new one takes effect, and it is the
@@ -107,7 +103,7 @@ ipcMain.handle('dao:set-model-api-key', async (_event, key) => {
 })
 
 ipcMain.handle('dao:clear-model-api-key', async () => {
-    const result = clearModelApiKey()
+    const result = clearCredential()
     if (!result.ok) {
         return result
     }
@@ -140,7 +136,7 @@ app.whenReady().then(async () => {
         app.dock.setIcon(appIconPath)
     }
 
-    serviceConfig = createServiceConfig(readModelApiKey())
+    serviceConfig = createServiceConfig(readServiceSecret().secret)
     localService = startLocalService(serviceConfig)
 
     await waitForServiceHealth(serviceConfig.baseUrl)
@@ -190,7 +186,7 @@ async function restartWithCurrentKey() {
         return { ok: false, error: 'Local service is not configured' }
     }
 
-    serviceConfig = { ...serviceConfig, modelApiKey: readModelApiKey() }
+    serviceConfig = { ...serviceConfig, modelApiKey: readServiceSecret().secret }
 
     try {
         await restartLocalService()

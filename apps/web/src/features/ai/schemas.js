@@ -64,6 +64,11 @@ export const AcceptedSchema = z.object({
 export const ModelKeyStatusSchema = z.object({
   available: z.boolean(),
   present: z.boolean(),
+  // What is stored, never the secret itself: the bridge is write-only, so this
+  // is the whole of what the renderer gets to know about it.
+  kind: z.enum(['', 'api-key', 'oauth-token']).default(''),
+  provider: z.string().default(''),
+  expires: z.string().default(''),
 });
 
 export const KeyMutationResultSchema = z.object({
