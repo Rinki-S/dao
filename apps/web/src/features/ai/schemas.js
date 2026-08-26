@@ -75,3 +75,13 @@ export const KeyMutationResultSchema = z.object({
   ok: z.boolean(),
   error: z.string(),
 });
+
+// A provider that can be signed in to. `defaults` is where the credential it
+// yields can actually be used — without it, signing in succeeds and nothing
+// works, because the endpoint is still unset.
+export const OAuthProviderSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  yields: z.enum(['api-key', 'oauth-token']),
+  defaults: z.object({ wire: z.enum(PROVIDER_WIRES), baseUrl: z.string() }),
+});

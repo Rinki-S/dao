@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { IconAlertTriangle, IconCheck } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCheck, IconCircleCheck } from '@tabler/icons-react';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Field, FieldLabel } from '@/components/ui/field.jsx';
 import { Input } from '@/components/ui/input.jsx';
@@ -10,10 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select.jsx';
-import { waitForAllPendingNoteSaves } from '@/features/notes/note-save-queue.js';
 import {
+  connectOAuthProvider,
   getModelKeyStatus,
   getProviderSettings,
+  listOAuthProviders,
+  onCredentialEvent,
   removeModelApiKey,
   saveModelApiKey,
   updateProviderSettings,
@@ -60,22 +63,32 @@ function StatusLine({ tone, children }) {
  */
 export function AiProviderSettings() {
   const [settings, setSettings] = useState(null);
-  const [keyStatus, setKeyStatus] = useState({ available: false, present: false });
+  const [keyStatus, setKeyStatus] = useState({
+    available: false,
+    present: false,
+    kind: '',
+    provider: '',
+    expires: '',
+  });
+  const [providers, setProviders] = useState([]);
   const [wire, setWire] = useState('openai');
   const [baseUrl, setBaseUrl] = useState('');
   const [modelName, setModelName] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [status, setStatus] = useState('idle');
   const [message, setMessage] = useState('');
+  const [connecting, setConnecting] = useState('');
+  const [reconnectNeeded, setReconnectNeeded] = useState('');
 
   useEffect(() => {
     let active = true;
 
-    Promise.all([getProviderSettings(), getModelKeyStatus()])
-      .then(([provider, key]) => {
+    Promise.all([getProviderSettings(), getModelKeyStatus(), listOAuthProviders()])
+      .then(([provider, key, available]) => {
         if (!active) return;
         setSettings(provider);
         setKeyStatus(key);
+        setProviders(available);
         setWire(provider.wire || 'openai');
         setBaseUrl(provider.baseUrl);
         setModelName(provider.model);
@@ -91,6 +104,23 @@ export function AiProviderSettings() {
     };
   }, []);
 
+  // Renewal runs on a timer in the main process, so this panel is told about
+  // it rather than asking. The only outcome worth interrupting for is one the
+  // user has to act on.
+  useEffect(
+    () =>
+      onCredentialEvent((event) => {
+        if (event.type === 'needs-reconnect') {
+          setReconnectNeeded(event.error);
+        }
+        if (event.type === 'refreshed') {
+          setReconnectNeeded('');
+          setKeyStatus((current) => ({ ...current, expires: event.expires }));
+        }
+      }),
+    [],
+  );
+
   async function save(event) {
     event.preventDefault();
     setStatus('saving');
@@ -99,10 +129,9 @@ export function AiProviderSettings() {
     try {
       const saved = await updateProviderSettings({ wire, baseUrl, model: modelName });
 
-      // Saving a key restarts the service, so any note mid-flight is flushed
-      // first — the same care the working-directory change takes.
+      // The key is handed to the running service rather than restarting it,
+      // so there is no longer a note mid-flight to flush first.
       if (apiKey.trim()) {
-        await waitForAllPendingNoteSaves();
         const result = await saveModelApiKey(apiKey);
         if (!result.ok) {
           setStatus('error');
@@ -110,7 +139,8 @@ export function AiProviderSettings() {
           return;
         }
         setApiKey('');
-        setKeyStatus((current) => ({ ...current, present: true }));
+        setKeyStatus((current) => ({ ...current, present: true, kind: 'api-key', provider: '' }));
+        setReconnectNeeded('');
       }
 
       setSettings(saved);
@@ -122,9 +152,63 @@ export function AiProviderSettings() {
     }
   }
 
-  async function forgetKey() {
+  /**
+   * Sign in to a provider, then point Dao at where that credential works.
+   *
+   * The endpoint has to follow rather than lead: saving settings requires a
+   * model, and a first-time user has not chosen one yet. So the defaults are
+   * filled into the form, and persisted only when there is already a model to
+   * persist them with — otherwise the user is asked for the one choice
+   * signing in cannot make for them.
+   */
+  async function signIn(provider) {
+    setConnecting(provider.id);
     setStatus('saving');
-    await waitForAllPendingNoteSaves();
+    setMessage('');
+    setReconnectNeeded('');
+
+    try {
+      const result = await connectOAuthProvider(provider.id);
+
+      if (!result.ok) {
+        setStatus('error');
+        setMessage(result.error);
+        return;
+      }
+
+      setWire(provider.defaults.wire);
+      setBaseUrl(provider.defaults.baseUrl);
+      setApiKey('');
+      setKeyStatus(await getModelKeyStatus());
+
+      if (modelName.trim()) {
+        setSettings(
+          await updateProviderSettings({
+            wire: provider.defaults.wire,
+            baseUrl: provider.defaults.baseUrl,
+            model: modelName,
+          }),
+        );
+        setStatus('saved');
+        // Not "signed in to X" — the alert above already says that, and
+        // saying it twice reads as two separate things having happened.
+        setMessage('Saved');
+        return;
+      }
+
+      setStatus('saved');
+      setMessage('Choose a model and save.');
+    } catch (error) {
+      setStatus('error');
+      setMessage(error instanceof Error ? error.message : 'Sign-in failed');
+    } finally {
+      setConnecting('');
+    }
+  }
+
+  async function disconnect() {
+    setStatus('saving');
+    setReconnectNeeded('');
     const result = await removeModelApiKey();
 
     if (!result.ok) {
@@ -133,12 +217,18 @@ export function AiProviderSettings() {
       return;
     }
 
-    setKeyStatus((current) => ({ ...current, present: false }));
+    setKeyStatus((current) => ({
+      ...current,
+      present: false,
+      kind: '',
+      provider: '',
+      expires: '',
+    }));
     setSettings((current) =>
       current ? { ...current, keyPresent: false, configured: false } : current,
     );
     setStatus('saved');
-    setMessage('Key removed');
+    setMessage('Disconnected');
   }
 
   if (!settings) {
@@ -155,8 +245,61 @@ export function AiProviderSettings() {
     return <p className="py-4 text-muted-foreground text-sm">Loading…</p>;
   }
 
+  const connectedTo = providers.find((provider) => provider.id === keyStatus.provider);
+
   return (
     <form className="flex flex-col gap-4 py-1" onSubmit={save}>
+      {reconnectNeeded ? (
+        <Alert variant="warning">
+          {/* No aria-hidden: the icon carries the status. */}
+          <IconAlertTriangle />
+          <AlertTitle>Sign in again to keep using this model</AlertTitle>
+          <AlertDescription>{reconnectNeeded}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {keyStatus.present && connectedTo ? (
+        <Alert variant="success">
+          <IconCircleCheck />
+          <AlertTitle>Signed in to {connectedTo.label}</AlertTitle>
+          <AlertDescription>
+            {keyStatus.kind === 'oauth-token'
+              ? 'Dao renews this in the background, including after the machine sleeps.'
+              : 'A key belonging to your account, kept in the keychain.'}
+          </AlertDescription>
+          <AlertAction>
+            <Button size="xs" type="button" variant="outline" onClick={disconnect}>
+              Disconnect
+            </Button>
+          </AlertAction>
+        </Alert>
+      ) : null}
+
+      {providers.length > 0 && !connectedTo ? (
+        <Field>
+          <FieldLabel>Sign in</FieldLabel>
+          <div className="flex flex-wrap gap-2">
+            {providers.map((provider) => (
+              <Button
+                key={provider.id}
+                disabled={connecting !== '' && connecting !== provider.id}
+                loading={connecting === provider.id}
+                size="sm"
+                type="button"
+                variant="outline"
+                onClick={() => signIn(provider)}
+              >
+                Sign in to {provider.label}
+              </Button>
+            ))}
+          </div>
+          <p className="text-muted-foreground text-sm">
+            Opens your browser. The credential comes back to Dao on a local address and goes
+            straight into the keychain — it is never shown here.
+          </p>
+        </Field>
+      ) : null}
+
       <Field>
         <FieldLabel>Provider format</FieldLabel>
         <Select items={WIRE_OPTIONS} value={wire} onValueChange={setWire}>
@@ -205,7 +348,7 @@ export function AiProviderSettings() {
         />
         <p className="text-muted-foreground text-sm">
           {keyStatus.available
-            ? 'Encrypted by macOS and never shown again. Saving one restarts the local service.'
+            ? 'Encrypted by macOS and never shown again. It takes effect without a restart.'
             : 'This system cannot store secrets securely, so no key can be saved.'}
         </p>
       </Field>
@@ -222,8 +365,10 @@ export function AiProviderSettings() {
       <div className="flex items-center justify-between gap-4">
         <StatusLine tone={status === 'error' ? 'error' : 'ok'}>{message}</StatusLine>
         <div className="flex shrink-0 gap-2">
-          {keyStatus.present ? (
-            <Button size="sm" type="button" variant="ghost" onClick={forgetKey}>
+          {/* A signed-in provider is disconnected from its own alert, so this
+              is only for a key that was typed in here. */}
+          {keyStatus.present && !connectedTo ? (
+            <Button size="sm" type="button" variant="ghost" onClick={disconnect}>
               Forget key
             </Button>
           ) : null}

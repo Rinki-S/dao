@@ -3,6 +3,7 @@ import {
   AcceptedSchema,
   KeyMutationResultSchema,
   ModelKeyStatusSchema,
+  OAuthProviderSchema,
   ProviderSettingsSchema,
   SummaryResultSchema,
   UpdateProviderSettingsInputSchema,
@@ -119,13 +120,58 @@ export async function saveSummaryAsNote(traceId) {
 export async function getModelKeyStatus() {
   try {
     if (!window.dao?.getModelKeyStatus) {
-      return { available: false, present: false };
+      return NO_CREDENTIAL;
     }
 
     return ModelKeyStatusSchema.parse(await window.dao.getModelKeyStatus());
   } catch {
-    return { available: false, present: false };
+    return NO_CREDENTIAL;
   }
+}
+
+// Spelled out rather than parsed: this is the answer when the bridge is not
+// there to ask, so there is nothing to validate.
+const NO_CREDENTIAL = { available: false, present: false, kind: '', provider: '', expires: '' };
+
+/**
+ * The providers that can be signed in to.
+ *
+ * Empty outside the desktop app, where there is no browser to open and no
+ * keychain to keep the result in. The manual key field still works there.
+ */
+export async function listOAuthProviders() {
+  try {
+    if (!window.dao?.listOAuthProviders) return [];
+
+    return OAuthProviderSchema.array().parse(await window.dao.listOAuthProviders());
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Sign in to a provider.
+ *
+ * Everything happens in the main process — the browser, the callback, the
+ * exchange, the keychain. What comes back here is only whether it worked.
+ */
+export async function connectOAuthProvider(providerId) {
+  if (!window.dao?.connectProvider) {
+    return { ok: false, error: 'Signing in is only available in the desktop app' };
+  }
+
+  return KeyMutationResultSchema.parse(await window.dao.connectProvider(providerId));
+}
+
+/**
+ * Subscribe to renewal news from the main process.
+ *
+ * A token is renewed on a timer nobody in the renderer started, so this is
+ * pushed rather than polled. Returns an unsubscribe function, and a no-op one
+ * outside the desktop app so callers need no branch.
+ */
+export function onCredentialEvent(listener) {
+  return window.dao?.onCredentialEvent?.(listener) ?? (() => {});
 }
 
 export async function saveModelApiKey(key) {

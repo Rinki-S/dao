@@ -27,6 +27,9 @@
  *   api-key provider has nothing to refresh; an oauth-token one does.
  * @property {string[]} [ports]       Fixed loopback ports, for providers that
  *   require an exactly pre-registered redirect URI.
+ * @property {{wire: string, baseUrl: string}} defaults  Where the credential
+ *   this yields can actually be used. Without these, signing in succeeds and
+ *   nothing works, because the endpoint is still unset.
  */
 
 /** @type {Record<string, Provider>} */
@@ -46,6 +49,9 @@ export const PROVIDERS = {
         // their OpenRouter account. There is no refresh token, so none of the
         // renewal machinery applies.
         yields: 'api-key',
+        // OpenRouter speaks the OpenAI wire. The model is left to the user
+        // because it is the one choice signing in cannot make for them.
+        defaults: { wire: 'openai', baseUrl: 'https://openrouter.ai/api/v1' },
     },
 }
 
@@ -58,5 +64,10 @@ export function getProvider(id) {
 }
 
 export function listProviders() {
-    return Object.values(PROVIDERS).map(({ id, label, yields }) => ({ id, label, yields }))
+    return Object.values(PROVIDERS).map(({ id, label, yields, defaults }) => ({
+        id,
+        label,
+        yields,
+        defaults,
+    }))
 }
