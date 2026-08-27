@@ -70,7 +70,7 @@ const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: IconHome },
   { id: 'today', label: 'Today', icon: IconSparkles },
   { id: 'tasks', label: 'Tasks', icon: IconCircleCheck },
-  { id: 'chats', label: 'Chats', icon: IconMessageCircle, disabled: true },
+  { id: 'chats', label: 'Chats', icon: IconMessageCircle },
   { id: 'search', label: 'Search', icon: IconSearch },
 ];
 

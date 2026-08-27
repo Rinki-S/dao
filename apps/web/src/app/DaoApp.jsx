@@ -1,4 +1,3 @@
-import { IconMessageCircle } from '@tabler/icons-react';
 import { useState } from 'react';
 import { DaoSidebar } from '@/components/shell/DaoSidebar.jsx';
 import { WorkingDirectoryOnboarding } from '@/components/app/WorkingDirectoryOnboarding.jsx';
@@ -15,6 +14,7 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar.jsx';
 import { WindowSidebarTrigger } from '@/components/shell/WindowSidebarTrigger.jsx';
 import { TitlebarPeekContext } from '@/components/shell/use-titlebar-inset.js';
 import { Spinner } from '@/components/ui/spinner.jsx';
+import { ChatsWorkspace } from '@/features/chats/components/ChatsWorkspace.jsx';
 import { CommandPalette } from '@/features/command-palette/components/CommandPalette.jsx';
 import { NoteEditorPanel } from '@/features/notes/components/NoteEditorPanel.jsx';
 import { TodayWorkspace } from '@/features/ai/components/TodayWorkspace.jsx';
@@ -97,20 +97,7 @@ export function DaoApp() {
       return <TodayWorkspace model={model} onOpenSettings={() => setSettingsOpen(true)} />;
     if (model.activeView === 'tasks') return <TasksWorkspace model={model} />;
     if (model.activeView === 'search') return <SearchWorkspace model={model} />;
-    return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <IconMessageCircle aria-hidden="true" />
-          </EmptyMedia>
-          <EmptyTitle>Chats will live here.</EmptyTitle>
-          <EmptyDescription>
-            The navigation is reserved for Dao's future AI context, but no AI behavior is enabled
-            yet.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
+    return <ChatsWorkspace model={model} onOpenSettings={() => setSettingsOpen(true)} />;
   })();
 
   return (
