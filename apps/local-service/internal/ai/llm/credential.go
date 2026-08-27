@@ -52,6 +52,21 @@ func (k APIKey) Apply(_ context.Context, request *http.Request) error {
 	return nil
 }
 
+// Anonymous authenticates nothing, for an endpoint that asks for nothing.
+//
+// A model running on the machine has no account behind it, so there is no
+// secret to send. That is a real kind of credential rather than a missing one,
+// and saying so here is what keeps the absence from having to be special-cased
+// everywhere a credential is required: Validate sees a credential, Apply
+// attaches no header, and the request goes out as the local server expects it.
+//
+// It is deliberately not the zero value of anything. Reaching this state takes
+// a caller that meant it, which is what stops a forgotten key from quietly
+// becoming an unauthenticated call to a paid endpoint.
+type Anonymous struct{}
+
+func (Anonymous) Apply(context.Context, *http.Request) error { return nil }
+
 // Token is an OAuth credential: a short-lived key, the longer-lived one that
 // buys a replacement, and the moment the first stops working.
 type Token struct {

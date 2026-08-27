@@ -7,9 +7,16 @@ import (
 )
 
 // Credential kinds, matching what the desktop process stores.
+//
+// KindNone is the odd one: it carries no secret at all. It exists because a
+// model served from the machine itself — Ollama, LM Studio — has no account
+// and issues no key, and the alternative was to treat "no key" as both "the
+// user has not finished setting this up" and "this endpoint wants nothing",
+// which are opposite states that need opposite handling.
 const (
 	KindAPIKey     = "api-key"
 	KindOAuthToken = "oauth-token"
+	KindNone       = "none"
 )
 
 // Credentials is the secret this process was given, and whatever has replaced
@@ -61,7 +68,10 @@ func (c *Credentials) Present() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	return c.secret != ""
+	// An endpoint declared as needing nothing is as ready to be called as one
+	// holding a key. Answering false here would leave the settings panel
+	// reporting a local model as unconfigured while it works perfectly.
+	return c.kind == KindNone || c.secret != ""
 }
 
 // Credential turns what is held into something that can authenticate a
@@ -75,6 +85,11 @@ func (c *Credentials) Present() bool {
 func (c *Credentials) Credential(wire llm.Wire) llm.Credential {
 	kind, secret := c.Get()
 
+	// Checked before the empty-secret case below, which it would otherwise be
+	// caught by: this kind is empty on purpose.
+	if kind == KindNone {
+		return llm.Anonymous{}
+	}
 	if secret == "" {
 		return nil
 	}

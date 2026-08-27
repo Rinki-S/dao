@@ -205,6 +205,15 @@ func (h *Handler) updateCredential(w http.ResponseWriter, r *http.Request) {
 
 	switch request.Kind {
 	case KindAPIKey, KindOAuthToken:
+	case KindNone:
+		// A secret sent alongside "this endpoint needs nothing" is a
+		// contradiction. Guessing which half was meant would either drop a
+		// credential the caller supplied or send one to a server that never
+		// asked for it, so it is refused instead.
+		if request.Secret != "" {
+			httpx.Error(w, http.StatusBadRequest, "a credential of kind none carries no secret")
+			return
+		}
 	case "":
 		// Only meaningful when disconnecting, where there is no secret whose
 		// kind could be named.

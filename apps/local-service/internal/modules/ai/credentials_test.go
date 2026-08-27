@@ -257,3 +257,52 @@ func TestAPushedCredentialChangesTheNextRequest(t *testing.T) {
 		t.Errorf("provider saw %v, want %v", seen, want)
 	}
 }
+
+// The distinction the "none" kind exists to make: an endpoint that wants
+// nothing is set up, and an empty form is not. Both hold no secret, so nothing
+// but the kind can tell them apart.
+func TestAnEndpointThatNeedsNothingIsStillConfigured(t *testing.T) {
+	credentials := NewCredentials(KindNone, "")
+
+	if !credentials.Present() {
+		t.Error("Present() = false, so a working local model would be reported as unconfigured")
+	}
+
+	credential := credentials.Credential(llm.WireOpenAI)
+	if credential == nil {
+		t.Fatal("built no credential, so llm.Config would fail to validate")
+	}
+
+	// The point of the kind: the request goes out bare.
+	for _, header := range []string{"authorization", "x-api-key"} {
+		if got := applied(t, credential).Get(header); got != "" {
+			t.Errorf("%s = %q, want nothing sent to a server that asked for nothing", header, got)
+		}
+	}
+}
+
+// A secret alongside "needs nothing" is contradictory, and the resolution that
+// matters is the one that never puts a paid key on the wire to localhost.
+func TestKindNoneRefusesASecret(t *testing.T) {
+	repo := NewRepository(openTestDB(t))
+	if _, err := repo.Set(validRequest(), true); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	credentials := NewCredentials(KindAPIKey, "sk-old")
+	mux := http.NewServeMux()
+	NewHandler(repo, credentials).RegisterRoutes(mux)
+
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, httptest.NewRequest(
+		http.MethodPut, "/api/ai/credential",
+		bytes.NewBufferString(`{"kind":"none","secret":"sk-paid"}`),
+	))
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", recorder.Code)
+	}
+	if _, secret := credentials.Get(); secret != "sk-old" {
+		t.Errorf("held %q, want the previous credential untouched", secret)
+	}
+}
