@@ -31,6 +31,7 @@ beforeEach(() => {
   bridge = {
     getModelKeyStatus: vi.fn().mockResolvedValue({ available: true, present: false }),
     setModelApiKey: vi.fn().mockResolvedValue({ ok: true, error: '' }),
+    setModelNoKey: vi.fn().mockResolvedValue({ ok: true, error: '' }),
     clearModelApiKey: vi.fn().mockResolvedValue({ ok: true, error: '' }),
   };
   window.dao = bridge;
@@ -159,5 +160,38 @@ describe('AiProviderSettings', () => {
     await open();
 
     expect(screen.getByText(/cannot store secrets securely/i)).toBeInTheDocument();
+  });
+
+  it('sets up a local endpoint in one click', async () => {
+    await open();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ollama' }));
+    await userEvent.clear(screen.getByLabelText('Model'));
+    await userEvent.type(screen.getByLabelText('Model'), 'qwen3:8b');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(bridge.setModelNoKey).toHaveBeenCalled());
+
+    const put = apiFetch.mock.calls.find(([, init]) => init?.method === 'PUT');
+    // Without the trailing /v1: the wire appends its own path, and the 404
+    // that results from doubling it reads like a missing model.
+    expect(JSON.parse(put[1].body)).toMatchObject({
+      wire: 'openai',
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'qwen3:8b',
+    });
+  });
+
+  // The one that matters: a key left over from a paid provider must not be
+  // posted to whatever is listening on a local port.
+  it('never sends a leftover key to an endpoint declared keyless', async () => {
+    await open();
+
+    await userEvent.type(screen.getByLabelText('API key'), 'sk-paid');
+    await userEvent.click(screen.getByRole('checkbox', { name: /needs no key/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(bridge.setModelNoKey).toHaveBeenCalled());
+    expect(bridge.setModelApiKey).not.toHaveBeenCalled();
   });
 });

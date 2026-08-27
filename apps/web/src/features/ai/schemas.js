@@ -66,7 +66,9 @@ export const ModelKeyStatusSchema = z.object({
   present: z.boolean(),
   // What is stored, never the secret itself: the bridge is write-only, so this
   // is the whole of what the renderer gets to know about it.
-  kind: z.enum(['', 'api-key', 'oauth-token']).default(''),
+  // 'none' is a stored answer, not a missing one: the endpoint was set up and
+  // asks for nothing.
+  kind: z.enum(['', 'api-key', 'oauth-token', 'none']).default(''),
   provider: z.string().default(''),
   expires: z.string().default(''),
 });

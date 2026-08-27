@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { IconAlertTriangle, IconCheck, IconCircleCheck } from '@tabler/icons-react';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert.jsx';
 import { Button } from '@/components/ui/button.jsx';
+import { Checkbox } from '@/components/ui/checkbox.jsx';
 import { Field, FieldLabel } from '@/components/ui/field.jsx';
 import { Input } from '@/components/ui/input.jsx';
+import { Label } from '@/components/ui/label.jsx';
 import {
   Select,
   SelectItem,
@@ -19,11 +21,24 @@ import {
   onCredentialEvent,
   removeModelApiKey,
   saveModelApiKey,
+  saveModelNoKey,
   updateProviderSettings,
 } from '../api.js';
 import { PROVIDER_WIRES, WIRE_LABELS } from '../schemas.js';
 
 const WIRE_OPTIONS = PROVIDER_WIRES.map((value) => ({ label: WIRE_LABELS[value], value }));
+
+// Servers that run on this machine. They are here as a shortcut, not as a
+// separate concept: each one fills in the same three fields anyone could type
+// themselves, and every one of them speaks the OpenAI wire.
+//
+// The base URL stops before /v1 because the wire appends its own path. Getting
+// that wrong produces a 404 that reads like the model is missing, which is the
+// single most likely way to get this screen wrong by hand.
+const LOCAL_PRESETS = [
+  { id: 'ollama', label: 'Ollama', baseUrl: 'http://127.0.0.1:11434' },
+  { id: 'lm-studio', label: 'LM Studio', baseUrl: 'http://127.0.0.1:1234' },
+];
 
 // Named so the reader can check it against what they are about to enable. A
 // local-first app that starts sending a workspace to a third party owes the
@@ -75,6 +90,9 @@ export function AiProviderSettings() {
   const [baseUrl, setBaseUrl] = useState('');
   const [modelName, setModelName] = useState('');
   const [apiKey, setApiKey] = useState('');
+  // Whether the user has said this endpoint wants no credential. Kept apart
+  // from "the key field is empty", which is what an unfinished form looks like.
+  const [noKey, setNoKey] = useState(false);
   const [status, setStatus] = useState('idle');
   const [message, setMessage] = useState('');
   const [connecting, setConnecting] = useState('');
@@ -92,6 +110,7 @@ export function AiProviderSettings() {
         setWire(provider.wire || 'openai');
         setBaseUrl(provider.baseUrl);
         setModelName(provider.model);
+        setNoKey(key.kind === 'none');
       })
       .catch((error) => {
         if (!active) return;
@@ -129,9 +148,26 @@ export function AiProviderSettings() {
     try {
       const saved = await updateProviderSettings({ wire, baseUrl, model: modelName });
 
-      // The key is handed to the running service rather than restarting it,
-      // so there is no longer a note mid-flight to flush first.
-      if (apiKey.trim()) {
+      // The credential is handed to the running service rather than restarting
+      // it, so there is no longer a note mid-flight to flush first.
+      //
+      // "Needs no key" is checked first and wins: with the box ticked, a key
+      // left in the field is a leftover from a previous endpoint, and sending
+      // it to a local server would be both pointless and a way to leak a paid
+      // key to whatever is listening on that port.
+      if (noKey) {
+        if (keyStatus.kind !== 'none') {
+          const result = await saveModelNoKey();
+          if (!result.ok) {
+            setStatus('error');
+            setMessage(result.error);
+            return;
+          }
+          setKeyStatus((current) => ({ ...current, present: true, kind: 'none', provider: '' }));
+          setReconnectNeeded('');
+        }
+        setApiKey('');
+      } else if (apiKey.trim()) {
         const result = await saveModelApiKey(apiKey);
         if (!result.ok) {
           setStatus('error');
@@ -224,6 +260,9 @@ export function AiProviderSettings() {
       provider: '',
       expires: '',
     }));
+    // The stored record is gone, so the declaration it held is too. Leaving the
+    // box ticked would show a credential that is no longer there.
+    setNoKey(false);
     setSettings((current) =>
       current ? { ...current, keyPresent: false, configured: false } : current,
     );
@@ -326,6 +365,24 @@ export function AiProviderSettings() {
           value={baseUrl}
           onChange={(event) => setBaseUrl(event.target.value)}
         />
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground text-sm">Running one locally?</span>
+          {LOCAL_PRESETS.map((preset) => (
+            <Button
+              key={preset.id}
+              size="xs"
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setWire('openai');
+                setBaseUrl(preset.baseUrl);
+                setNoKey(true);
+              }}
+            >
+              {preset.label}
+            </Button>
+          ))}
+        </div>
       </Field>
 
       <Field>
@@ -341,16 +398,31 @@ export function AiProviderSettings() {
         <FieldLabel>API key</FieldLabel>
         <Input
           autoComplete="off"
-          placeholder={keyStatus.present ? 'Stored — type to replace' : 'sk-…'}
+          disabled={noKey}
+          placeholder={
+            noKey ? 'Not needed' : keyStatus.present ? 'Stored — type to replace' : 'sk-…'
+          }
           type="password"
-          value={apiKey}
+          value={noKey ? '' : apiKey}
           onChange={(event) => setApiKey(event.target.value)}
         />
         <p className="text-muted-foreground text-sm">
-          {keyStatus.available
-            ? 'Encrypted by macOS and never shown again. It takes effect without a restart.'
-            : 'This system cannot store secrets securely, so no key can be saved.'}
+          {noKey
+            ? 'Nothing is sent to authenticate. Correct for a model served from this machine, and wrong for anything reachable from outside it.'
+            : keyStatus.available
+              ? 'Encrypted by macOS and never shown again. It takes effect without a restart.'
+              : 'This system cannot store secrets securely, so no key can be saved.'}
         </p>
+      </Field>
+
+      {/* Its own Field, not part of the one above: a Field associates every
+          label inside it with its control, so a second label there would name
+          the key input rather than this box. */}
+      <Field className="flex-row items-center gap-2">
+        <Checkbox checked={noKey} id="ai-no-key" onCheckedChange={setNoKey} />
+        <Label className="font-normal text-muted-foreground" htmlFor="ai-no-key">
+          This endpoint needs no key
+        </Label>
       </Field>
 
       <div className="rounded-md border p-3">
@@ -369,7 +441,7 @@ export function AiProviderSettings() {
               is only for a key that was typed in here. */}
           {keyStatus.present && !connectedTo ? (
             <Button size="sm" type="button" variant="ghost" onClick={disconnect}>
-              Forget key
+              {keyStatus.kind === 'none' ? 'Forget endpoint' : 'Forget key'}
             </Button>
           ) : null}
           <Button loading={status === 'saving'} size="sm" type="submit">

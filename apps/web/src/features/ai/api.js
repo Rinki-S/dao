@@ -182,6 +182,20 @@ export async function saveModelApiKey(key) {
   return KeyMutationResultSchema.parse(await window.dao.setModelApiKey(key));
 }
 
+/**
+ * Declare that the configured endpoint needs no credential.
+ *
+ * Goes through the same store as a key: a local model is a choice about what
+ * this workspace authenticates with, not the absence of one.
+ */
+export async function saveModelNoKey() {
+  if (!window.dao?.setModelNoKey) {
+    return { ok: false, error: 'Key storage is only available in the desktop app' };
+  }
+
+  return KeyMutationResultSchema.parse(await window.dao.setModelNoKey());
+}
+
 export async function removeModelApiKey() {
   if (!window.dao?.clearModelApiKey) {
     return { ok: false, error: 'Key storage is only available in the desktop app' };
