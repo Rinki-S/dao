@@ -15,6 +15,7 @@ import {
     readServiceSecret,
     writeModelApiKey,
     writeModelToken,
+    writeNoCredential,
 } from './credential-store.js'
 import { createRefreshScheduler } from './refresh-scheduler.js'
 import { connect, refresh } from './oauth/flow.js'
@@ -151,6 +152,20 @@ ipcMain.handle('dao:set-model-api-key', async (_event, key) => {
 
     // A typed key has no expiry, so anything scheduled against a previous
     // token no longer applies.
+    refreshScheduler.stop()
+
+    return pushCurrentCredential()
+})
+
+// Declaring that the endpoint needs nothing. Same shape as saving a key,
+// because it is the same decision — what this workspace authenticates with —
+// and it replaces whatever was stored before rather than sitting beside it.
+ipcMain.handle('dao:set-model-no-key', async () => {
+    const result = writeNoCredential()
+    if (!result.ok) {
+        return result
+    }
+
     refreshScheduler.stop()
 
     return pushCurrentCredential()

@@ -12,10 +12,11 @@ export const CREDENTIAL_VERSION = 1
 
 export const API_KEY = 'api-key'
 export const OAUTH_TOKEN = 'oauth-token'
+export const NONE = 'none'
 
 /**
  * @typedef {object} StoredCredential
- * @property {'api-key'|'oauth-token'} kind
+ * @property {'api-key'|'oauth-token'|'none'} kind
  * @property {string} provider  Which provider issued it. Empty for a key the
  *   user typed in themselves, which belongs to whatever endpoint they also
  *   configured.
@@ -25,6 +26,19 @@ export const OAUTH_TOKEN = 'oauth-token'
 
 export function apiKeyCredential(key, provider = '') {
     return { kind: API_KEY, provider, key }
+}
+
+/**
+ * A credential for an endpoint that asks for none — a model served from this
+ * machine.
+ *
+ * Storing a record that holds no secret sounds pointless, but the record is
+ * the point: it is the difference between "the user has not finished setting
+ * this up" and "the user set it up, and it needs nothing". Without it the two
+ * are the same empty file, and the app has to guess which one it is looking at.
+ */
+export function noCredential(provider = '') {
+    return { kind: NONE, provider }
 }
 
 export function tokenCredential(token, provider) {
@@ -84,6 +98,12 @@ export function parseCredential(text) {
         if (typeof access !== 'string' || !access) return null
 
         return tokenCredential(parsed.token, provider)
+    }
+
+    // Checked before the key case below, which reads an absent key as an
+    // unusable record. Here the absence is the whole meaning.
+    if (parsed.kind === NONE) {
+        return noCredential(provider)
     }
 
     // Treated as the default kind: a record written by a version that did not

@@ -3,6 +3,7 @@ import test, { describe } from 'node:test'
 import {
     apiKeyCredential,
     describeCredential,
+    noCredential,
     parseCredential,
     serialiseCredential,
     tokenCredential,
@@ -122,5 +123,32 @@ describe('describeCredential', () => {
             provider: 'example',
             expires: '2026-08-26T13:00:00.000Z',
         })
+    })
+
+    // A record holding no secret still describes a configured endpoint. The
+    // whole reason it is written down is to say so.
+    test('reports an endpoint that needs nothing as present', () => {
+        assert.deepEqual(describeCredential(noCredential()), {
+            present: true,
+            kind: 'none',
+            provider: '',
+            expires: '',
+        })
+    })
+})
+
+describe('a credential that is deliberately empty', () => {
+    test('survives the round trip', () => {
+        assert.deepEqual(parseCredential(serialiseCredential(noCredential('ollama'))), {
+            kind: 'none',
+            provider: 'ollama',
+        })
+    })
+
+    // The failure this guards against is quiet: a record with no key looks
+    // exactly like the unusable ones above, and reading it as null would turn
+    // a working local setup back into an unconfigured one on the next start.
+    test('is not mistaken for an unusable record', () => {
+        assert.notEqual(parseCredential('{"version":1,"kind":"none","provider":""}'), null)
     })
 })

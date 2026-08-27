@@ -3,9 +3,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import {
     API_KEY,
+    NONE,
     OAUTH_TOKEN,
     apiKeyCredential,
     describeCredential,
+    noCredential,
     parseCredential,
     serialiseCredential,
     tokenCredential,
@@ -87,6 +89,18 @@ export function writeModelApiKey(key, provider = '') {
     return write(apiKeyCredential(trimmed, provider))
 }
 
+/**
+ * Record that the configured endpoint needs no credential.
+ *
+ * Written through the same encrypted file as the others even though it holds
+ * no secret, so that there is exactly one place the app looks to answer "what
+ * is this workspace authenticating with" — and so that choosing a local model
+ * clears whatever key was there before, rather than leaving it behind.
+ */
+export function writeNoCredential(provider = '') {
+    return write(noCredential(provider))
+}
+
 /** Store a credential obtained through an authorisation flow. */
 export function writeModelToken(token, provider) {
     if (!token?.access) {
@@ -119,6 +133,11 @@ export function readServiceSecret() {
     const credential = readCredential()
 
     if (!credential) return { secret: '', kind: '' }
+
+    // The kind still travels, with nothing beside it. An empty secret and an
+    // empty kind would read as "not set up"; an empty secret and this kind is
+    // what tells the service the endpoint wants no header at all.
+    if (credential.kind === NONE) return { secret: '', kind: NONE }
 
     return credential.kind === OAUTH_TOKEN
         ? { secret: credential.token.access, kind: OAUTH_TOKEN }

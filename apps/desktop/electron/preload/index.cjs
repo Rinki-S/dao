@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('dao', {
     // the same status anyone else would get.
     getModelKeyStatus: () => ipcRenderer.invoke('dao:get-model-key-status'),
     setModelApiKey: (key) => ipcRenderer.invoke('dao:set-model-api-key', key),
+    setModelNoKey: () => ipcRenderer.invoke('dao:set-model-no-key'),
     clearModelApiKey: () => ipcRenderer.invoke('dao:clear-model-api-key'),
     listOAuthProviders: () => ipcRenderer.invoke('dao:list-oauth-providers'),
     connectProvider: (providerId) => ipcRenderer.invoke('dao:connect-provider', providerId),
