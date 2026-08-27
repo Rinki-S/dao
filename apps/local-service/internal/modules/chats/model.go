@@ -70,3 +70,28 @@ type RenameConversationRequest struct {
 type SendMessageRequest struct {
 	Content string `json:"content"`
 }
+
+// The three events a turn's stream can carry.
+//
+// Every stream that opens ends with done, whether the reply succeeded or not,
+// and done carries the assistant row exactly as it was stored. That is the
+// property worth having: what the client shows after done is what a reload
+// would show, so a failure needs no separate rendering path invented for it.
+const (
+	EventStart = "start"
+	EventDelta = "delta"
+	EventDone  = "done"
+)
+
+// StartEvent opens the stream. The user's turn comes back because the server
+// assigned its id, position and timestamp, and the assistant's id comes back so
+// the client has somewhere to put the deltas that follow.
+type StartEvent struct {
+	UserMessage        Message `json:"userMessage"`
+	AssistantMessageID string  `json:"assistantMessageId"`
+}
+
+// DeltaEvent is one piece of the reply as it arrives.
+type DeltaEvent struct {
+	Text string `json:"text"`
+}

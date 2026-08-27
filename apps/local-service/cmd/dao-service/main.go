@@ -20,6 +20,7 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/trace"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/ai"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/chats"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/notes"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/projects"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
@@ -97,6 +98,16 @@ func main() {
 
 	searchHandler := search.NewHandler(searchRepo)
 	searchHandler.RegisterRoutes(apiMux)
+
+	// Chat reaches the model through the ai handler's two functions rather than
+	// through the ai module itself. Which provider is configured, and whether it
+	// still is a minute from now, stays one module's business; chat is handed
+	// the ability to ask, not the settings behind it.
+	chats.NewHandler(
+		chats.NewRepository(db, func() string { return ulid.Make().String() }),
+		aiHandler.Client,
+		aiHandler.Describe,
+	).RegisterRoutes(apiMux)
 
 	// Registered last: the harness reads notes and tasks, so it is wired once
 	// the repositories that own them exist.

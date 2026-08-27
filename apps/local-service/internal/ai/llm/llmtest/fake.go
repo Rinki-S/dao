@@ -81,3 +81,71 @@ func (f *Fake) Complete(_ context.Context, request llm.Context, opts llm.Options
 func (f *Fake) Calls() int {
 	return f.next
 }
+
+// StreamingFake answers the way an endpoint that streams does.
+//
+// A separate type rather than a method on Fake, because whether a client
+// implements Streamer is itself behaviour worth testing: llm.StreamOrComplete
+// takes one path when it does and another when it does not, and a Fake that
+// always streamed would leave the fallback unreachable.
+type StreamingFake struct {
+	Fake
+
+	// Chunks is how many pieces an answer is delivered in. A real endpoint
+	// decides this for itself and a caller must not depend on where the splits
+	// land, which is exactly why a test should be able to move them.
+	Chunks int
+}
+
+// Streamed queues a single answer, delivered in the given number of pieces.
+func Streamed(answer string, chunks int) *StreamingFake {
+	return &StreamingFake{
+		Fake:   Fake{Turns: []Turn{{Text: answer, Stop: llm.StopEnd}}},
+		Chunks: chunks,
+	}
+}
+
+// Stream delivers the queued answer in pieces and only then returns the turn's
+// error, if it has one. That order is the point: it is the shape of a stream
+// that dies part-way through, having already handed the caller real text.
+func (f *StreamingFake) Stream(
+	ctx context.Context,
+	request llm.Context,
+	opts llm.Options,
+	onText func(string) error,
+) (llm.Response, error) {
+	response, err := f.Fake.Complete(ctx, request, opts)
+
+	for _, chunk := range pieces(response.Text(), f.Chunks) {
+		if writeErr := onText(chunk); writeErr != nil {
+			return response, writeErr
+		}
+	}
+
+	return response, err
+}
+
+// pieces cuts text into roughly equal parts, by byte. Splitting a multi-byte
+// character across two events is a thing real endpoints do, and a caller that
+// only reassembles the pieces should not care.
+func pieces(text string, count int) []string {
+	if text == "" {
+		return nil
+	}
+	if count <= 1 || count > len(text) {
+		return []string{text}
+	}
+
+	size := (len(text) + count - 1) / count
+	parts := []string{}
+
+	for start := 0; start < len(text); start += size {
+		end := start + size
+		if end > len(text) {
+			end = len(text)
+		}
+		parts = append(parts, text[start:end])
+	}
+
+	return parts
+}
