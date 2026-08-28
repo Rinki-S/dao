@@ -5,10 +5,13 @@ import { z } from 'zod';
 // never sees one and has nothing to render for it.
 export const MESSAGE_ROLES = ['user', 'assistant'];
 
-// What became of an assistant turn. Failed does not mean empty — a stream that
-// died half way left real text behind, and the surface has to show that text
-// while being honest that it stops mid-thought.
-export const MESSAGE_STATUSES = ['ok', 'failed'];
+// What became of an assistant turn.
+//
+// Failed does not mean empty — a stream that died half way left real text
+// behind, and the surface has to show that text while being honest that it
+// stops mid-thought. Stopped is not a kind of failure at all: the reader ended
+// it, and what had arrived is kept the way a finished turn's words are.
+export const MESSAGE_STATUSES = ['ok', 'failed', 'stopped'];
 
 // The fields the service leaves out when they are empty are given defaults
 // rather than made optional. A component reading message.model should get a

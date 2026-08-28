@@ -401,10 +401,14 @@ func TestConversationRoutes(t *testing.T) {
 	}
 }
 
-// A client that goes away stops the work. Nobody is reading, and a local model
-// asked to keep generating for a closed window is spending the machine's own
-// resources on nothing.
-func TestSendStopsWhenTheClientDisconnects(t *testing.T) {
+// A reader who stops reading stops the work. Nobody is waiting, and a local
+// model asked to keep generating for a closed window is spending the machine's
+// own resources on nothing.
+//
+// The turn is recorded as stopped rather than failed. Pressing stop and closing
+// the window are the same event from here — the reader stopped reading — and
+// neither is the model getting something wrong.
+func TestSendRecordsAStoppedReplyRatherThanAFailedOne(t *testing.T) {
 	fake := llmtest.Streamed("one two three four", 4)
 	handler, repo := newHandler(t, fake, nil)
 	conversation := newConversation(t, repo)
@@ -435,10 +439,10 @@ func TestSendStopsWhenTheClientDisconnects(t *testing.T) {
 		t.Fatalf("Messages: %v", err)
 	}
 	if len(stored) != 2 {
-		t.Fatalf("stored %d messages, want the question and a failed reply", len(stored))
+		t.Fatalf("stored %d messages, want the question and a stopped reply", len(stored))
 	}
-	if stored[1].Status != StatusFailed {
-		t.Fatalf("reply status = %q, want %q", stored[1].Status, StatusFailed)
+	if stored[1].Status != StatusStopped {
+		t.Fatalf("reply status = %q, want %q", stored[1].Status, StatusStopped)
 	}
 
 	// Nothing reached the client, so nothing is claimed to have. The response
@@ -447,8 +451,11 @@ func TestSendStopsWhenTheClientDisconnects(t *testing.T) {
 	if stored[1].Content != "" {
 		t.Fatalf("kept %q from a stream nobody read", stored[1].Content)
 	}
-	if !strings.Contains(stored[1].ErrorMessage, context.Canceled.Error()) {
-		t.Fatalf("error message = %q, want the cancellation", stored[1].ErrorMessage)
+
+	// No error message, because there was no error. A cancellation reported as
+	// one would put "context canceled" in front of someone who pressed stop.
+	if stored[1].ErrorMessage != "" {
+		t.Fatalf("error message = %q, want none on a stopped reply", stored[1].ErrorMessage)
 	}
 }
 
@@ -591,5 +598,71 @@ func TestAHandlerWithNoToolsStillAnswers(t *testing.T) {
 	}
 	if len(final.ToolCalls) != 0 {
 		t.Errorf("tool calls = %+v", final.ToolCalls)
+	}
+}
+
+// stopsPartway streams a piece, ends the request, then tries to stream another
+// — which is what pressing stop looks like from inside the handler.
+type stopsPartway struct {
+	cancel context.CancelFunc
+}
+
+func (s *stopsPartway) Complete(context.Context, llm.Context, llm.Options) (llm.Response, error) {
+	return llm.Response{}, nil
+}
+
+func (s *stopsPartway) Stream(
+	_ context.Context, _ llm.Context, _ llm.Options, onText func(string) error,
+) (llm.Response, error) {
+	if err := onText("Half an answer"); err != nil {
+		return llm.Response{}, err
+	}
+
+	s.cancel()
+
+	if err := onText(" and the rest of it"); err != nil {
+		return llm.Response{}, err
+	}
+
+	return llm.Response{}, nil
+}
+
+// Stopping keeps what had already been said. The reader watched those words
+// arrive; a transcript that dropped them would be missing the only part of the
+// turn that ever existed.
+func TestAStoppedReplyKeepsTheTextThatArrived(t *testing.T) {
+	handler, repo := newHandler(t, nil, nil)
+	conversation := newConversation(t, repo)
+
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/chats/"+conversation.ID+"/messages",
+		strings.NewReader(`{"content":"a question"}`),
+	)
+	ctx, cancel := context.WithCancel(request.Context())
+	handler.newClient = func() (llm.Client, error) { return &stopsPartway{cancel: cancel}, nil }
+
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, request.WithContext(ctx))
+
+	stored, err := repo.Messages(conversation.ID)
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	if len(stored) != 2 {
+		t.Fatalf("stored %d messages, want 2", len(stored))
+	}
+	if stored[1].Status != StatusStopped {
+		t.Fatalf("status = %q, want %q", stored[1].Status, StatusStopped)
+	}
+	if stored[1].Content != "Half an answer" {
+		t.Fatalf("kept %q, want the words that arrived before the stop", stored[1].Content)
+	}
+	// Not the piece that came after it: the reader never saw that one.
+	if strings.Contains(stored[1].Content, "the rest of it") {
+		t.Errorf("kept text written after the stop: %q", stored[1].Content)
 	}
 }

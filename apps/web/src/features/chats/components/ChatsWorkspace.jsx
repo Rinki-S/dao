@@ -3,6 +3,7 @@ import {
   IconAlertTriangle,
   IconInfoCircle,
   IconMessageCircle,
+  IconPlayerStop,
   IconPlus,
   IconSend,
   IconTool,
@@ -227,6 +228,16 @@ function Turn({ message }) {
           <AlertDescription>{message.errorMessage}</AlertDescription>
         </Alert>
       ) : null}
+
+      {/* A line, not an alert. Stopping is something the reader did on purpose,
+          and dressing it in an error's colour would report their own decision
+          back to them as a problem. */}
+      {message.status === 'stopped' ? (
+        <p className="flex items-center gap-2 text-muted-foreground text-xs">
+          <IconPlayerStop aria-hidden="true" className="size-3.5 shrink-0" />
+          {message.content ? 'You stopped this reply' : 'You stopped this reply before it began'}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -259,6 +270,15 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   const [deleting, setDeleting] = useState(null);
 
   const bottom = useRef(null);
+  // The turn in flight, in refs as well as in state.
+  //
+  // Stopping reads them from inside a catch, where the state captured when the
+  // send began is the state as it was then — an empty reply and no id. The refs
+  // are what the reader was actually shown by the time they pressed the button.
+  const running = useRef(null);
+  const streamed = useRef('');
+  const streamedTools = useRef([]);
+  const assistantId = useRef('');
   // The conversation whose turns are already in hand.
   //
   // Selecting one is not the only way to arrive at it: sending the first
@@ -334,6 +354,11 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
     setOutcome(null);
     setFailure('');
 
+    running.current = new AbortController();
+    streamed.current = '';
+    streamedTools.current = [];
+    assistantId.current = '';
+
     try {
       // Lazily, so the list only ever holds conversations with something in
       // them. The id is needed before the turn can be sent either way.
@@ -352,11 +377,19 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
         // The stored user turn replaces the local one: it carries the id,
         // position and timestamp only the service could assign.
         onStart: (start) => {
+          assistantId.current = start.assistantMessageId;
           setPending('');
           setMessages((current) => [...current, start.userMessage]);
         },
-        onDelta: (text) => setStreaming((current) => current + text),
-        onTool: (call) => setActivity((current) => [...current, call]),
+        onDelta: (text) => {
+          streamed.current += text;
+          setStreaming((current) => current + text);
+        },
+        onTool: (call) => {
+          streamedTools.current = [...streamedTools.current, call];
+          setActivity((current) => [...current, call]);
+        },
+        signal: running.current.signal,
       });
 
       setMessages((current) => [...current, reply]);
@@ -370,6 +403,43 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
       // conversation its title, and every turn changes the order of the list.
       setConversations(await listConversations(workspaceId));
     } catch (error) {
+      // Stopping is not a failure, and it is the one path with no done event to
+      // end on — the reader ended the stream, so nothing arrives after it. The
+      // turn is built from what they were actually shown, which is also what
+      // the service stored on its side of the same connection.
+      if (error.name === 'AbortError') {
+        setMessages((current) => [
+          ...current,
+          {
+            id: assistantId.current || 'stopped',
+            conversationId: selectedId ?? '',
+            role: 'assistant',
+            content: streamed.current,
+            position: current.length,
+            model: '',
+            wire: '',
+            inputTokens: 0,
+            outputTokens: 0,
+            status: 'stopped',
+            errorMessage: '',
+            createdAt: '',
+            // Carried onto the turn rather than dropped with the live lines.
+            // The service stored them, so a reload shows them; the pane should
+            // not disagree with itself for the rest of the session.
+            toolCalls: streamedTools.current,
+          },
+        ]);
+        setPending('');
+        setActivity([]);
+        setStreaming('');
+
+        // A stopped turn still made a conversation, and one missing from the
+        // list until the next reload is one the reader cannot get back to.
+        setConversations(await listConversations(workspaceId));
+
+        return;
+      }
+
       setOutcome(error.outcome ?? CHAT_OUTCOMES.failed);
       setFailure(error.message);
       setPending('');
@@ -379,8 +449,17 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
       // failure the user is about to be asked to do something about.
       setDraft((current) => current || content);
     } finally {
+      running.current = null;
       setSending(false);
     }
+  }
+
+  // Aborting the request is the whole mechanism. The connection closing is what
+  // tells the service to stop, which is the same thing it already does when a
+  // window is closed mid-answer — so there is no second code path, and no way
+  // for the model to keep spending on an answer nobody is waiting for.
+  function stop() {
+    running.current?.abort();
   }
 
   async function rename(title) {
@@ -564,15 +643,25 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
                 }
               }}
             />
-            <Button
-              aria-label="Send"
-              disabled={!draft.trim() || !workspaceId}
-              loading={sending}
-              size="icon"
-              type="submit"
-            >
-              <IconSend aria-hidden="true" />
-            </Button>
+            {/* The same corner, so the button that started the reply is the
+                button that ends it — and type="button" while it stops, or
+                pressing it would submit the form it sits in. It is never
+                disabled: the moment a reply is worth stopping is exactly the
+                moment it is running. */}
+            {sending ? (
+              <Button aria-label="Stop" size="icon" type="button" variant="outline" onClick={stop}>
+                <IconPlayerStop aria-hidden="true" />
+              </Button>
+            ) : (
+              <Button
+                aria-label="Send"
+                disabled={!draft.trim() || !workspaceId}
+                size="icon"
+                type="submit"
+              >
+                <IconSend aria-hidden="true" />
+              </Button>
+            )}
           </div>
         </form>
       </div>

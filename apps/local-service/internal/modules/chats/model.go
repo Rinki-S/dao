@@ -18,6 +18,13 @@ const (
 const (
 	StatusOK     = "ok"
 	StatusFailed = "failed"
+	// StatusStopped is a reply the reader ended on purpose.
+	//
+	// Separate from failed because nothing went wrong. The text that arrived is
+	// kept either way, but a transcript that called this a failure would be
+	// blaming the model for a decision the user made — and the difference is
+	// exactly what someone reading the conversation back needs to know.
+	StatusStopped = "stopped"
 )
 
 // Conversation is one thread of messages in a workspace.

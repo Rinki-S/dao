@@ -1,6 +1,7 @@
 package chats
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -279,6 +280,17 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 		ToolCalls:    used,
 	}
 	switch {
+	case errors.Is(runErr, context.Canceled):
+		// The reader closed the stream, which in this app means they pressed
+		// stop. Nothing went wrong, so nothing is recorded as having gone
+		// wrong: the text that arrived is kept and the turn says it was ended
+		// rather than that it broke.
+		//
+		// A dropped connection lands here too and is called the same thing.
+		// From this side the two are identical — the reader stopped reading —
+		// and guessing which one it was would mean inventing a distinction the
+		// service cannot see.
+		finished.Status = StatusStopped
 	case runErr != nil:
 		finished.Status = StatusFailed
 		finished.ErrorMessage = runErr.Error()

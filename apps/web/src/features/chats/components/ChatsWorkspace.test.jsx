@@ -284,3 +284,61 @@ describe('what the model looked up', () => {
     expect(await screen.findByText('Searched your notes')).toBeInTheDocument();
   });
 });
+
+describe('stopping a reply', () => {
+  /** A send that streams a piece and then waits to be aborted. */
+  function replyThatWaits() {
+    api.sendMessage.mockImplementation(
+      (_id, content, { onStart, onDelta, signal }) =>
+        new Promise((_resolve, reject) => {
+          onStart?.({ userMessage: message({ content }), assistantMessageId: 'message-2' });
+          onDelta?.('Half an answer');
+          signal?.addEventListener('abort', () => {
+            const error = new Error('aborted');
+            error.name = 'AbortError';
+            reject(error);
+          });
+        }),
+    );
+  }
+
+  it('offers a stop while a reply is running, and a send when it is not', async () => {
+    replyThatWaits();
+    await ask();
+
+    // The moment a reply is worth stopping is the moment it is running, so the
+    // control is there and enabled.
+    const stop = await screen.findByRole('button', { name: 'Stop' });
+    expect(stop).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Send' })).toBeNull();
+
+    await userEvent.click(stop);
+
+    expect(await screen.findByRole('button', { name: 'Send' })).toBeInTheDocument();
+  });
+
+  it('keeps the words that arrived and says who ended it', async () => {
+    replyThatWaits();
+    await ask();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }));
+
+    // What the reader watched arrive is what the turn holds.
+    expect(await screen.findByText('Half an answer')).toBeInTheDocument();
+    expect(screen.getByText('You stopped this reply')).toBeInTheDocument();
+  });
+
+  it('does not report stopping as a failure', async () => {
+    replyThatWaits();
+    await ask();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }));
+    await screen.findByText('You stopped this reply');
+
+    // Nothing went wrong, so none of the failure machinery fires: no alert, and
+    // the composer is not handed the question back as though it were unsent.
+    expect(screen.queryByText('The reply did not arrive')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByLabelText('Message')).toHaveValue('');
+  });
+});

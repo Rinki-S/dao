@@ -277,7 +277,19 @@ function streamChatReply(request, response, conversationId) {
     const words = QA_REPLY.split(' ');
     let index = 0;
 
-    const timer = setInterval(() => {
+    // A reader who presses stop closes the connection, and the service's answer
+    // to that is to stop generating. Here it is also the difference between
+    // ending the interval and writing to a destroyed socket until Node throws
+    // and takes the dev server with it.
+    let timer;
+    response.on('close', () => clearInterval(timer));
+
+    timer = setInterval(() => {
+      if (response.writableEnded || response.destroyed) {
+        clearInterval(timer);
+        return;
+      }
+
       if (index < words.length) {
         const text = index === 0 ? words[index] : ` ${words[index]}`;
         response.write(`event: delta\ndata: ${JSON.stringify({ text })}\n\n`);
