@@ -17,11 +17,25 @@ import (
 // Turn is one queued answer. Err is returned as-is when set, which is how a
 // test reaches the failure paths that matter: a refused key, a rate limit, a
 // timeout.
+//
+// Calls is what the model asks to have run. A turn can carry both: a model that
+// says "let me look" and then asks for a tool is the ordinary case, not an edge
+// one, and a fake that could not produce it would leave the loop's most common
+// step untested.
 type Turn struct {
 	Text  string
+	Calls []llm.ContentBlock
 	Usage llm.Usage
 	Stop  llm.StopReason
 	Err   error
+}
+
+// ToolCall queues one call, for the common case of a turn that is nothing else.
+func ToolCall(id, name, input string) Turn {
+	return Turn{
+		Calls: []llm.ContentBlock{llm.ToolCallBlock(id, name, []byte(input))},
+		Stop:  llm.StopToolUse,
+	}
 }
 
 // Fake answers with its queued turns in order.
@@ -68,6 +82,7 @@ func (f *Fake) Complete(_ context.Context, request llm.Context, opts llm.Options
 	if turn.Text != "" {
 		response.Content = []llm.ContentBlock{llm.TextBlock(turn.Text)}
 	}
+	response.Content = append(response.Content, turn.Calls...)
 	if turn.Err != nil {
 		// Usage still travels with the error: a call that failed part-way
 		// still spent tokens, and the trace should record them.
