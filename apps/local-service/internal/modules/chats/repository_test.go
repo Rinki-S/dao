@@ -319,9 +319,10 @@ func TestFinishRecordsWhichModelAnswered(t *testing.T) {
 	}
 }
 
-// The schema declares ON DELETE CASCADE, but this database never turns on
-// PRAGMA foreign_keys, so the cascade does nothing. This test is what stops
-// that from being discovered as orphaned rows later.
+// The schema declares ON DELETE CASCADE, and the service opens its database
+// with foreign keys enforced — but the database this test builds does not, on
+// purpose. It is the case where the cascade does nothing, which is what makes
+// this the test of the repository's own delete rather than of SQLite's.
 func TestDeletingAConversationRemovesItsMessages(t *testing.T) {
 	repo := newRepo(t)
 	conversation := newConversation(t, repo)

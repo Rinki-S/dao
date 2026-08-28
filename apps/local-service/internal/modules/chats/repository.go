@@ -365,10 +365,13 @@ func (r *Repository) Rename(id, title string) (Conversation, error) {
 
 // Delete removes a conversation and its messages.
 //
-// The messages are deleted explicitly rather than left to the ON DELETE
-// CASCADE the schema declares. SQLite enforces foreign keys only when
-// PRAGMA foreign_keys is on, and this database never turns it on — so relying
-// on the cascade here would silently leave every message behind.
+// The messages are deleted explicitly even though the schema declares ON DELETE
+// CASCADE and the service now opens its database with that enforced. SQLite
+// applies the cascade only when PRAGMA foreign_keys is on for the connection,
+// and a repository does not get to assume how the database it was handed was
+// opened — the tests below hand it one where it is off, which is exactly the
+// case where trusting the cascade would leave every message behind. Under
+// enforcement the cascade has already run and this deletes nothing.
 func (r *Repository) Delete(id string) error {
 	transaction, err := r.db.Begin()
 	if err != nil {

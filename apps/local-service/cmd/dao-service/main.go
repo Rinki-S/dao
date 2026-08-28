@@ -18,6 +18,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/harness"
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/trace"
+	"github.com/rinki-s/dao/apps/local-service/internal/database"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/ai"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/chats"
@@ -186,9 +187,7 @@ func openDatabase() (*sql.DB, error) {
 		return nil, err
 	}
 
-	dbPath := filepath.Join(dataDir, "dao.db")
-
-	return sql.Open("sqlite", dbPath)
+	return database.Open(filepath.Join(dataDir, "dao.db"))
 }
 
 func runMigrations(db *sql.DB) error {
