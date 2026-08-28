@@ -29,6 +29,19 @@ export const CreateNoteInputSchema = z.object({
 
 export const UpdateNoteContentInputSchema = z.object({
   content: z.string(),
+  // What the editor believed the note said when it read it. The service refuses
+  // the save if that is no longer true. Empty means "I have seen the conflict
+  // and I mean it".
+  expectedUpdatedAt: z.string().default(''),
+});
+
+// What comes back when a save is refused: the note as the app knows it, and the
+// text that is actually on disk — so a choice can be offered without a second
+// request to find out what is being chosen between.
+export const NoteConflictSchema = z.object({
+  note: NoteSchema,
+  onDisk: z.string(),
+  updatedAt: z.string(),
 });
 
 export const UpdateNoteInputSchema = z

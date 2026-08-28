@@ -1,10 +1,11 @@
 import { apiFetch } from '../../lib/api-client.js';
 import {
   CreateNoteInputSchema,
+  NoteConflictSchema,
   NoteListSchema,
   NoteSchema,
-  UpdateNoteInputSchema,
   UpdateNoteContentInputSchema,
+  UpdateNoteInputSchema,
 } from './schemas.js';
 
 export async function listNotes() {
@@ -48,6 +49,21 @@ export async function createNote(input) {
   return NoteSchema.parse(data);
 }
 
+/**
+ * A save that was refused because the file moved on underneath it.
+ *
+ * Carries the other version, because the editor has to let somebody choose and
+ * a choice against something invisible is not one.
+ */
+export class NoteConflictError extends Error {
+  constructor(conflict) {
+    super('This note changed on disk');
+    this.name = 'NoteConflictError';
+    this.note = conflict.note;
+    this.onDisk = conflict.onDisk;
+  }
+}
+
 export async function updateNoteContent(id, input) {
   const payload = UpdateNoteContentInputSchema.parse(input);
 
@@ -58,6 +74,13 @@ export async function updateNoteContent(id, input) {
     },
     body: JSON.stringify(payload),
   });
+
+  // Refused, not failed: something else changed the file since this editor read
+  // it. The body says what, so the caller can offer a choice rather than an
+  // apology.
+  if (response.status === 409) {
+    throw new NoteConflictError(NoteConflictSchema.parse(await response.json()));
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to update note content: ${response.status}`);

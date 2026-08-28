@@ -11,7 +11,9 @@ import {
   setPendingNoteDraft,
   waitForNoteSaves,
 } from '@/features/notes/note-save-queue.js';
-import { getNote, updateNote, updateNoteContent } from '../api.js';
+import { Button } from '@/components/ui/button.jsx';
+import { watchWorkspace } from '@/lib/workspace-events.js';
+import { getNote, NoteConflictError, updateNote, updateNoteContent } from '../api.js';
 
 const AUTOSAVE_DELAY_MS = 800;
 const MarkdownRichEditor = lazy(() =>
@@ -65,6 +67,11 @@ export function NoteEditorPanel({ noteId }) {
   const savedTitleRef = useRef('');
   const latestTitleRef = useRef('');
   const savedContentRef = useRef('');
+  // What the note said when this editor read it. Sent with every save so the
+  // service can refuse one that would write over somebody else's edit.
+  const readAtRef = useRef('');
+  const [conflict, setConflict] = useState(null);
+  const [showingTheirs, setShowingTheirs] = useState(false);
   const latestContentRef = useRef('');
   const latestNoteIdRef = useRef(noteId);
   const loadedNoteIdRef = useRef(null);
@@ -150,9 +157,17 @@ export function NoteEditorPanel({ noteId }) {
         updateSavePresentation(noteIdToSave, noteGeneration);
       }
 
-      const savePromise = enqueueNoteSave(noteIdToSave, () =>
-        updateNoteContent(noteIdToSave, { content: contentToSave }),
-      );
+      const savePromise = enqueueNoteSave(noteIdToSave, async () => {
+        const saved = await updateNoteContent(noteIdToSave, {
+          content: contentToSave,
+          expectedUpdatedAt: readAtRef.current,
+        });
+        // The save moved the note on, so the next one has to expect where it
+        // is now rather than where it was when the editor opened it.
+        readAtRef.current = saved.updatedAt;
+
+        return saved;
+      });
 
       void savePromise.then(
         () => {
@@ -174,6 +189,20 @@ export function NoteEditorPanel({ noteId }) {
           updateSavePresentation(noteIdToSave, noteGeneration);
         },
         (err) => {
+          // A refused save is not a failed one: nothing is wrong, the file
+          // moved on. Held rather than reported, so the choice below can be
+          // offered instead of an error nobody can act on.
+          if (err instanceof NoteConflictError) {
+            markPendingNoteDraftSaved(noteIdToSave, 'content', contentToSave);
+
+            if (isActiveNoteGeneration(noteIdToSave, noteGeneration)) {
+              setConflict({ mine: contentToSave, theirs: err.onDisk, note: err.note });
+              setShowingTheirs(false);
+            }
+
+            return;
+          }
+
           markPendingNoteDraftFailed(noteIdToSave, 'content', contentToSave, err);
 
           if (
@@ -366,6 +395,7 @@ export function NoteEditorPanel({ noteId }) {
         latestTitleRef.current = nextTitle;
         savedContentRef.current = nextNote.content;
         latestContentRef.current = nextContent;
+        readAtRef.current = nextNote.updatedAt;
         saveErrorsRef.current = {
           content: pendingContent?.error ?? null,
           title: pendingTitle?.error ?? null,
@@ -444,6 +474,35 @@ export function NoteEditorPanel({ noteId }) {
     };
   }, [content, enqueueContentSave, hasPendingFieldSave, loadStatus, noteId]);
 
+  // A note edited somewhere else, with nothing unsaved here, is not a conflict —
+  // it is news. The editor takes the new text rather than sitting on a copy that
+  // is already wrong and would overwrite it on the next keystroke.
+  //
+  // Only when clean. Replacing text somebody is in the middle of typing would be
+  // the same data loss from the other direction, and that case is the conflict
+  // above, reached when they next save.
+  useEffect(() => {
+    return watchWorkspace(async () => {
+      const id = latestNoteIdRef.current;
+      if (!id || latestContentRef.current !== savedContentRef.current) return;
+
+      const fresh = await getNote(id).catch(() => null);
+      if (!fresh || fresh.id !== latestNoteIdRef.current) return;
+      if (fresh.updatedAt === readAtRef.current || fresh.content === savedContentRef.current)
+        return;
+      if (latestContentRef.current !== savedContentRef.current) return;
+
+      noteGenerationRef.current += 1;
+      setContent(fresh.content);
+      setTitle(fresh.title);
+      savedContentRef.current = fresh.content;
+      latestContentRef.current = fresh.content;
+      savedTitleRef.current = fresh.title;
+      latestTitleRef.current = fresh.title;
+      readAtRef.current = fresh.updatedAt;
+    });
+  }, []);
+
   if (!noteId) {
     return (
       <NoteEditorState
@@ -468,14 +527,65 @@ export function NoteEditorPanel({ noteId }) {
     return <NoteEditorState title="Unable to load note" description={error} />;
   }
 
+  // Keeping mine means writing over theirs on purpose, which is what an empty
+  // expectation says to the service.
+  async function keepMine() {
+    const mine = conflict.mine;
+    setConflict(null);
+
+    const saved = await updateNoteContent(noteId, { content: mine, expectedUpdatedAt: '' });
+    readAtRef.current = saved.updatedAt;
+    savedContentRef.current = mine;
+  }
+
+  // Taking theirs discards what was typed here. The editor is remounted on the
+  // new text rather than told to change under the cursor, which is why the
+  // generation is bumped.
+  function takeTheirs() {
+    const theirs = conflict.theirs;
+    setConflict(null);
+    noteGenerationRef.current += 1;
+    setContent(theirs);
+    savedContentRef.current = theirs;
+    latestContentRef.current = theirs;
+    readAtRef.current = conflict.note.updatedAt;
+  }
+
   const saveStatusLabel = getSaveStatusLabel(saveStatus);
 
   return (
     <section aria-label="Note editor" className="flex h-full min-h-0 flex-col overflow-hidden">
-      {error && saveStatus === 'failed' && (
+      {error && saveStatus === 'failed' && !conflict && (
         <p className="bg-destructive/8 p-2 text-destructive text-sm" role="alert">
           {error}
         </p>
+      )}
+
+      {/* Not an error's colour. Nothing went wrong — two people wrote to one
+          file, and the only thing missing is a decision. */}
+      {conflict && (
+        <div className="flex flex-col gap-2 border-b bg-warning/8 p-3 text-sm" role="alert">
+          <p className="font-medium">This note changed on disk</p>
+          <p className="text-muted-foreground">
+            Something else edited this file while you were writing. Nothing has been saved.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => void keepMine()}>
+              Keep mine
+            </Button>
+            <Button size="sm" variant="outline" onClick={takeTheirs}>
+              Take theirs
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowingTheirs((open) => !open)}>
+              {showingTheirs ? 'Hide the other version' : 'Show both'}
+            </Button>
+          </div>
+          {showingTheirs && (
+            <pre className="max-h-64 overflow-auto rounded-md border bg-secondary p-3 font-mono text-xs">
+              {conflict.theirs}
+            </pre>
+          )}
+        </div>
       )}
 
       <Suspense fallback={<MarkdownEditorLoadingState />}>
