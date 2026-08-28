@@ -681,27 +681,78 @@ Validation:
 - Go `test ./...` and `vet ./...` pass
 - browser and real Electron visual QA are recorded in project-root `design-qa.md`
 
-Chats remains a disabled placeholder until the AI Harness milestone.
+Chats remained a disabled placeholder until the milestones below.
 
-## Later Milestone: AI Summary Loop
+## Milestone: AI Summary Loop
+
+Status: complete
+
+Branch:
+
+```txt
+feat/ai-harness
+```
+
+Completed scope:
+
+- reach a model through one interface and two wire protocols, Anthropic and OpenAI-compatible, so a vendor is a base URL, a key and a model name
+- keep the model credential out of the database and out of the renderer: the desktop process holds it in the OS keychain and hands it to the service through the environment, and the service never writes it down, logs it, or returns it
+- carry a credential that can renew itself, so an OAuth token refreshes across sleep without restarting the service
+- let an endpoint declare that it needs no credential, for a local model
+- record every run in an execution trace, including the ones that failed
+- gather one day of a workspace and summarise it, validating the answer against a schema before anything is shown
+- require confirmation before a summary is kept, and write the note from the trace rather than from the renderer's copy
+- deliver an answer while it is still being written
+
+## Milestone: Chats
+
+Status: complete
+
+Branch:
+
+```txt
+feat/chat
+```
+
+Completed scope:
+
+- keep a conversation as rows in the order it happened, with turn order as a column rather than an inference from a second-precision timestamp
+- answer a turn over a server-sent event stream that always ends the same way, so what the client holds after the stream is what a reload shows
+- render a reply's Markdown without ever building HTML from it, then move that to markstream and give it the note editor's look
+- offer the model the workspace's notes and tasks through read-only tools, bound to one workspace with no argument that could name another
+- run the agent loop: ask, run what the model asks for, ask again, bounded
+- record what the model looked up on the turn it looked it up for, so a reload still answers "did it read my notes?"
+- let a reply be stopped, and record that as stopping rather than as a failure
+- put conversations in the search index, both sides of them
+
+Also in this branch:
+
+- make the foreign keys six migrations declare actually hold, by opening the database with them enforced
+- set the interface in Iosevka Aile and code in Iosevka Extended, bundled rather than assumed
+
+Validation:
+
+- Go `test ./...` and `vet ./...` pass; renderer formatting, lint, tests and production build pass
+- each milestone verified against a copy of the real database, with a fake provider standing in for the model
+- browser visual QA in both appearances
+
+## Later Milestone: Tools That Write
 
 Recommended branch:
 
 ```txt
-feat/ai-summary
+feat/ai-write
 ```
 
 Goal:
 
 ```txt
-Dao starts the first AI feature by generating structured summaries from existing local workspace context through the AI Harness boundary.
+The model can propose a change to a note or the task list, and a human agrees to it before anything is written.
 ```
 
 Planned scope:
 
-- read `docs/ai-harness.md` before implementation
-- define the first AI summary contract
-- keep AI calls out of random React components and feature modules
-- validate AI output with Zod before using it
-- require user confirmation before writing AI-generated changes
-- keep tool calling and agent workflows deferred
+- keep every existing tool read-only; a writing tool is a different shape, not a flag on an existing one
+- follow the summary run's shape: produce something, show it, and wait to be told to keep it
+- show the change before it is applied, as a diff against what is on disk
+- never write without a confirmation that names what will change

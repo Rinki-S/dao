@@ -1,5 +1,10 @@
 # Dao COSS Shell Design QA
 
+This records the Recent-first coss Workspace Shell pass. It describes the app as
+it was at that milestone — Chats was still a disabled placeholder then, and the
+AI surfaces did not exist. Later passes are recorded in the commits that made
+them, and the QA server they were looked at through is `vite.qa.config.js`.
+
 ## Evidence
 
 - Source visual truth: `/Users/rinki/.codex/generated_images/01a022fc-3e36-74f1-b3d2-a1d250f667af/exec-54edcbf1-a063-46c6-a0f7-d1cd1e9953a3.png`
@@ -57,3 +62,19 @@ No actionable P0, P1, or P2 mismatch remained. Console error/warning collection 
 - [x] Keep the Electron-only visual effect as an explicitly recorded runtime test gap.
 
 final result: passed
+
+## Later passes
+
+The shell has been through further visual QA since, none of which changed the
+composition above:
+
+- Today, the AI provider settings, and the Settings dialog, at the AI Summary
+  Loop milestone.
+- Chats: the conversation list, a streamed reply, a reply that stops
+  mid-thought, the lines saying what the model looked up, the rendered Markdown
+  in both appearances, and stopping a reply.
+- Iosevka Aile and Iosevka Extended throughout, which is what exposed the
+  sidebar row that overflowed instead of truncating.
+
+Each is recorded in the commit that made it, with what was looked at and what
+was found.
