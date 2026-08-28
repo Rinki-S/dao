@@ -200,8 +200,31 @@ const chatMessages = {
   ],
 };
 
-const QA_REPLY =
-  'Streaming is the point of this surface, so the QA server writes a reply the way a model does: in pieces, with a pause between them, so the pane can be watched filling in rather than appearing all at once.';
+// Written to exercise what a reply is actually made of — prose, a list, a
+// fenced block, a table, a link — so the rendered shapes can be looked at
+// rather than assumed. It streams in pieces, so the pane can be watched filling
+// in rather than only inspected once it has finished.
+const QA_REPLY = [
+  'The lexer flushes a token only when it sees the character after it, so the last one never lands.',
+  '',
+  'Two ways out:',
+  '',
+  '- flush whatever is buffered when the reader returns EOF',
+  '- append a synthetic newline before lexing',
+  '',
+  '```go',
+  'if err == io.EOF {',
+  '    return lexer.flush()',
+  '}',
+  '```',
+  '',
+  '| approach | honest |',
+  '| --- | --- |',
+  '| flush at EOF | yes |',
+  '| synthetic newline | no |',
+  '',
+  'The first is the fix. See [the SQLite docs](https://sqlite.org/foreignkeys.html) for the other thing you asked about.',
+].join('\n');
 
 /**
  * Answer a turn the way the service does — start, deltas, done — so the surface
@@ -233,6 +256,14 @@ function streamChatReply(request, response, conversationId) {
       createdAt: now,
     };
     stored.push(userMessage);
+
+    // The service names a conversation after the message that started it, and
+    // the QA server has to do the same or this surface is inspected in a state
+    // production never reaches.
+    const conversation = conversations.find((item) => item.id === conversationId);
+    if (conversation && !conversation.title) {
+      conversation.title = content.split('\n')[0].slice(0, 60);
+    }
 
     const assistantId = `qa-assistant-${stored.length}`;
     response.write(

@@ -48,6 +48,7 @@ import { Spinner } from '@/components/ui/spinner.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
 import { useTitlebarInset } from '@/components/shell/use-titlebar-inset.js';
 import { cn } from '@/lib/utils';
+import { Markdown } from './Markdown.jsx';
 import {
   CHAT_OUTCOMES,
   createConversation,
@@ -133,10 +134,10 @@ function RenameDialog({ conversation, open, onOpenChange, onSubmit }) {
 /**
  * One turn.
  *
- * The reply is rendered as text, not as Markdown. The model is asked to write
- * Markdown and mostly does, but turning a model's output into HTML is a thing
- * to do once and carefully, with a sanitiser — not in passing. Preserved
- * whitespace keeps lists and fenced code readable meanwhile.
+ * What the user wrote stays text: they typed it, they know what it says, and a
+ * question that renders its own asterisks as emphasis is surprising in a way
+ * nothing gains from. The reply is rendered, because the model was asked to
+ * write Markdown and does.
  */
 function Turn({ message }) {
   if (message.role === 'user') {
@@ -151,7 +152,11 @@ function Turn({ message }) {
 
   return (
     <div className="flex flex-col gap-2">
-      {message.content ? <p className="whitespace-pre-wrap text-sm">{message.content}</p> : null}
+      {message.content ? (
+        <div className="flex flex-col gap-3 text-sm">
+          <Markdown text={message.content} />
+        </div>
+      ) : null}
       {message.status === 'failed' ? (
         <Alert variant="error">
           <IconAlertTriangle />
@@ -388,7 +393,11 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
           <h2 className="truncate font-heading font-semibold text-sm">
-            {selected?.title || 'New chat'}
+            {/* Three states, not two. Nothing selected is a new chat; a
+                conversation whose title has not been derived yet is untitled,
+                and calling that "New chat" would give the row in the list and
+                the header above it two different names for one thing. */}
+            {selected ? selected.title || 'Untitled' : 'New chat'}
           </h2>
         </header>
 
@@ -421,7 +430,13 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
               </div>
             ) : null}
 
-            {streaming ? <p className="whitespace-pre-wrap text-sm">{streaming}</p> : null}
+            {/* Rendered while it streams, not only once it lands, so the reply
+                does not visibly re-lay-itself-out the moment it finishes. */}
+            {streaming ? (
+              <div className="flex flex-col gap-3 text-sm">
+                <Markdown text={streaming} />
+              </div>
+            ) : null}
 
             {sending && !streaming ? <Spinner aria-hidden="true" /> : null}
 
