@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rinki-s/dao/apps/local-service/internal/ai/agent"
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm"
 	"github.com/rinki-s/dao/apps/local-service/internal/httpx"
 )
@@ -22,6 +23,16 @@ type Handler struct {
 	repo      *Repository
 	newClient func() (llm.Client, error)
 	describe  func() (wire string, model string)
+
+	// newTools builds the tools for one workspace. A function of the workspace
+	// rather than a fixed set, because a tool's reach is decided when it is
+	// built — the model is never given the workspace to name, so the only place
+	// that can be got wrong is here.
+	//
+	// Nil means the model is offered nothing and answers from the conversation
+	// alone, which is what a build with no tools wired up should do rather than
+	// crash.
+	newTools func(workspaceID string) []agent.Tool
 }
 
 func NewHandler(
@@ -30,6 +41,13 @@ func NewHandler(
 	describe func() (wire string, model string),
 ) *Handler {
 	return &Handler{repo: repo, newClient: newClient, describe: describe}
+}
+
+// WithTools gives the model something to look things up with.
+func (h *Handler) WithTools(newTools func(workspaceID string) []agent.Tool) *Handler {
+	h.newTools = newTools
+
+	return h
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
@@ -155,6 +173,15 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 
 	conversationID := r.PathValue("id")
 
+	// Read before anything is written, for the workspace. The tools are built
+	// around it and the model has no say in which one that is — this line is
+	// where a chat's reach is decided.
+	conversation, err := h.repo.GetConversation(conversationID)
+	if err != nil {
+		httpx.Error(w, statusFor(err), messageFor(err, "failed to read the conversation"))
+		return
+	}
+
 	user, err := h.repo.Append(conversationID, Message{Role: RoleUser, Content: content})
 	if err != nil {
 		httpx.Error(w, statusFor(err), messageFor(err, "failed to store the message"))
@@ -198,13 +225,17 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 	})
 
 	var reply strings.Builder
+	var used []ToolCall
 
-	response, streamErr := llm.StreamOrComplete(
-		r.Context(),
-		client,
-		BuildContext(history),
-		llm.Options{MaxTokens: chatMaxTokens},
-		func(chunk string) error {
+	var tools []agent.Tool
+	if h.newTools != nil {
+		tools = h.newTools(conversation.WorkspaceID)
+	}
+
+	loop := &agent.Loop{
+		Client: client,
+		Tools:  tools,
+		OnText: func(chunk string) error {
 			// The context, not the write, is what reports a browser that has
 			// gone away: a write to a closed connection is buffered by the
 			// kernel and succeeds for some time after there is nobody there.
@@ -217,30 +248,49 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 
 			return writeEvent(w, flusher, EventDelta, DeltaEvent{Text: chunk})
 		},
-	)
+		OnToolStart: func(name string, input json.RawMessage) {
+			// Recorded and announced in the same place, so what the reader was
+			// told and what the transcript keeps cannot disagree.
+			used = append(used, ToolCall{Name: name, Input: string(input)})
+			_ = writeEvent(w, flusher, EventTool, ToolEvent{Name: name, Input: string(input)})
+		},
+	}
 
-	// The deltas are the answer; the response is the accounting. They are only
-	// read the other way round when a call that succeeded reported no deltas at
-	// all, which an endpoint claiming to be OpenAI-compatible is entirely
-	// capable of doing. Not after a failure: a response can carry more than the
-	// caller was actually handed, and storing that as the reply would record an
-	// answer the user never saw.
+	result, runErr := loop.Run(r.Context(), BuildContext(history), llm.Options{MaxTokens: chatMaxTokens})
+
+	// The deltas are the answer; the result's text is the same words gathered by
+	// the loop. They are only read the other way round when a call that
+	// succeeded reported no deltas at all, which an endpoint claiming to be
+	// OpenAI-compatible is entirely capable of doing. Not after a failure: the
+	// result can carry more than the caller was actually handed, and storing
+	// that as the reply would record an answer the user never saw.
 	text := reply.String()
-	if text == "" && streamErr == nil {
-		text = response.Text()
+	if text == "" && runErr == nil {
+		text = result.Text
 	}
 
 	finished := Message{
 		Content:      text,
 		Model:        model,
 		Wire:         wire,
-		InputTokens:  response.Usage.InputTokens,
-		OutputTokens: response.Usage.OutputTokens,
+		InputTokens:  result.Usage.InputTokens,
+		OutputTokens: result.Usage.OutputTokens,
 		Status:       StatusOK,
+		ToolCalls:    used,
 	}
-	if streamErr != nil {
+	switch {
+	case runErr != nil:
 		finished.Status = StatusFailed
-		finished.ErrorMessage = streamErr.Error()
+		finished.ErrorMessage = runErr.Error()
+	case result.StepsExhausted:
+		// Not a broken reply — the model was still looking things up when it
+		// ran out of rope. Marked failed because whatever it had said by then
+		// is not the answer to the question, and presenting it as one would be
+		// the transcript's own claim rather than the model's.
+		finished.Status = StatusFailed
+		finished.ErrorMessage = fmt.Sprintf(
+			"the model was still looking things up after %d steps and was stopped", result.Steps,
+		)
 	}
 
 	stored, err := h.repo.Finish(assistant.ID, finished)

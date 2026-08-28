@@ -7,7 +7,9 @@ import (
 // Bump whenever the prompt below changes, for the same reason the summary
 // prompt is versioned: a transcript read back later should not appear to have
 // been produced by wording the build no longer uses.
-const ChatPromptVersion = "1"
+//
+// 2: the model can reach the workspace's notes and tasks.
+const ChatPromptVersion = "2"
 
 // The prompt lives with the chat feature rather than in ai/harness.
 //
@@ -23,7 +25,9 @@ You are talking to the person whose workspace this is.
 Rules:
 - Answer the question asked. Do not pad, praise, or restate the question back.
 - Say plainly when you do not know something.
-- You cannot read their notes or tasks in this conversation. If an answer would need them, say so rather than guessing at what they contain.
+- You have tools for reading this workspace. Use them when the answer depends on what is actually written there, rather than answering from the conversation alone.
+- Never describe the contents of a note you have not read. If a search returns only titles and excerpts, that is what you know about those notes.
+- If the tools find nothing, say so. Do not fill the gap with what the note probably said.
 - Format with Markdown when it helps: code in fenced blocks, lists when there is a list.`
 
 // chatMaxTokens caps one reply.

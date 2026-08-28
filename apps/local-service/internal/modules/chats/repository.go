@@ -2,6 +2,7 @@ package chats
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -152,9 +153,7 @@ func (r *Repository) ListConversations(workspaceID string) ([]Conversation, erro
 
 func (r *Repository) Messages(conversationID string) ([]Message, error) {
 	rows, err := r.db.Query(`
-		SELECT id, conversation_id, role, content, position,
-		       model, wire, input_tokens, output_tokens,
-		       status, error_message, created_at
+		SELECT `+messageColumns+`
 		FROM chat_messages
 		WHERE conversation_id = ?
 		ORDER BY position
@@ -167,19 +166,79 @@ func (r *Repository) Messages(conversationID string) ([]Message, error) {
 	messages := []Message{}
 
 	for rows.Next() {
-		var message Message
-		if err := rows.Scan(
-			&message.ID, &message.ConversationID, &message.Role, &message.Content,
-			&message.Position, &message.Model, &message.Wire,
-			&message.InputTokens, &message.OutputTokens,
-			&message.Status, &message.ErrorMessage, &message.CreatedAt,
-		); err != nil {
+		message, err := scanMessage(rows)
+		if err != nil {
 			return nil, err
 		}
 		messages = append(messages, message)
 	}
 
 	return messages, rows.Err()
+}
+
+// The columns of a message, in the order scanMessage reads them. Written once
+// because the two places that select a message have to agree, and the way they
+// stop agreeing is that someone adds a column to one of them.
+const messageColumns = `id, conversation_id, role, content, position,
+	       model, wire, input_tokens, output_tokens,
+	       status, error_message, created_at, tool_calls`
+
+// scanner is what Row and Rows have in common, so one scan serves both.
+type scanner interface {
+	Scan(dest ...any) error
+}
+
+func scanMessage(row scanner) (Message, error) {
+	var message Message
+	var toolCalls string
+
+	if err := row.Scan(
+		&message.ID, &message.ConversationID, &message.Role, &message.Content,
+		&message.Position, &message.Model, &message.Wire,
+		&message.InputTokens, &message.OutputTokens,
+		&message.Status, &message.ErrorMessage, &message.CreatedAt, &toolCalls,
+	); err != nil {
+		return Message{}, err
+	}
+
+	calls, err := decodeToolCalls(toolCalls)
+	if err != nil {
+		return Message{}, err
+	}
+	message.ToolCalls = calls
+
+	return message, nil
+}
+
+// The empty string is what every row written before the column existed holds,
+// and what a turn that called nothing holds now. Both mean the same thing, so
+// neither is an error.
+func decodeToolCalls(stored string) ([]ToolCall, error) {
+	if stored == "" {
+		return nil, nil
+	}
+
+	var calls []ToolCall
+	if err := json.Unmarshal([]byte(stored), &calls); err != nil {
+		return nil, fmt.Errorf("decode tool calls: %w", err)
+	}
+
+	return calls, nil
+}
+
+// encodeToolCalls stores nothing as the empty string rather than as "null",
+// so that a turn with no calls reads back the same however it was written.
+func encodeToolCalls(calls []ToolCall) (string, error) {
+	if len(calls) == 0 {
+		return "", nil
+	}
+
+	encoded, err := json.Marshal(calls)
+	if err != nil {
+		return "", fmt.Errorf("encode tool calls: %w", err)
+	}
+
+	return string(encoded), nil
 }
 
 func (r *Repository) Detail(conversationID string) (ConversationDetail, error) {
@@ -245,15 +304,20 @@ func (r *Repository) Append(conversationID string, message Message) (Message, er
 		stored.Status = StatusOK
 	}
 
+	toolCalls, err := encodeToolCalls(stored.ToolCalls)
+	if err != nil {
+		return Message{}, err
+	}
+
 	if _, err := transaction.Exec(`
 		INSERT INTO chat_messages (
 			id, conversation_id, role, content, position,
 			model, wire, input_tokens, output_tokens,
-			status, error_message, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			status, error_message, created_at, tool_calls
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, stored.ID, stored.ConversationID, stored.Role, stored.Content, stored.Position,
 		stored.Model, stored.Wire, stored.InputTokens, stored.OutputTokens,
-		stored.Status, stored.ErrorMessage, stored.CreatedAt); err != nil {
+		stored.Status, stored.ErrorMessage, stored.CreatedAt, toolCalls); err != nil {
 		return Message{}, err
 	}
 
@@ -291,15 +355,20 @@ func (r *Repository) Finish(messageID string, message Message) (Message, error) 
 		status = StatusOK
 	}
 
+	toolCalls, err := encodeToolCalls(message.ToolCalls)
+	if err != nil {
+		return Message{}, err
+	}
+
 	result, err := r.db.Exec(`
 		UPDATE chat_messages
 		SET content = ?, model = ?, wire = ?,
 		    input_tokens = ?, output_tokens = ?,
-		    status = ?, error_message = ?
+		    status = ?, error_message = ?, tool_calls = ?
 		WHERE id = ?
 	`, message.Content, message.Model, message.Wire,
 		message.InputTokens, message.OutputTokens,
-		status, message.ErrorMessage, messageID)
+		status, message.ErrorMessage, toolCalls, messageID)
 	if err != nil {
 		return Message{}, err
 	}
@@ -316,19 +385,9 @@ func (r *Repository) Finish(messageID string, message Message) (Message, error) 
 }
 
 func (r *Repository) message(id string) (Message, error) {
-	var message Message
-
-	err := r.db.QueryRow(`
-		SELECT id, conversation_id, role, content, position,
-		       model, wire, input_tokens, output_tokens,
-		       status, error_message, created_at
-		FROM chat_messages WHERE id = ?
-	`, id).Scan(
-		&message.ID, &message.ConversationID, &message.Role, &message.Content,
-		&message.Position, &message.Model, &message.Wire,
-		&message.InputTokens, &message.OutputTokens,
-		&message.Status, &message.ErrorMessage, &message.CreatedAt,
-	)
+	message, err := scanMessage(r.db.QueryRow(
+		`SELECT `+messageColumns+` FROM chat_messages WHERE id = ?`, id,
+	))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Message{}, ErrMessageNotFound
 	}

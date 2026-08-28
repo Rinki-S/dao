@@ -29,6 +29,16 @@ type Conversation struct {
 	UpdatedAt   string `json:"updatedAt"`
 }
 
+// ToolCall is one thing the model did before it answered.
+//
+// The arguments are kept beside the name because "searched your notes" and
+// "searched your notes for parser" are different claims, and only the second is
+// one the reader can check.
+type ToolCall struct {
+	Name  string `json:"name"`
+	Input string `json:"input"`
+}
+
 // Message is one turn.
 //
 // Model and Wire are per message rather than per conversation because the user
@@ -47,6 +57,11 @@ type Message struct {
 	Status         string `json:"status"`
 	ErrorMessage   string `json:"errorMessage,omitempty"`
 	CreatedAt      string `json:"createdAt"`
+
+	// ToolCalls is what the model did before answering, in order. Stored with
+	// the turn so that reloading a conversation still shows how its answers
+	// were arrived at, rather than only what they were.
+	ToolCalls []ToolCall `json:"toolCalls,omitempty"`
 }
 
 // ConversationDetail is a conversation together with its turns, which is how
@@ -80,8 +95,23 @@ type SendMessageRequest struct {
 const (
 	EventStart = "start"
 	EventDelta = "delta"
+	EventTool  = "tool"
 	EventDone  = "done"
 )
+
+// ToolEvent says that the model is looking something up.
+//
+// Sent when a tool starts rather than when it finishes, because the point of it
+// is to fill the pause: a reader watching nothing happen for two seconds should
+// be told what is happening, not told afterwards what happened.
+//
+// It carries the name and the arguments and no phrasing. How to say "searched
+// your notes for parser" is the renderer's business, where the rest of the
+// product's words live.
+type ToolEvent struct {
+	Name  string `json:"name"`
+	Input string `json:"input"`
+}
 
 // StartEvent opens the stream. The user's turn comes back because the server
 // assigned its id, position and timestamp, and the assistant's id comes back so

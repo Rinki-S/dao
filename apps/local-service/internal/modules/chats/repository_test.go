@@ -42,6 +42,7 @@ func openTestDB(t *testing.T) *sql.DB {
 			status TEXT NOT NULL DEFAULT 'ok',
 			error_message TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL,
+			tool_calls TEXT NOT NULL DEFAULT '',
 			UNIQUE (conversation_id, position)
 		);
 	`); err != nil {

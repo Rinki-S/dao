@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/rinki-s/dao/apps/local-service/internal/ai/agent"
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm"
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm/llmtest"
 )
@@ -156,7 +158,7 @@ func TestSendStreamsTheReplyAndStoresBothTurns(t *testing.T) {
 	if stored[0].Role != RoleUser || stored[0].Content != "What is the question?" {
 		t.Fatalf("first turn = %+v", stored[0])
 	}
-	if stored[1] != final {
+	if !reflect.DeepEqual(stored[1], final) {
 		t.Fatalf("done event = %+v, stored = %+v", final, stored[1])
 	}
 	if stored[1].Status != StatusOK || stored[1].ErrorMessage != "" {
@@ -240,7 +242,7 @@ func TestSendKeepsPartialTextWhenTheStreamFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Messages: %v", err)
 	}
-	if len(stored) != 2 || stored[1] != final {
+	if len(stored) != 2 || !reflect.DeepEqual(stored[1], final) {
 		t.Fatalf("stored = %+v, done event = %+v", stored, final)
 	}
 }
@@ -447,5 +449,147 @@ func TestSendStopsWhenTheClientDisconnects(t *testing.T) {
 	}
 	if !strings.Contains(stored[1].ErrorMessage, context.Canceled.Error()) {
 		t.Fatalf("error message = %q, want the cancellation", stored[1].ErrorMessage)
+	}
+}
+
+// stubTool answers however the test needs and remembers that it ran.
+type stubTool struct {
+	name   string
+	answer string
+	runs   int
+}
+
+func (s *stubTool) Definition() llm.ToolDefinition {
+	return llm.ToolDefinition{
+		Name:        s.name,
+		Description: "a tool, for testing",
+		Schema:      json.RawMessage(`{"type":"object"}`),
+	}
+}
+
+func (s *stubTool) Run(context.Context, json.RawMessage) (string, error) {
+	s.runs++
+
+	return s.answer, nil
+}
+
+func withTools(t *testing.T, client llm.Client, tool agent.Tool) (*Handler, *Repository) {
+	t.Helper()
+
+	handler, repo := newHandler(t, client, nil)
+	handler.WithTools(func(string) []agent.Tool { return []agent.Tool{tool} })
+
+	return handler, repo
+}
+
+// A turn where the model looks something up: the tool runs, the stream says so
+// while it happens, and the transcript keeps the record of it.
+func TestATurnThatUsesAToolSaysSoAndKeepsTheRecord(t *testing.T) {
+	search := &stubTool{name: "search_notes", answer: "Parser recovery strategy.md"}
+	model := llmtest.Sequence(
+		llmtest.Turn{Text: "Let me look. ", Calls: llmtest.ToolCall("call-1", "search_notes", `{"query":"parser"}`).Calls},
+		llmtest.Turn{Text: "You wrote about parser recovery.", Stop: llm.StopEnd},
+	)
+
+	handler, repo := withTools(t, model, search)
+	conversation := newConversation(t, repo)
+
+	recorder := send(t, handler, conversation.ID, "what did I write about parsers?")
+	events := parseEvents(t, recorder.Body.String())
+
+	if search.runs != 1 {
+		t.Fatalf("the tool ran %d times, want 1", search.runs)
+	}
+
+	// The reader is told what is happening while it happens, not afterwards.
+	var announced ToolEvent
+	found := false
+	for _, e := range events {
+		if e.name != EventTool {
+			continue
+		}
+		found = true
+		if err := json.Unmarshal([]byte(e.data), &announced); err != nil {
+			t.Fatalf("decode tool event: %v", err)
+		}
+	}
+	if !found {
+		t.Fatalf("no tool event in %v", names(events))
+	}
+	if announced.Name != "search_notes" || announced.Input != `{"query":"parser"}` {
+		t.Errorf("announced %+v", announced)
+	}
+
+	var final Message
+	lastData(t, events, &final)
+
+	if final.Content != "Let me look. You wrote about parser recovery." {
+		t.Errorf("content = %q", final.Content)
+	}
+	// The question this app has to be able to answer about itself is "did it
+	// read my notes?", and an answer that only exists in the stream disappears
+	// on reload.
+	if len(final.ToolCalls) != 1 || final.ToolCalls[0].Name != "search_notes" {
+		t.Fatalf("tool calls = %+v", final.ToolCalls)
+	}
+	if final.ToolCalls[0].Input != `{"query":"parser"}` {
+		t.Errorf("the arguments were not kept: %+v", final.ToolCalls[0])
+	}
+
+	stored, err := repo.Messages(conversation.ID)
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	if !reflect.DeepEqual(stored[1], final) {
+		t.Fatalf("done event = %+v, stored = %+v", final, stored[1])
+	}
+}
+
+// A model still looking things up when the bound runs out has not answered the
+// question, and whatever it had said by then is not the answer.
+func TestARunThatRanOutOfStepsIsMarkedFailed(t *testing.T) {
+	search := &stubTool{name: "search_notes", answer: "still nothing"}
+
+	turns := make([]llmtest.Turn, 20)
+	for index := range turns {
+		turns[index] = llmtest.ToolCall("call", "search_notes", `{"query":"x"}`)
+	}
+
+	handler, repo := withTools(t, llmtest.Sequence(turns...), search)
+	conversation := newConversation(t, repo)
+
+	recorder := send(t, handler, conversation.ID, "a question")
+
+	var final Message
+	lastData(t, parseEvents(t, recorder.Body.String()), &final)
+
+	if final.Status != StatusFailed {
+		t.Fatalf("status = %q, want %q", final.Status, StatusFailed)
+	}
+	if !strings.Contains(final.ErrorMessage, "looking things up") {
+		t.Errorf("error message = %q", final.ErrorMessage)
+	}
+	// Every step it took is on the record, not just the last.
+	if len(final.ToolCalls) == 0 {
+		t.Error("the steps it did take were not kept")
+	}
+}
+
+// A build with no tools wired up offers none and answers from the conversation
+// alone, rather than failing.
+func TestAHandlerWithNoToolsStillAnswers(t *testing.T) {
+	handler, repo := newHandler(t, llmtest.Text("no tools here"), nil)
+	conversation := newConversation(t, repo)
+
+	recorder := send(t, handler, conversation.ID, "a question")
+
+	var final Message
+	lastData(t, parseEvents(t, recorder.Body.String()), &final)
+
+	if final.Content != "no tools here" || final.Status != StatusOK {
+		t.Errorf("final = %+v", final)
+	}
+	if len(final.ToolCalls) != 0 {
+		t.Errorf("tool calls = %+v", final.ToolCalls)
 	}
 }

@@ -16,7 +16,9 @@ import (
 
 	"github.com/oklog/ulid/v2"
 	"github.com/pressly/goose/v3"
+	"github.com/rinki-s/dao/apps/local-service/internal/ai/agent"
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/harness"
+	"github.com/rinki-s/dao/apps/local-service/internal/ai/tools"
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/trace"
 	"github.com/rinki-s/dao/apps/local-service/internal/database"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
@@ -108,7 +110,7 @@ func main() {
 		chats.NewRepository(db, func() string { return ulid.Make().String() }),
 		aiHandler.Client,
 		aiHandler.Describe,
-	).RegisterRoutes(apiMux)
+	).WithTools(workspaceTools(searchRepo, noteRepo, taskRepo)).RegisterRoutes(apiMux)
 
 	// Registered last: the harness reads notes and tasks, so it is wired once
 	// the repositories that own them exist.
@@ -177,6 +179,72 @@ func main() {
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
+	}
+}
+
+// workspaceTools builds the read-only tools a chat in one workspace is given.
+//
+// The workspace comes from the conversation the request is for, and closes over
+// every function below. There is no argument by which a model could name a
+// different one, and this is the only place that could stop being true.
+func workspaceTools(
+	searchRepo *search.Repository,
+	noteRepo *notes.Repository,
+	taskRepo *tasks.Repository,
+) func(string) []agent.Tool {
+	return func(workspaceID string) []agent.Tool {
+		return tools.New(tools.Workspace{
+			SearchNotes: func(query string) ([]tools.NoteMatch, error) {
+				results, err := searchRepo.Search(query)
+				if err != nil {
+					return nil, err
+				}
+
+				// The index holds tasks and projects too, and every workspace's.
+				// Both filters are here rather than in the tool, because what a
+				// row in the index means is this module's business.
+				matches := []tools.NoteMatch{}
+				for _, result := range results {
+					if result.EntityType != "note" || result.WorkspaceID != workspaceID {
+						continue
+					}
+					matches = append(matches, tools.NoteMatch{
+						ID:      result.EntityID,
+						Title:   result.Title,
+						Snippet: result.Snippet,
+					})
+				}
+
+				return matches, nil
+			},
+			ReadNote: func(id string) (tools.NoteContent, error) {
+				note, err := noteRepo.Get(id)
+				if err != nil {
+					return tools.NoteContent{}, err
+				}
+				// Checked after reading rather than in the query, so that a note
+				// in another workspace is refused rather than returned. An id
+				// found by search is always in this workspace; one the model
+				// invented or remembered from earlier need not be.
+				if note.WorkspaceID != workspaceID {
+					return tools.NoteContent{}, fmt.Errorf("no note %q in this workspace", id)
+				}
+
+				return tools.NoteContent{
+					Title:     note.Title,
+					Content:   note.Content,
+					UpdatedAt: note.UpdatedAt,
+				}, nil
+			},
+			ReadTasks: func() (string, error) {
+				document, err := taskRepo.Get(workspaceID)
+				if err != nil {
+					return "", err
+				}
+
+				return document.Content, nil
+			},
+		})
 	}
 }
 
