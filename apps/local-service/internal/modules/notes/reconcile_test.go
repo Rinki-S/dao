@@ -1,6 +1,7 @@
 package notes
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -249,5 +250,141 @@ func TestTitleFromFileName(t *testing.T) {
 		if got := titleFromFileName(testCase.in); got != testCase.want {
 			t.Errorf("titleFromFileName(%q) = %q, want %q", testCase.in, got, testCase.want)
 		}
+	}
+}
+
+// The file is not the editor's alone. Somebody can change it in Finder while a
+// window is open on it, and without this the next autosave writes over what
+// they did from a copy read before the change.
+func TestSavingOverAnEditMadeElsewhereIsRefused(t *testing.T) {
+	repo, _, _, _ := reconcileFixture(t)
+
+	note, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		Title:       "Kestrel",
+		Content:     "listens on 8080",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	readByTheEditor := note.UpdatedAt
+
+	// Somebody edits it elsewhere, and the watcher reconciles it.
+	if err := os.WriteFile(note.FilePath, []byte("listens on 7743"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	later := time.Now().Add(2 * time.Minute)
+	if err := os.Chtimes(note.FilePath, later, later); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+	if _, err := repo.Reconcile([]string{note.FilePath}); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+
+	// The editor, still holding what it read before, autosaves.
+	_, err = repo.UpdateContent(note.ID, "listens on 8080 and is fine", readByTheEditor)
+
+	var conflict *Conflict
+	if !errors.As(err, &conflict) {
+		t.Fatalf("err = %v, want a conflict", err)
+	}
+
+	// The other version comes back with it, or the editor would be asking
+	// somebody to choose against something they cannot see.
+	if conflict.OnDisk != "listens on 7743" {
+		t.Errorf("conflict carried %q", conflict.OnDisk)
+	}
+
+	// And nothing was written.
+	onDisk, _ := os.ReadFile(note.FilePath)
+	if string(onDisk) != "listens on 7743" {
+		t.Errorf("the file was overwritten anyway: %q", onDisk)
+	}
+}
+
+// The window between an external edit and the watcher noticing it is small and
+// real. A save that lands inside it must still be refused, or the protection is
+// only as good as the filesystem's timing.
+func TestSavingOverAnEditTheWatcherHasNotSeenYetIsRefused(t *testing.T) {
+	repo, _, _, _ := reconcileFixture(t)
+
+	note, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		Title:       "Kestrel",
+		Content:     "listens on 8080",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	// Edited on disk, and deliberately not reconciled — updated_at still says
+	// what it said, so the expectation the editor sends still matches.
+	if err := os.WriteFile(note.FilePath, []byte("listens on 7743"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	later := time.Now().Add(2 * time.Minute)
+	if err := os.Chtimes(note.FilePath, later, later); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+
+	_, err = repo.UpdateContent(note.ID, "from the editor", note.UpdatedAt)
+
+	var conflict *Conflict
+	if !errors.As(err, &conflict) {
+		t.Fatalf("err = %v, want a conflict from the file being ahead of the row", err)
+	}
+}
+
+// Having seen the conflict and chosen, the caller must be able to mean it.
+func TestSavingWithNoExpectationWritesRegardless(t *testing.T) {
+	repo, _, _, _ := reconcileFixture(t)
+
+	note, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		Title:       "Kestrel",
+		Content:     "listens on 8080",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	if err := os.WriteFile(note.FilePath, []byte("changed elsewhere"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	later := time.Now().Add(2 * time.Minute)
+	if err := os.Chtimes(note.FilePath, later, later); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+
+	if _, err := repo.UpdateContent(note.ID, "mine wins", ""); err != nil {
+		t.Fatalf("UpdateContent: %v", err)
+	}
+
+	onDisk, _ := os.ReadFile(note.FilePath)
+	if string(onDisk) != "mine wins" {
+		t.Errorf("file = %q, want the caller's version", onDisk)
+	}
+}
+
+// The ordinary case: nobody else touched it, so the save goes through.
+func TestAnUncontestedSaveIsNotAConflict(t *testing.T) {
+	repo, _, _, _ := reconcileFixture(t)
+
+	note, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		Title:       "Kestrel",
+		Content:     "first",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	if _, err := repo.UpdateContent(note.ID, "second", note.UpdatedAt); err != nil {
+		t.Fatalf("an ordinary save was refused: %v", err)
+	}
+
+	onDisk, _ := os.ReadFile(note.FilePath)
+	if string(onDisk) != "second" {
+		t.Errorf("file = %q", onDisk)
 	}
 }

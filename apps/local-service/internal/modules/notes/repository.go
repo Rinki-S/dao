@@ -201,7 +201,21 @@ func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 	return note, nil
 }
 
-func (r *Repository) UpdateContent(id string, content string) (Note, error) {
+// UpdateContent writes a note's file, unless somebody else already did.
+//
+// expectedUpdatedAt is what the caller believed the note said when it read it.
+// Empty skips the check, which is how a caller says "I have seen the conflict
+// and I mean it".
+//
+// Two ways the file can have moved on, and both have to be caught:
+//
+// The row's updated_at no longer matches what the caller expected — an external
+// edit the watcher has already reconciled, which is the ordinary case.
+//
+// The file itself is newer than the row — an external edit the watcher has not
+// caught up with yet. Without this second check there is a window, a fraction
+// of a second wide, in which a save silently wins over an edit it never saw.
+func (r *Repository) UpdateContent(id string, content string, expectedUpdatedAt string) (Note, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	note, err := scanNote(r.db.QueryRow(`
@@ -217,6 +231,12 @@ func (r *Repository) UpdateContent(id string, content string) (Note, error) {
 	previousContent, err := os.ReadFile(note.FilePath)
 	if err != nil {
 		return Note{}, err
+	}
+
+	if expectedUpdatedAt != "" {
+		if conflict := r.conflict(note, expectedUpdatedAt, previousContent); conflict != nil {
+			return Note{}, conflict
+		}
 	}
 
 	if err := os.WriteFile(note.FilePath, []byte(content), 0644); err != nil {
@@ -477,4 +497,29 @@ func scanNote(scanner noteScanner) (Note, error) {
 	}
 
 	return note, nil
+}
+
+// conflict reports whether the file moved on since the caller read it.
+func (r *Repository) conflict(note Note, expectedUpdatedAt string, onDisk []byte) error {
+	moved := note.UpdatedAt != expectedUpdatedAt
+
+	if !moved {
+		// The watcher may not have caught up. Compared against the row rather
+		// than against what the caller expects, because those are the same
+		// string here and the file is the thing that might be ahead of both.
+		if info, err := os.Stat(note.FilePath); err == nil {
+			if saved, err := time.Parse(time.RFC3339, note.UpdatedAt); err == nil {
+				// The same second of tolerance the reconciler uses, and for the
+				// same reason: updated_at is stored to the second, so the app's
+				// own save always looks a fraction newer than it claims to be.
+				moved = info.ModTime().After(saved.Add(time.Second))
+			}
+		}
+	}
+
+	if !moved {
+		return nil
+	}
+
+	return &Conflict{Note: note, OnDisk: string(onDisk), UpdatedAt: note.UpdatedAt}
 }

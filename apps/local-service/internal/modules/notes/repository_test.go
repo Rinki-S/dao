@@ -139,7 +139,7 @@ func TestRepositoryUpdateContentWritesMarkdownFileAndReplacesIndex(t *testing.T)
 		t.Fatalf("create note: %v", err)
 	}
 
-	updatedNote, err := repo.UpdateContent(createdNote.ID, "Updated content")
+	updatedNote, err := repo.UpdateContent(createdNote.ID, "Updated content", "")
 	if err != nil {
 		t.Fatalf("update content: %v", err)
 	}
