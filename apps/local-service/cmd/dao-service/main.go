@@ -31,6 +31,7 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/settings"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/tasks"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/workspaces"
+	"github.com/rinki-s/dao/apps/local-service/internal/watch"
 
 	_ "modernc.org/sqlite"
 )
@@ -109,6 +110,25 @@ func main() {
 
 	searchHandler := search.NewHandler(searchRepo)
 	searchHandler.RegisterRoutes(apiMux)
+
+	// The workspace folder is a place the user is invited to open, so the app
+	// has to cope with them doing so. Failing to watch is not failing to start:
+	// an app that will not open because a folder moved is worse than one whose
+	// live updates stopped.
+	watchCtx, stopWatching := context.WithCancel(context.Background())
+	defer stopWatching()
+
+	if roots, err := workspaceRoots(db); err != nil {
+		log.Printf("workspace roots: %v", err)
+	} else if _, err := watch.Watch(watchCtx, roots, watch.Options{
+		OnChange: func(paths []string) {
+			if _, err := noteRepo.Reconcile(paths); err != nil {
+				log.Printf("reconcile: %v", err)
+			}
+		},
+	}); err != nil {
+		log.Printf("watch workspace: %v", err)
+	}
 
 	// Chat reaches the model through the ai handler's two functions rather than
 	// through the ai module itself. Which provider is configured, and whether it
@@ -289,4 +309,26 @@ func requireToken(token string, next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// workspaceRoots is every folder the app should be watching.
+func workspaceRoots(db *sql.DB) ([]string, error) {
+	rows, err := db.Query(`SELECT root_path FROM workspaces WHERE deleted_at IS NULL`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var roots []string
+	for rows.Next() {
+		var root string
+		if err := rows.Scan(&root); err != nil {
+			return nil, err
+		}
+		if root != "" {
+			roots = append(roots, root)
+		}
+	}
+
+	return roots, rows.Err()
 }
