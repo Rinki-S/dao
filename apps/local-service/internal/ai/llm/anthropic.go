@@ -28,6 +28,13 @@ type anthropicRequest struct {
 	System    string             `json:"system,omitempty"`
 	Messages  []anthropicMessage `json:"messages"`
 	Stream    bool               `json:"stream,omitempty"`
+	Tools     []anthropicTool    `json:"tools,omitempty"`
+}
+
+type anthropicTool struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description,omitempty"`
+	InputSchema json.RawMessage `json:"input_schema"`
 }
 
 type anthropicMessage struct {
@@ -35,10 +42,23 @@ type anthropicMessage struct {
 	Content []anthropicContent `json:"content"`
 }
 
+// anthropicContent is the union of the block shapes this wire uses. A tool call
+// and its result are both content here — the result rides in a user message,
+// which is the shape this package normalised on.
 type anthropicContent struct {
 	Type     string `json:"type"`
 	Text     string `json:"text,omitempty"`
 	Thinking string `json:"thinking,omitempty"`
+
+	// tool_use
+	ID    string          `json:"id,omitempty"`
+	Name  string          `json:"name,omitempty"`
+	Input json.RawMessage `json:"input,omitempty"`
+
+	// tool_result
+	ToolUseID string `json:"tool_use_id,omitempty"`
+	Content   string `json:"content,omitempty"`
+	IsError   bool   `json:"is_error,omitempty"`
 }
 
 type anthropicResponse struct {
@@ -64,16 +84,42 @@ func (c *anthropicClient) newRequest(
 		Stream:    stream,
 	}
 
+	for _, tool := range opts.Tools {
+		body.Tools = append(body.Tools, anthropicTool{
+			Name:        tool.Name,
+			Description: tool.Description,
+			InputSchema: tool.Schema,
+		})
+	}
+
 	for _, message := range request.Messages {
 		content := make([]anthropicContent, 0, len(message.Content))
 		for _, block := range message.Content {
-			// Reasoning is never sent back up: it is the model's own working,
-			// and replaying it across a wire that did not produce it is how
-			// contexts get corrupted.
-			if block.Kind != KindText {
-				continue
+			switch block.Kind {
+			case KindText:
+				content = append(content, anthropicContent{Type: "text", Text: block.Text})
+			case KindToolCall:
+				// Sent back up, unlike reasoning: the result that follows refers
+				// to this block by id, and a wire that never saw the call has
+				// nothing for the result to answer.
+				content = append(content, anthropicContent{
+					Type:  "tool_use",
+					ID:    block.ID,
+					Name:  block.Name,
+					Input: block.Input,
+				})
+			case KindToolResult:
+				content = append(content, anthropicContent{
+					Type:      "tool_result",
+					ToolUseID: block.ID,
+					Content:   block.Text,
+					IsError:   block.IsError,
+				})
+			default:
+				// Reasoning is never sent back up: it is the model's own
+				// working, and replaying it across a wire that did not produce
+				// it is how contexts get corrupted.
 			}
-			content = append(content, anthropicContent{Type: "text", Text: block.Text})
 		}
 		body.Messages = append(body.Messages, anthropicMessage{
 			Role:    string(message.Role),
@@ -143,6 +189,8 @@ func (c *anthropicClient) Complete(ctx context.Context, request Context, opts Op
 			result.Content = append(result.Content, ContentBlock{Kind: KindText, Text: block.Text})
 		case "thinking":
 			result.Content = append(result.Content, ContentBlock{Kind: KindThinking, Text: block.Thinking})
+		case "tool_use":
+			result.Content = append(result.Content, ToolCallBlock(block.ID, block.Name, block.Input))
 		}
 	}
 
@@ -262,6 +310,8 @@ func anthropicStopReason(reason string) StopReason {
 	switch reason {
 	case "max_tokens":
 		return StopLength
+	case "tool_use":
+		return StopToolUse
 	case "end_turn", "stop_sequence":
 		return StopEnd
 	default:

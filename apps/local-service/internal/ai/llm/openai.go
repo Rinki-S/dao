@@ -29,21 +29,52 @@ type openAIRequest struct {
 	// chunk when asked. Endpoints that do not recognise it ignore it, which is
 	// why it costs nothing to always ask.
 	StreamOptions *openAIStreamOptions `json:"stream_options,omitempty"`
+	Tools         []openAITool         `json:"tools,omitempty"`
 }
 
 type openAIStreamOptions struct {
 	IncludeUsage bool `json:"include_usage"`
 }
 
+// A tool is a "function" on this wire, wrapped in an envelope whose type field
+// has only ever had one value.
+type openAITool struct {
+	Type     string             `json:"type"`
+	Function openAIToolFunction `json:"function"`
+}
+
+type openAIToolFunction struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description,omitempty"`
+	Parameters  json.RawMessage `json:"parameters"`
+}
+
 type openAIMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+	// An assistant turn's calls, and — on a message with role "tool" — the one
+	// this message answers.
+	ToolCalls  []openAIToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string           `json:"tool_call_id,omitempty"`
+}
+
+// openAIToolCall carries its arguments as a *string* of JSON rather than as
+// JSON, which is the sharpest difference between the two wires and the reason
+// the raw bytes are kept rather than decoded on the way through.
+type openAIToolCall struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Function struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	} `json:"function"`
 }
 
 type openAIResponse struct {
 	Choices []struct {
 		Message struct {
-			Content string `json:"content"`
+			Content   string           `json:"content"`
+			ToolCalls []openAIToolCall `json:"tool_calls"`
 		} `json:"message"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
@@ -81,17 +112,19 @@ func (c *openAIClient) newRequest(
 		})
 	}
 
-	for _, message := range request.Messages {
-		text := ""
-		for _, block := range message.Content {
-			if block.Kind == KindText {
-				text += block.Text
-			}
-		}
-		body.Messages = append(body.Messages, openAIMessage{
-			Role:    string(message.Role),
-			Content: text,
+	for _, tool := range opts.Tools {
+		body.Tools = append(body.Tools, openAITool{
+			Type: "function",
+			Function: openAIToolFunction{
+				Name:        tool.Name,
+				Description: tool.Description,
+				Parameters:  tool.Schema,
+			},
 		})
+	}
+
+	for _, message := range request.Messages {
+		body.Messages = append(body.Messages, openAIMessages(message)...)
 	}
 
 	payload, err := json.Marshal(body)
@@ -114,6 +147,57 @@ func (c *openAIClient) newRequest(
 	}
 
 	return httpRequest, nil
+}
+
+// openAIMessages turns one message into the one or more this wire needs.
+//
+// One in, several out, because a tool's result is a message here rather than
+// content inside one. A user turn carrying three results becomes three messages
+// with role "tool" — and the prose in that same turn, if there is any, becomes
+// a fourth, after them: this wire reads a tool message as answering the calls
+// before it, so anything the user said has to come once that exchange is
+// closed.
+func openAIMessages(message Message) []openAIMessage {
+	var messages []openAIMessage
+	var text strings.Builder
+	var calls []openAIToolCall
+
+	for _, block := range message.Content {
+		switch block.Kind {
+		case KindText:
+			text.WriteString(block.Text)
+		case KindToolCall:
+			call := openAIToolCall{ID: block.ID, Type: "function"}
+			call.Function.Name = block.Name
+			// The arguments go back as the string this wire wants. Raw JSON
+			// with no bytes touched: re-encoding a number the model wrote is
+			// how 1e300 becomes something else.
+			call.Function.Arguments = string(block.Input)
+			calls = append(calls, call)
+		case KindToolResult:
+			// An error is reported as the result's text. This wire has no flag
+			// for it, and the model needs to be told in words regardless.
+			content := block.Text
+			if block.IsError {
+				content = "Error: " + content
+			}
+			messages = append(messages, openAIMessage{
+				Role:       "tool",
+				ToolCallID: block.ID,
+				Content:    content,
+			})
+		}
+	}
+
+	if text.Len() > 0 || len(calls) > 0 {
+		messages = append(messages, openAIMessage{
+			Role:      string(message.Role),
+			Content:   text.String(),
+			ToolCalls: calls,
+		})
+	}
+
+	return messages
 }
 
 func (c *openAIClient) Complete(ctx context.Context, request Context, opts Options) (Response, error) {
@@ -161,6 +245,16 @@ func (c *openAIClient) Complete(ctx context.Context, request Context, opts Optio
 	result.StopReason = openAIStopReason(choice.FinishReason)
 	if choice.Message.Content != "" {
 		result.Content = []ContentBlock{TextBlock(choice.Message.Content)}
+	}
+	for _, call := range choice.Message.ToolCalls {
+		// Arguments come as a string of JSON. Empty means the model asked for a
+		// tool that takes none, and an empty object is what a schema-validating
+		// tool expects to decode.
+		arguments := json.RawMessage(call.Function.Arguments)
+		if len(arguments) == 0 {
+			arguments = json.RawMessage("{}")
+		}
+		result.Content = append(result.Content, ToolCallBlock(call.ID, call.Function.Name, arguments))
 	}
 
 	return result, nil
@@ -267,6 +361,8 @@ func openAIStopReason(reason string) StopReason {
 	switch reason {
 	case "length":
 		return StopLength
+	case "tool_calls":
+		return StopToolUse
 	case "stop":
 		return StopEnd
 	default:

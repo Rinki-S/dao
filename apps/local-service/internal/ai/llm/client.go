@@ -71,6 +71,13 @@ type Options struct {
 	// caller parsing structured output needs the ceiling high enough that a
 	// complete object fits.
 	MaxTokens int
+
+	// Tools the model may ask to have run.
+	//
+	// Per call rather than per client, because which tools exist is a property
+	// of what is being asked, not of which provider is configured: a summary
+	// run offers none, and a chat offers the ones its workspace can answer.
+	Tools []ToolDefinition
 }
 
 // Client is the whole surface the rest of Dao sees. One method: no streaming,
