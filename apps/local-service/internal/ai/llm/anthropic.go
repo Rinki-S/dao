@@ -209,11 +209,23 @@ func (c *anthropicClient) Complete(ctx context.Context, request Context, opts Op
 // wire is free to add events, and a stream that failed on one it had not seen
 // before would break on a provider upgrade.
 type anthropicEvent struct {
-	Type  string `json:"type"`
+	Type string `json:"type"`
+	// Which block of the turn this event belongs to. Text is usually block 0
+	// and a tool call the one after it, but the only thing worth relying on is
+	// that the number identifies the block.
+	Index        int `json:"index"`
+	ContentBlock struct {
+		Type string `json:"type"`
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"content_block"`
 	Delta struct {
-		Type       string `json:"type"`
-		Text       string `json:"text"`
-		StopReason string `json:"stop_reason"`
+		Type string `json:"type"`
+		Text string `json:"text"`
+		// A tool's arguments arrive as fragments of JSON text, which is why
+		// they cannot be decoded until the block is closed.
+		PartialJSON string `json:"partial_json"`
+		StopReason  string `json:"stop_reason"`
 	} `json:"delta"`
 	// Input tokens arrive once, in message_start; output tokens arrive at the
 	// end, in message_delta. Neither event carries both.
@@ -251,6 +263,7 @@ func (c *anthropicClient) Stream(
 	}
 
 	var text strings.Builder
+	var calls toolCalls
 	result := Response{StopReason: StopEnd}
 	sawEvent := false
 
@@ -265,16 +278,30 @@ func (c *anthropicClient) Stream(
 		case "message_start":
 			result.Usage.InputTokens = event.Message.Usage.InputTokens
 
+		case "content_block_start":
+			// The only event carrying a call's id and name; everything after it
+			// is arguments.
+			if event.ContentBlock.Type == "tool_use" {
+				calls.start(event.Index, event.ContentBlock.ID, event.ContentBlock.Name)
+			}
+
 		case "content_block_delta":
-			// Only text deltas. A thinking delta is the model's own working,
-			// which this package already declines to carry back up.
-			if event.Delta.Type != "text_delta" || event.Delta.Text == "" {
-				return true, nil
+			switch event.Delta.Type {
+			case "text_delta":
+				if event.Delta.Text == "" {
+					return true, nil
+				}
+				text.WriteString(event.Delta.Text)
+				if err := onText(event.Delta.Text); err != nil {
+					return false, err
+				}
+			case "input_json_delta":
+				// Not passed to onText. These are a tool's arguments, not
+				// something anybody should be reading as an answer.
+				calls.argument(event.Index, event.Delta.PartialJSON)
 			}
-			text.WriteString(event.Delta.Text)
-			if err := onText(event.Delta.Text); err != nil {
-				return false, err
-			}
+			// Any other delta is the model's own working, which this package
+			// already declines to carry back up.
 
 		case "message_delta":
 			if event.Delta.StopReason != "" {
@@ -302,6 +329,7 @@ func (c *anthropicClient) Stream(
 	if text.Len() > 0 {
 		result.Content = []ContentBlock{TextBlock(text.String())}
 	}
+	result.Content = append(result.Content, calls.blocks()...)
 
 	return result, nil
 }

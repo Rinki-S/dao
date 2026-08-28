@@ -270,6 +270,17 @@ type openAIChunk struct {
 	Choices []struct {
 		Delta struct {
 			Content string `json:"content"`
+			// A call's id and name arrive with its first fragment and are
+			// absent from every one after it, which is why the accumulator is
+			// keyed on index rather than on id.
+			ToolCalls []struct {
+				Index    int    `json:"index"`
+				ID       string `json:"id"`
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
 		} `json:"delta"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
@@ -299,6 +310,7 @@ func (c *openAIClient) Stream(
 	}
 
 	var text strings.Builder
+	var calls toolCalls
 	result := Response{StopReason: StopEnd}
 	sawChunk := false
 
@@ -324,6 +336,19 @@ func (c *openAIClient) Stream(
 			if choice.FinishReason != "" {
 				result.StopReason = openAIStopReason(choice.FinishReason)
 			}
+
+			for _, call := range choice.Delta.ToolCalls {
+				if call.ID != "" || call.Function.Name != "" {
+					calls.start(call.Index, call.ID, call.Function.Name)
+				}
+				if call.Function.Arguments != "" {
+					// Not passed to onText: arguments are not prose, and a
+					// reader shown half a JSON object would be right to think
+					// something had gone wrong.
+					calls.argument(call.Index, call.Function.Arguments)
+				}
+			}
+
 			if choice.Delta.Content == "" {
 				continue
 			}
@@ -353,6 +378,7 @@ func (c *openAIClient) Stream(
 	if text.Len() > 0 {
 		result.Content = []ContentBlock{TextBlock(text.String())}
 	}
+	result.Content = append(result.Content, calls.blocks()...)
 
 	return result, nil
 }

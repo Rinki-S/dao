@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // Streamer is a client that can deliver an answer while it is still being
@@ -63,6 +65,90 @@ func StreamOrComplete(
 	}
 
 	return response, nil
+}
+
+// toolCalls accumulates calls that arrive in pieces.
+//
+// Both wires stream a tool's arguments as fragments of JSON keyed by the call's
+// position in the turn, and differ only in what they call the fields. So the
+// gathering lives here once rather than twice, and each wire is left with the
+// part that is genuinely its own: how it says "a call starts" and "here is more
+// of its arguments".
+//
+// Position rather than id, because on the OpenAI wire the id arrives with the
+// first fragment and nothing after it — there is no id to key on when the
+// second fragment turns up.
+type toolCalls struct {
+	order   []int
+	partial map[int]*partialCall
+}
+
+type partialCall struct {
+	id        string
+	name      string
+	arguments strings.Builder
+}
+
+func (t *toolCalls) at(index int) *partialCall {
+	if t.partial == nil {
+		t.partial = map[int]*partialCall{}
+	}
+	if call, seen := t.partial[index]; seen {
+		return call
+	}
+
+	call := &partialCall{}
+	t.partial[index] = call
+	// Kept in the order the wire opened them, which is the order the model
+	// asked for them in. A map's iteration order would shuffle two calls whose
+	// sequence the model may well have meant.
+	t.order = append(t.order, index)
+
+	return call
+}
+
+// start records a call's identity. Called when the wire announces one, which on
+// both wires is the only moment the id and the name are sent.
+func (t *toolCalls) start(index int, id, name string) {
+	call := t.at(index)
+	if id != "" {
+		call.id = id
+	}
+	if name != "" {
+		call.name = name
+	}
+}
+
+// argument adds a fragment of the call's arguments.
+func (t *toolCalls) argument(index int, fragment string) {
+	t.at(index).arguments.WriteString(fragment)
+}
+
+// blocks is the finished calls.
+//
+// Nothing is reported until the stream is over, which is the difference between
+// a tool call and text: prose is useful a word at a time, and half a call
+// cannot be run at all. A caller waiting to display "reading your notes" waits
+// for the whole call, and that is correct — the alternative is announcing a
+// tool the model was still in the middle of naming.
+func (t *toolCalls) blocks() []ContentBlock {
+	var blocks []ContentBlock
+
+	for _, index := range t.order {
+		call := t.partial[index]
+
+		// A tool that takes no arguments is streamed with no fragments at all,
+		// and a tool expecting to decode its arguments needs an object rather
+		// than nothing.
+		arguments := call.arguments.String()
+		if arguments == "" {
+			arguments = "{}"
+		}
+
+		blocks = append(blocks, ToolCallBlock(call.id, call.name, json.RawMessage(arguments)))
+	}
+
+	return blocks
 }
 
 // sseData is the payload of one server-sent event.
