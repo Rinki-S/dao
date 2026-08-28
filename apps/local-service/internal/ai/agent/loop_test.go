@@ -319,3 +319,81 @@ func TestAnEmptyResultIsSaidInWords(t *testing.T) {
 		t.Error("finding nothing was reported as a failure")
 	}
 }
+
+// refusingTools turns the request down while tools are on it, and answers once
+// they are gone. Ollama does exactly this for a model with no tool support, and
+// most models people run locally have none.
+type refusingTools struct {
+	answer  string
+	refused int
+}
+
+func (r *refusingTools) Complete(
+	_ context.Context, _ llm.Context, opts llm.Options,
+) (llm.Response, error) {
+	if len(opts.Tools) > 0 {
+		r.refused++
+
+		return llm.Response{}, &llm.APIError{
+			StatusCode: 400,
+			Body:       `{"error":{"message":"registry.ollama.ai/library/gemma3:12b does not support tools"}}`,
+		}
+	}
+
+	return llm.Response{
+		Content:    []llm.ContentBlock{llm.TextBlock(r.answer)},
+		StopReason: llm.StopEnd,
+	}, nil
+}
+
+// Offering tools must not break plain conversation on an endpoint that will not
+// take them — which is the local setup this app goes out of its way to support.
+func TestAnEndpointThatRefusesToolsStillAnswers(t *testing.T) {
+	model := &refusingTools{answer: "no tools, still an answer"}
+	search := &stub{name: "search_notes"}
+
+	result := run(t, &Loop{Client: model, Tools: []Tool{search}})
+
+	if result.Text != "no tools, still an answer" {
+		t.Fatalf("text = %q", result.Text)
+	}
+	if model.refused != 1 {
+		t.Errorf("offered tools %d times, want one attempt before giving up on them", model.refused)
+	}
+}
+
+// The retry is for one refusal, not for every failure. A rejected key or a rate
+// limit says something else, and asking again without tools would only hide it.
+func TestOtherRefusalsAreNotRetriedWithoutTools(t *testing.T) {
+	for _, testCase := range []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{"a rejected key", 401, "invalid api key"},
+		{"a rate limit", 429, "slow down"},
+		{"a bad request about something else", 400, "messages: must not be empty"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			model := llmtest.Sequence(llmtest.Turn{
+				Err: &llm.APIError{StatusCode: testCase.status, Body: testCase.body},
+			})
+
+			loop := &Loop{Client: model, Tools: []Tool{&stub{name: "search_notes"}}}
+			_, err := loop.Run(
+				context.Background(),
+				llm.Context{Messages: []llm.Message{llm.UserText("hi")}},
+				llm.Options{},
+			)
+
+			if err == nil {
+				t.Fatal("the refusal was swallowed")
+			}
+			// One attempt: a second would have exhausted the queued turn and
+			// come back with a different error.
+			if model.Calls() != 1 {
+				t.Errorf("asked %d times, want 1", model.Calls())
+			}
+		})
+	}
+}

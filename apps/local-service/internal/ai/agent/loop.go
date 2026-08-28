@@ -3,7 +3,10 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm"
 )
@@ -88,6 +91,23 @@ func (l *Loop) Run(ctx context.Context, request llm.Context, opts llm.Options) (
 		result.Steps++
 
 		response, err := llm.StreamOrComplete(ctx, l.Client, request, opts, l.text)
+
+		// An endpoint that will not take tools at all, asked again without them.
+		//
+		// "OpenAI compatible" is a claim, not a guarantee — the same reason
+		// Streamer is a separate interface. Ollama is the case in hand: it
+		// refuses a request outright when the model has no tool support, and
+		// the models most people run locally do not. Without this, offering
+		// tools would break plain conversation for exactly the local setup this
+		// app goes out of its way to support.
+		//
+		// Once per run and only before anything has been streamed, so a reader
+		// never sees the start of an answer twice.
+		if err != nil && len(opts.Tools) > 0 && result.Text == "" && refusedTools(err) {
+			opts.Tools = nil
+			response, err = llm.StreamOrComplete(ctx, l.Client, request, opts, l.text)
+		}
+
 		// Usage first: a step that failed part way still spent tokens, and the
 		// count should say so even when there is nothing to show for them.
 		result.Usage.InputTokens += response.Usage.InputTokens
@@ -221,4 +241,29 @@ func names(tools []Tool) string {
 	}
 
 	return list
+}
+
+// refusedTools reports whether a provider turned the request down because tools
+// were on it.
+//
+// By reading the message, which is not a good way to decide anything — and is
+// the only way available. Neither wire has a code for "this model has no tools";
+// the endpoint returns an ordinary bad request and says why in prose. So the
+// test is deliberately narrow: a refusal, from the provider, that mentions
+// tools. A rejected credential or a rate limit says something else and is left
+// alone, because retrying those without tools would only hide them.
+func refusedTools(err error) bool {
+	var apiError *llm.APIError
+	if !errors.As(err, &apiError) {
+		return false
+	}
+	if apiError.StatusCode < 400 || apiError.StatusCode >= 500 {
+		return false
+	}
+	switch apiError.StatusCode {
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests:
+		return false
+	}
+
+	return strings.Contains(strings.ToLower(apiError.Body), "tool")
 }
