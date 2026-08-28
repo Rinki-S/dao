@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
+@import './fonts/fonts.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -112,9 +113,15 @@
 }
 
 @theme inline {
-  --font-heading: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
-  --font-mono: 'SFMono-Regular', ui-monospace, Menlo, monospace;
+  /* Iosevka Aile for the interface, Iosevka Extended for code — both bundled,
+     see fonts/fonts.css. The system stacks stay behind them: a face still
+     loading, or one file that failed to decode, should fall back to the
+     platform's own text font rather than to Times. */
+  --font-heading:
+    'Iosevka Aile', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  --font-sans:
+    'Iosevka Aile', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  --font-mono: 'Iosevka Extended', 'SFMono-Regular', ui-monospace, Menlo, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

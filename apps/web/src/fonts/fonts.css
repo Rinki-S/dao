@@ -1,0 +1,48 @@
+/* The app's two typefaces, carried with it.
+ *
+ * Bundled rather than named and hoped for. A font referenced by family name
+ * only renders on a machine that happens to have it installed, and this is a
+ * desktop app that is meant to look the same wherever it is opened — and to
+ * work with nothing on the network, which rules out a font CDN.
+ *
+ * Iosevka Aile is the UI face: Iosevka's quasi-proportional sans, so the
+ * interface and the code share one design without the interface being
+ * monospaced. Iosevka Extended is the code face — Iosevka's default width is
+ * unusually narrow, and Extended is the same typeface at ordinary proportions.
+ *
+ * Both are SIL OFL 1.1; LICENSE.md beside this file is the licence they are
+ * redistributed under.
+ */
+
+/* Aile comes from @fontsource, which ships it per weight. Only the weights the
+   app actually asks for: 400 for body, 500 for the medium labels, 600 for
+   headings and semibold text, and 400 italic for emphasis in a note or a
+   reply. Each is about 1.2 MB, so an unused weight is not free. */
+@import '@fontsource/iosevka-aile/400.css';
+@import '@fontsource/iosevka-aile/400-italic.css';
+@import '@fontsource/iosevka-aile/500.css';
+@import '@fontsource/iosevka-aile/600.css';
+
+/* Extended has no package — fontsource ships Iosevka's default width only, and
+   Extended is a width rather than a weight. These two faces were taken out of
+   the official v34.8.1 release collection by scripts/build-iosevka-extended.py,
+   which is committed beside them so they can be rebuilt or moved to a newer
+   release.
+
+   No italic: nothing in this app sets code in italics — there is no syntax
+   highlighting — and the face is 1.8 MB. */
+@font-face {
+  font-family: 'Iosevka Extended';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('@/fonts/iosevka-extended-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Iosevka Extended';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('@/fonts/iosevka-extended-700-normal.woff2') format('woff2');
+}

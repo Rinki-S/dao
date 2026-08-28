@@ -1,3 +1,6 @@
 dist
 node_modules
 coverage
+
+# A licence is quoted verbatim or it is not the licence.
+src/fonts/LICENSE.md
