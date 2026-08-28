@@ -215,11 +215,9 @@ function Turn({ message }) {
   return (
     <div className="flex flex-col gap-2">
       <ToolActivity calls={message.toolCalls} />
-      {message.content ? (
-        <div className="flex flex-col gap-3 text-sm">
-          <Markdown text={message.content} />
-        </div>
-      ) : null}
+      {/* No wrapper for size or spacing: the reply brings its own, so that a
+          note and a reply are laid out by the same rules. */}
+      {message.content ? <Markdown text={message.content} /> : null}
       {message.status === 'failed' ? (
         <Alert variant="error">
           <IconAlertTriangle />
@@ -509,11 +507,7 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
                 final={false} is what tells the renderer that a half-written
                 fence is a fence still being written rather than a stray
                 backtick. */}
-            {streaming ? (
-              <div className="flex flex-col gap-3 text-sm">
-                <Markdown final={false} text={streaming} />
-              </div>
-            ) : null}
+            {streaming ? <Markdown final={false} text={streaming} /> : null}
 
             {sending && !streaming && activity.length === 0 ? <Spinner aria-hidden="true" /> : null}
 

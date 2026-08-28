@@ -205,7 +205,11 @@ const chatMessages = {
 // rather than assumed. It streams in pieces, so the pane can be watched filling
 // in rather than only inspected once it has finished.
 const QA_REPLY = [
+  '## Why the last token is dropped',
+  '',
   'The lexer flushes a token only when it sees the character after it, so the last one never lands.',
+  '',
+  '> The end of input is not a character, and `readRune` never reports one.',
   '',
   'Two ways out:',
   '',
@@ -222,6 +226,8 @@ const QA_REPLY = [
   '| --- | --- |',
   '| flush at EOF | yes |',
   '| synthetic newline | no |',
+  '',
+  '---',
   '',
   'The first is the fix. See [the SQLite docs](https://sqlite.org/foreignkeys.html) for the other thing you asked about.',
 ].join('\n');

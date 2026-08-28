@@ -6,6 +6,8 @@ import MarkstreamRender from 'markstream-react';
 // only exists inside a dependency's compiled JavaScript, so the lists came out
 // with no bullets. This variant carries its own, scoped to .markstream-react.
 import 'markstream-react/index.css';
+// Dao's own look, applied over it. Imported after, so it wins ties.
+import './markdown.css';
 
 /**
  * Schemes a link in a model's reply is allowed to have.
@@ -115,12 +117,17 @@ const PARSE_OPTIONS = {
  * causes a request to a host the model chose.
  */
 export function Markdown({ text, final = true }) {
+  // The wrapper is what markdown.css hangs off. markstream takes no className,
+  // and the extra class is needed anyway: its markup carries utility classes
+  // that outrank a bare element selector.
   return (
-    <MarkstreamRender
-      content={text}
-      final={final}
-      htmlPolicy="escape"
-      parseOptions={PARSE_OPTIONS}
-    />
+    <div className="dao-chat-markdown">
+      <MarkstreamRender
+        content={text}
+        final={final}
+        htmlPolicy="escape"
+        parseOptions={PARSE_OPTIONS}
+      />
+    </div>
   );
 }

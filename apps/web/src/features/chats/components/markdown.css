@@ -1,0 +1,221 @@
+/* A model's reply, in Dao's own voice.
+ *
+ * markstream ships a complete look of its own — a shadcn-ish palette, GitHub
+ * blue links, its own type scale and rhythm. None of it is wrong; it is just
+ * somebody else's. What a reply should look like here is already settled by the
+ * note editor, because a note and a reply are the same thing on the page: prose
+ * the user reads in this app. So these rules say what markdown-editor.css says,
+ * to markstream's markup.
+ *
+ * Read the aliases below before changing anything here.
+ */
+
+/* markstream declares --border, --background, --foreground, --secondary,
+ * --muted and --muted-foreground on its own root, as bare HSL triples for its
+ * `hsl(var(--x))` rules. Those are the same six names Dao uses for finished
+ * oklch colours. So inside markstream's subtree `var(--border)` is not Dao's
+ * border — it is three numbers, and any property fed it silently computes to
+ * nothing.
+ *
+ * These aliases are declared out here, on the wrapper, where the six names
+ * still mean what the rest of the app means by them. markstream declares
+ * nothing called --dao-md-*, so they inherit inwards untouched. Every rule
+ * below uses these and never the originals; that is not a style preference, it
+ * is the only way to read a Dao colour from in there.
+ */
+.dao-chat-markdown {
+  --dao-md-fg: var(--foreground);
+  --dao-md-muted-fg: var(--muted-foreground);
+  --dao-md-border: var(--border);
+  --dao-md-surface: var(--secondary);
+  --dao-md-header: var(--muted);
+}
+
+/* Set on markstream's own root element, not on the wrapper.
+ *
+ * A custom property declared on an element beats one inherited from an
+ * ancestor, however specific that ancestor's selector is — and markstream
+ * declares its whole --code-* palette on `.markstream-react`. So these have to
+ * land on that same element, with both of its classes, which clears
+ * `.dark .markstream-react` outright rather than tying with it and depending on
+ * which stylesheet the bundler emitted second.
+ */
+.dao-chat-markdown .markstream-react.markdown-renderer {
+  --ms-font-sans: var(--font-sans);
+  --blockquote-border-color: var(--dao-md-border);
+  --table-border: var(--dao-md-border);
+  --code-bg: var(--dao-md-surface);
+  --code-fg: var(--dao-md-fg);
+  --code-border: var(--dao-md-border);
+  --code-header-bg: var(--dao-md-header);
+  --code-action-fg: var(--dao-md-muted-fg);
+  --code-action-hover-fg: var(--dao-md-fg);
+  --code-action-hover-bg: var(--accent);
+  --code-line-number: var(--dao-md-muted-fg);
+
+  color: var(--dao-md-fg);
+  font-family: var(--font-sans);
+  /* The transcript's own size. Everything below is in em, so the whole scale
+     hangs off this one number. */
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* Everything from here reaches for elements, because the rest of markstream's
+ * look has no variable behind it. Scoped `.dao-chat-markdown .markstream-react
+ * <element>` on purpose: markstream bakes utility classes into its markup
+ * (`my-5`, `pl-[calc(13/8*1em)]`), and those land at two class selectors'
+ * worth of specificity. Two classes plus an element clears them without a
+ * single `!important`.
+ */
+
+/* The note editor's block rhythm. A reply is short and read in a column beside
+   a question, so it gets the same one gap between blocks that a note does
+   rather than markstream's document-sized spacing. */
+.dao-chat-markdown .markstream-react :where(p, ul, ol, blockquote, pre, table, hr) {
+  margin: 0 0 0.5em;
+}
+
+.dao-chat-markdown .markstream-react > :last-child,
+.dao-chat-markdown .markstream-react > :last-child > :last-child {
+  margin-bottom: 0;
+}
+
+/* The note editor's type scale, in em rather than rem: the same multipliers
+   against a smaller base, so a heading in a reply is a heading of a reply and
+   not of the window. */
+.dao-chat-markdown .markstream-react :where(h1, h2, h3, h4, h5, h6) {
+  margin: 1.5em 0 0.5em;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.dao-chat-markdown .markstream-react :where(h1, h2, h3, h4, h5, h6):first-child {
+  margin-top: 0;
+}
+
+.dao-chat-markdown .markstream-react h1 {
+  font-size: 1.75em;
+}
+
+.dao-chat-markdown .markstream-react h2 {
+  font-size: 1.5em;
+}
+
+.dao-chat-markdown .markstream-react h3 {
+  font-size: 1.25em;
+}
+
+.dao-chat-markdown .markstream-react h4 {
+  font-size: 1.125em;
+}
+
+.dao-chat-markdown .markstream-react :where(h5, h6) {
+  font-size: 1em;
+}
+
+.dao-chat-markdown .markstream-react :where(ul, ol) {
+  padding-left: 1.5rem;
+}
+
+.dao-chat-markdown .markstream-react li {
+  padding-left: 0;
+  margin: 0;
+}
+
+/* One gap between every row, whether the next one is a sibling or a nested
+   list, so nesting reads as structure rather than as tighter spacing. */
+.dao-chat-markdown .markstream-react li + li {
+  margin-top: 0.3em;
+}
+
+.dao-chat-markdown .markstream-react li :where(ul, ol) {
+  margin: 0.3em 0 0;
+}
+
+.dao-chat-markdown .markstream-react li p {
+  margin: 0;
+}
+
+.dao-chat-markdown .markstream-react blockquote {
+  margin: 0 0 0.5em;
+  padding-left: 1rem;
+  border-left: 2px solid var(--dao-md-border);
+  color: var(--dao-md-muted-fg);
+  /* markstream italicises and half-bolds a quotation. Dao's does neither: a
+     quoted passage is someone else's words, not emphasis. */
+  font-weight: inherit;
+  font-style: normal;
+}
+
+.dao-chat-markdown .markstream-react code {
+  font-family: var(--font-mono);
+}
+
+/* Inline code only — the fenced kind sits inside a pre and wears the block's
+   own surface. */
+.dao-chat-markdown .markstream-react :not(pre) > code {
+  border: 1px solid var(--dao-md-border);
+  border-radius: var(--radius-sm);
+  background: var(--dao-md-surface);
+  padding: 0.125rem 0.25rem;
+  font-size: 0.875em;
+  -electron-corner-smoothing: var(--dao-corner-smoothing);
+}
+
+/* The fenced block keeps markstream's chrome — the language badge, the line
+   numbers, the copy button are all worth having — wearing Dao's surface. */
+.dao-chat-markdown .markstream-react .code-block-container {
+  margin: 0 0 0.5em;
+  border: 1px solid var(--dao-md-border);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+  -electron-corner-smoothing: var(--dao-corner-smoothing);
+}
+
+.dao-chat-markdown .markstream-react .code-block-header {
+  color: var(--dao-md-muted-fg);
+  border-bottom-color: var(--dao-md-border);
+  font-size: 0.75rem;
+}
+
+.dao-chat-markdown .markstream-react pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+/* Sized to its content rather than stretched to the pane: a two-column table
+   pulled to full width puts its second column an inch from its first, which
+   reads as two unrelated lists. The wrapper markstream provides is what handles
+   a table too wide to fit. */
+.dao-chat-markdown .markstream-react table {
+  width: auto;
+  margin: 0 0 0.5em;
+  font-size: 1em;
+}
+
+.dao-chat-markdown .markstream-react :where(th, td) {
+  padding: 0.375em 0.75em;
+}
+
+.dao-chat-markdown .markstream-react th {
+  color: var(--dao-md-fg);
+  font-weight: 600;
+}
+
+/* The colour, not markstream's --link-color: it writes that one inline on every
+   anchor, where no stylesheet can reach it. The declaration it feeds is an
+   ordinary `color`, and that is reachable. */
+.dao-chat-markdown .markstream-react a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 0.125em;
+}
+
+.dao-chat-markdown .markstream-react hr {
+  margin: 1.5em 0;
+  border: 0;
+  border-top: 1px solid var(--dao-md-border);
+}
