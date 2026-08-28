@@ -81,40 +81,28 @@ const notes = [
   },
 ];
 
-const tasks = [
-  {
-    id: '01QA0000000000000000000006',
-    workspaceId: workspace.id,
-    projectId: project.id,
-    parentId: null,
-    title: 'Implement parser recovery',
-    description: 'Make the parser resilient to common syntax errors and continue where possible.',
-    status: 'doing',
-    priority: 'high',
-    dueDate: '2026-08-21',
-    createdAt: '2026-08-19T08:00:00Z',
-    updatedAt: '2026-08-21T08:00:00Z',
-    deletedAt: null,
-    version: 3,
-    syncStatus: 'local',
-  },
-  {
-    id: '01QA0000000000000000000007',
-    workspaceId: workspace.id,
-    projectId: project.id,
-    parentId: '01QA0000000000000000000006',
-    title: 'Add error fixtures',
-    description: '',
-    status: 'done',
-    priority: 'medium',
-    dueDate: '2026-08-21',
-    createdAt: '2026-08-19T08:00:00Z',
-    updatedAt: '2026-08-21T08:00:00Z',
-    deletedAt: null,
-    version: 2,
-    syncStatus: 'local',
-  },
-];
+/* A workspace's whole task list is one Markdown document, not a row per task.
+ * The fixture was a row per task, from before that changed, and every load of
+ * this surface failed the schema with "expected object, received array".
+ *
+ * Unfinished first, then finished: that order is what the editor draws its
+ * "done" divider at, so a fixture that put them the other way round would hide
+ * the thing worth looking at. `@due(...)` and `!high` are the annotations it
+ * renders as chips.
+ */
+const taskDocument = {
+  workspaceId: workspace.id,
+  filePath: `${workspace.rootPath}/tasks.md`,
+  updatedAt: '2026-08-21T08:00:00Z',
+  content: [
+    '- [ ] Implement parser recovery @due(2026-08-21) !high',
+    '  - [ ] Decide what a recoverable error is',
+    '  - [x] Add error fixtures !medium',
+    '- [ ] Write the release notes @due(2026-08-28) !low',
+    '- [x] Rewrite the lexer flush path',
+    '',
+  ].join('\n'),
+};
 
 const activities = [
   {
@@ -323,6 +311,16 @@ function streamChatReply(request, response, conversationId) {
   });
 }
 
+// Collects a request body before acting on it. Node hands it over in pieces,
+// and a handler that reads request.body finds nothing there.
+function readBody(request, onBody) {
+  let body = '';
+  request.on('data', (chunk) => {
+    body += chunk;
+  });
+  request.on('end', () => onBody(body));
+}
+
 function sendJson(response, value, statusCode = 200) {
   response.statusCode = statusCode;
   response.setHeader('Content-Type', 'application/json');
@@ -358,14 +356,16 @@ function qaApiPlugin() {
             notes.find((note) => url.pathname.includes(note.id)) ?? notes[0],
           );
         }
+        // GET reads the document, PUT replaces its content and returns it.
+        // There is no route below /api/tasks — the service has exactly these
+        // two, because there is no task to address on its own.
         if (url.pathname === '/api/tasks') {
-          return sendJson(response, request.method === 'GET' ? tasks : tasks[0]);
-        }
-        if (url.pathname.startsWith('/api/tasks/')) {
-          return sendJson(
-            response,
-            tasks.find((task) => url.pathname.includes(task.id)) ?? tasks[0],
-          );
+          if (request.method === 'GET') return sendJson(response, taskDocument);
+
+          return readBody(request, (body) => {
+            taskDocument.content = JSON.parse(body || '{}').content ?? '';
+            sendJson(response, taskDocument);
+          });
         }
         if (url.pathname === '/api/chats') {
           if (request.method === 'GET') return sendJson(response, conversations);
