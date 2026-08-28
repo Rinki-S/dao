@@ -84,6 +84,29 @@ func (r *Repository) CreateConversation(request CreateConversationRequest) (Conv
 		return Conversation{}, fmt.Errorf("%w: workspaceId is required", ErrInvalidRequest)
 	}
 
+	// The workspace has to exist, and this is where that is checked.
+	//
+	// Every other table declares the constraint in its schema; chat_conversations
+	// does not, and adding it now would mean rebuilding the table. Under the
+	// foreign keys this database finally enforces, dropping chat_conversations
+	// runs an implicit DELETE FROM, which the ON DELETE CASCADE on chat_messages
+	// would answer by removing every message in the database. That is a lot of
+	// risk to carry for a constraint on a column nothing ever hard-deletes.
+	//
+	// This is also the stronger check. A foreign key only asks whether the row
+	// is there; workspaces are deleted by setting deleted_at, so a key would
+	// happily accept a conversation started in a workspace the user threw away.
+	var exists string
+	err := r.db.QueryRow(
+		`SELECT id FROM workspaces WHERE id = ? AND deleted_at IS NULL`, workspaceID,
+	).Scan(&exists)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Conversation{}, fmt.Errorf("%w: no such workspace", ErrInvalidRequest)
+	}
+	if err != nil {
+		return Conversation{}, err
+	}
+
 	now := r.timestamp()
 	conversation := Conversation{
 		ID:          r.nextID(),

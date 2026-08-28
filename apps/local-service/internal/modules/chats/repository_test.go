@@ -22,7 +22,17 @@ func openTestDB(t *testing.T) *sql.DB {
 	}
 	t.Cleanup(func() { db.Close() })
 
+	// The workspaces a conversation can belong to. Real rather than assumed:
+	// creating a conversation checks that its workspace exists, and a fixture
+	// without this table would make every test here exercise the failure.
 	if _, err := db.Exec(`
+		CREATE TABLE workspaces (
+			id TEXT PRIMARY KEY,
+			deleted_at TEXT
+		);
+
+		INSERT INTO workspaces (id, deleted_at) VALUES ('ws-1', NULL), ('ws-2', NULL);
+
 		CREATE TABLE chat_conversations (
 			id TEXT PRIMARY KEY,
 			workspace_id TEXT NOT NULL,
@@ -512,5 +522,47 @@ func TestDeletingAConversationRemovesItFromSearch(t *testing.T) {
 
 	if len(indexer.deleted) != 1 || indexer.deleted[0] != conversation.ID {
 		t.Errorf("deleted = %v, want the conversation", indexer.deleted)
+	}
+}
+
+// A conversation cannot be started in a workspace that is not there.
+//
+// The schema does not say this — chat_conversations declares no foreign key on
+// workspace_id, because adding one now would mean rebuilding the table, and
+// under enforcement that drop would cascade away every message in the database.
+// So the rule lives here, and this is what holds it.
+func TestAConversationNeedsAWorkspaceThatExists(t *testing.T) {
+	repo := newRepo(t)
+
+	_, err := repo.CreateConversation(CreateConversationRequest{WorkspaceID: "no-such-workspace"})
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("err = %v, want an invalid request", err)
+	}
+
+	var count int
+	if err := repo.db.QueryRow(`SELECT COUNT(*) FROM chat_conversations`).Scan(&count); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("%d conversations were stored anyway", count)
+	}
+}
+
+// Stronger than the foreign key it stands in for. A workspace is deleted by
+// setting deleted_at, so its row is still there — a key would accept a
+// conversation started in a workspace the user had thrown away.
+func TestAConversationCannotStartInADeletedWorkspace(t *testing.T) {
+	repo := newRepo(t)
+
+	if _, err := repo.db.Exec(
+		`UPDATE workspaces SET deleted_at = ? WHERE id = 'ws-1'`, "2026-08-28T00:00:00Z",
+	); err != nil {
+		t.Fatalf("soft delete: %v", err)
+	}
+
+	if _, err := repo.CreateConversation(CreateConversationRequest{WorkspaceID: "ws-1"}); !errors.Is(
+		err, ErrInvalidRequest,
+	) {
+		t.Fatalf("err = %v, want an invalid request", err)
 	}
 }

@@ -8,6 +8,17 @@
 -- transfer here.
 CREATE TABLE chat_conversations (
     id TEXT PRIMARY KEY,
+
+    -- No REFERENCES workspaces(id), and not by oversight.
+    --
+    -- Adding it now would mean rebuilding this table, and under the foreign
+    -- keys the database enforces since 00015's neighbour, dropping
+    -- chat_conversations runs an implicit DELETE FROM — which the ON DELETE
+    -- CASCADE below would answer by removing every message in the database.
+    --
+    -- The rule is kept in the repository instead, where it can also refuse a
+    -- workspace that has been soft-deleted. A foreign key only asks whether the
+    -- row is there, and a deleted workspace's row is still there.
     workspace_id TEXT NOT NULL,
 
     -- Empty until there is something to name it after. A conversation is
