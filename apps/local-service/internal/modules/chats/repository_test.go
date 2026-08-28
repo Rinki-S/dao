@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 	_ "modernc.org/sqlite"
 )
 
@@ -62,7 +64,7 @@ func newRepo(t *testing.T) *Repository {
 	repo := NewRepository(openTestDB(t), func() string {
 		next++
 		return fmt.Sprintf("id-%02d", next)
-	})
+	}, nil)
 
 	frozen := time.Date(2026, 8, 27, 10, 0, 0, 0, time.UTC)
 	repo.now = func() time.Time { return frozen }
@@ -409,5 +411,106 @@ func TestEmptyResultsAreListsRatherThanNull(t *testing.T) {
 	}
 	if messages == nil {
 		t.Error("Messages returned nil, which encodes as null")
+	}
+}
+
+// recordingIndexer stands in for the search index and remembers what it was
+// told, which is the part worth checking: not that SQLite can store a row, but
+// that the entry describes the conversation as it stands.
+type recordingIndexer struct {
+	entries map[string]search.IndexEntry
+	deleted []string
+}
+
+func (i *recordingIndexer) IndexTx(_ *sql.Tx, entry search.IndexEntry) error {
+	if i.entries == nil {
+		i.entries = map[string]search.IndexEntry{}
+	}
+	i.entries[entry.EntityID] = entry
+
+	return nil
+}
+
+func (i *recordingIndexer) ReplaceTx(tx *sql.Tx, entry search.IndexEntry) error {
+	return i.IndexTx(tx, entry)
+}
+
+func (i *recordingIndexer) DeleteTx(_ *sql.Tx, _ string, entityID string) error {
+	i.deleted = append(i.deleted, entityID)
+
+	return nil
+}
+
+func indexedRepo(t *testing.T) (*Repository, *recordingIndexer) {
+	t.Helper()
+
+	repo := newRepo(t)
+	indexer := &recordingIndexer{}
+	repo.indexer = indexer
+
+	return repo, indexer
+}
+
+// Both sides of the conversation are searchable. A question is as memorable as
+// its answer and often more so — it is the thing the person typed.
+func TestAConversationIsIndexedWithItsWholeTranscript(t *testing.T) {
+	repo, indexer := indexedRepo(t)
+	conversation := newConversation(t, repo)
+
+	appendTurn(t, repo, conversation.ID, RoleUser, "why does the lexer drop the last token")
+
+	// The reply arrives at Finish, not Append: the row is written empty. An
+	// index built only from Append would hold every question and no answer.
+	assistant := appendTurn(t, repo, conversation.ID, RoleAssistant, "")
+	if _, err := repo.Finish(assistant.ID, Message{Content: "because it flushes late"}); err != nil {
+		t.Fatalf("Finish: %v", err)
+	}
+
+	entry := indexer.entries[conversation.ID]
+	if entry.EntityType != SearchEntityType {
+		t.Errorf("indexed as %q, want %q", entry.EntityType, SearchEntityType)
+	}
+	if entry.WorkspaceID != "ws-1" {
+		t.Errorf("indexed under workspace %q", entry.WorkspaceID)
+	}
+	if !strings.Contains(entry.Body, "why does the lexer drop the last token") {
+		t.Errorf("the question is not searchable: %q", entry.Body)
+	}
+	if !strings.Contains(entry.Body, "because it flushes late") {
+		t.Errorf("the answer is not searchable: %q", entry.Body)
+	}
+	// The title is what a hit is headed with, and it is derived from the first
+	// turn rather than given.
+	if entry.Title != "why does the lexer drop the last token" {
+		t.Errorf("entry title = %q", entry.Title)
+	}
+}
+
+func TestRenamingAConversationRetitlesItsSearchEntry(t *testing.T) {
+	repo, indexer := indexedRepo(t)
+	conversation := newConversation(t, repo)
+	appendTurn(t, repo, conversation.ID, RoleUser, "the original question")
+
+	if _, err := repo.Rename(conversation.ID, "Lexer flushing"); err != nil {
+		t.Fatalf("Rename: %v", err)
+	}
+
+	if title := indexer.entries[conversation.ID].Title; title != "Lexer flushing" {
+		t.Errorf("entry title = %q, want the new name", title)
+	}
+}
+
+// A hit that opens nothing is worse than no hit.
+func TestDeletingAConversationRemovesItFromSearch(t *testing.T) {
+	repo, indexer := indexedRepo(t)
+	conversation := newConversation(t, repo)
+	appendTurn(t, repo, conversation.ID, RoleUser, "something to find")
+
+	if err := repo.Delete(conversation.ID); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+
+	if len(indexer.deleted) != 1 || indexer.deleted[0] != conversation.ID {
+		t.Errorf("deleted = %v, want the conversation", indexer.deleted)
 	}
 }

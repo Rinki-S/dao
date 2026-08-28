@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
 
 var (
@@ -24,10 +26,15 @@ type Repository struct {
 	db     *sql.DB
 	nextID func() string
 	now    func() time.Time
+	// indexer puts a conversation in the search index. Optional: the tests
+	// below build a repository without one, because what they check is what the
+	// tables hold, and a nil indexer is also the honest answer for a build that
+	// has no search.
+	indexer search.Indexer
 }
 
-func NewRepository(db *sql.DB, nextID func() string) *Repository {
-	return &Repository{db: db, nextID: nextID, now: time.Now}
+func NewRepository(db *sql.DB, nextID func() string, indexer search.Indexer) *Repository {
+	return &Repository{db: db, nextID: nextID, now: time.Now, indexer: indexer}
 }
 
 func (r *Repository) timestamp() string {
@@ -183,6 +190,76 @@ const messageColumns = `id, conversation_id, role, content, position,
 	       model, wire, input_tokens, output_tokens,
 	       status, error_message, created_at, tool_calls`
 
+// reindexTx rewrites a conversation's search entry from what the tables now
+// hold.
+//
+// The whole conversation is one entry rather than one per message. What
+// somebody searches for is the conversation where they worked something out,
+// and a hit per turn would bury that under its own fragments — the thing they
+// want to open is the thread.
+//
+// Called from inside the transaction that changed it, so the index cannot end
+// up describing a conversation that was never committed.
+func (r *Repository) reindexTx(tx *sql.Tx, conversationID string) error {
+	if r.indexer == nil {
+		return nil
+	}
+
+	var conversation Conversation
+	err := tx.QueryRow(`
+		SELECT id, workspace_id, title, created_at, updated_at
+		FROM chat_conversations WHERE id = ?
+	`, conversationID).Scan(
+		&conversation.ID, &conversation.WorkspaceID, &conversation.Title,
+		&conversation.CreatedAt, &conversation.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	rows, err := tx.Query(
+		`SELECT content FROM chat_messages WHERE conversation_id = ? ORDER BY position`,
+		conversationID,
+	)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	// Both sides of the conversation. A question is as searchable as its
+	// answer, and often more memorable — it is the thing the person typed.
+	var body strings.Builder
+	for rows.Next() {
+		var content string
+		if err := rows.Scan(&content); err != nil {
+			return err
+		}
+		if content == "" {
+			continue
+		}
+		if body.Len() > 0 {
+			body.WriteString("\n\n")
+		}
+		body.WriteString(content)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	return r.indexer.ReplaceTx(tx, search.IndexEntry{
+		EntityType:  SearchEntityType,
+		EntityID:    conversation.ID,
+		WorkspaceID: conversation.WorkspaceID,
+		Title:       conversation.Title,
+		Body:        body.String(),
+		CreatedAt:   conversation.CreatedAt,
+		UpdatedAt:   conversation.UpdatedAt,
+	})
+}
+
 // scanner is what Row and Rows have in common, so one scan serves both.
 type scanner interface {
 	Scan(dest ...any) error
@@ -336,6 +413,13 @@ func (r *Repository) Append(conversationID string, message Message) (Message, er
 		return Message{}, err
 	}
 
+	// Inside the same transaction that wrote the turn. An index updated after
+	// the commit is an index that is wrong whenever the commit is the thing
+	// that failed.
+	if err := r.reindexTx(transaction, conversationID); err != nil {
+		return Message{}, err
+	}
+
 	if err := transaction.Commit(); err != nil {
 		return Message{}, err
 	}
@@ -360,7 +444,13 @@ func (r *Repository) Finish(messageID string, message Message) (Message, error) 
 		return Message{}, err
 	}
 
-	result, err := r.db.Exec(`
+	transaction, err := r.db.Begin()
+	if err != nil {
+		return Message{}, err
+	}
+	defer func() { _ = transaction.Rollback() }()
+
+	result, err := transaction.Exec(`
 		UPDATE chat_messages
 		SET content = ?, model = ?, wire = ?,
 		    input_tokens = ?, output_tokens = ?,
@@ -379,6 +469,22 @@ func (r *Repository) Finish(messageID string, message Message) (Message, error) 
 	}
 	if changed == 0 {
 		return Message{}, ErrMessageNotFound
+	}
+
+	// The reply's text arrives here, not at Append — the row was written empty.
+	// Without this the index would hold every question and no answer.
+	var conversationID string
+	if err := transaction.QueryRow(
+		`SELECT conversation_id FROM chat_messages WHERE id = ?`, messageID,
+	).Scan(&conversationID); err != nil {
+		return Message{}, err
+	}
+	if err := r.reindexTx(transaction, conversationID); err != nil {
+		return Message{}, err
+	}
+
+	if err := transaction.Commit(); err != nil {
+		return Message{}, err
 	}
 
 	return r.message(messageID)
@@ -404,7 +510,13 @@ func (r *Repository) Rename(id, title string) (Conversation, error) {
 		return Conversation{}, fmt.Errorf("%w: title is required", ErrInvalidRequest)
 	}
 
-	result, err := r.db.Exec(
+	transaction, err := r.db.Begin()
+	if err != nil {
+		return Conversation{}, err
+	}
+	defer func() { _ = transaction.Rollback() }()
+
+	result, err := transaction.Exec(
 		`UPDATE chat_conversations SET title = ? WHERE id = ?`, clean, id,
 	)
 	if err != nil {
@@ -417,6 +529,16 @@ func (r *Repository) Rename(id, title string) (Conversation, error) {
 	}
 	if changed == 0 {
 		return Conversation{}, ErrConversationNotFound
+	}
+
+	// The title is what a search result is headed with, so a rename that did
+	// not reach the index would leave the old name on the hit.
+	if err := r.reindexTx(transaction, id); err != nil {
+		return Conversation{}, err
+	}
+
+	if err := transaction.Commit(); err != nil {
+		return Conversation{}, err
 	}
 
 	return r.GetConversation(id)
@@ -455,6 +577,13 @@ func (r *Repository) Delete(id string) error {
 		`DELETE FROM chat_messages WHERE conversation_id = ?`, id,
 	); err != nil {
 		return err
+	}
+
+	// A hit that opens nothing is worse than no hit.
+	if r.indexer != nil {
+		if err := r.indexer.DeleteTx(transaction, SearchEntityType, id); err != nil {
+			return err
+		}
 	}
 
 	return transaction.Commit()

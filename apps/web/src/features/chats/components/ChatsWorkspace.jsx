@@ -255,7 +255,12 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   const workspaceId = model.currentWorkspace?.id ?? '';
 
   const [conversations, setConversations] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
+  // Opens on the conversation a search hit asked for, read once as this pane
+  // mounts — which is the only moment it can arrive, since running a search
+  // means being on a different surface. The same shape the sidebar uses to open
+  // a revealed project, and for the same reason: an effect that assigned it
+  // afterwards would be a second render deciding what the first should have.
+  const [selectedId, setSelectedId] = useState(() => model.revealedChatId || null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   // The turn in flight: what the user just said, what is being looked up, and
@@ -333,6 +338,8 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   }, [messages, streaming, pending, activity]);
 
   function startNew() {
+    // Whatever a search asked for, the reader has moved on from it.
+    model.setRevealedChatId('');
     loaded.current = null;
     setSelectedId(null);
     setMessages([]);
@@ -514,7 +521,10 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
                         conversation.id === selectedId && 'bg-accent',
                       )}
                       type="button"
-                      onClick={() => setSelectedId(conversation.id)}
+                      onClick={() => {
+                        model.setRevealedChatId('');
+                        setSelectedId(conversation.id);
+                      }}
                     >
                       {conversation.title || 'Untitled'}
                     </button>

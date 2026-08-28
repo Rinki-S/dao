@@ -112,7 +112,7 @@ export function SearchWorkspace({ model }) {
                 </EmptyMedia>
                 <EmptyTitle>No matches</EmptyTitle>
                 <EmptyDescription>
-                  Try a title, technical term, or phrase from a note.
+                  Try a title, technical term, or phrase from a note or a conversation.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>

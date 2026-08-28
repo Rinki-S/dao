@@ -21,7 +21,12 @@ vi.mock('../api.js', async (importOriginal) => ({ ...(await importOriginal()), .
 
 afterEach(() => vi.clearAllMocks());
 
-const model = { currentWorkspace: { id: 'workspace-1' } };
+const model = {
+  currentWorkspace: { id: 'workspace-1' },
+  // What a search hit asked to open, and the way to say it has been opened.
+  revealedChatId: '',
+  setRevealedChatId: vi.fn(),
+};
 
 beforeEach(() => {
   api.listConversations.mockResolvedValue([]);
@@ -341,4 +346,28 @@ describe('stopping a reply', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByLabelText('Message')).toHaveValue('');
   });
+});
+
+// A hit in Search opens the conversation it found. Chats is not the surface
+// that ran the search, so the id has to survive the move between them.
+it('opens the conversation a search hit asked for', async () => {
+  api.listConversations.mockResolvedValue([
+    { id: 'chat-9', workspaceId: 'workspace-1', title: 'Found', createdAt: '', updatedAt: '' },
+  ]);
+  api.getConversation.mockResolvedValue({
+    id: 'chat-9',
+    workspaceId: 'workspace-1',
+    title: 'Found',
+    createdAt: '',
+    updatedAt: '',
+    messages: [message({ content: 'the question I searched for' })],
+  });
+
+  render(
+    <ChatsWorkspace model={{ ...model, revealedChatId: 'chat-9' }} onOpenSettings={vi.fn()} />,
+  );
+
+  // Opened without anybody clicking it.
+  expect(await screen.findByText('the question I searched for')).toBeInTheDocument();
+  expect(api.getConversation).toHaveBeenCalledWith('chat-9');
 });

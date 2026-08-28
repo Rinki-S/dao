@@ -10,6 +10,11 @@ const (
 	RoleAssistant = "assistant"
 )
 
+// SearchEntityType is what a conversation is called in the search index. One
+// name, used by the thing that writes the entry and by the thing that decides
+// where a hit opens.
+const SearchEntityType = "chat"
+
 // What became of an assistant turn.
 //
 // StatusFailed does not mean empty. A stream that dies halfway leaves real

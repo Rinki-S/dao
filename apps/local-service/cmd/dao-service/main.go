@@ -107,7 +107,7 @@ func main() {
 	// still is a minute from now, stays one module's business; chat is handed
 	// the ability to ask, not the settings behind it.
 	chats.NewHandler(
-		chats.NewRepository(db, func() string { return ulid.Make().String() }),
+		chats.NewRepository(db, func() string { return ulid.Make().String() }, searchRepo),
 		aiHandler.Client,
 		aiHandler.Describe,
 	).WithTools(workspaceTools(searchRepo, noteRepo, taskRepo)).RegisterRoutes(apiMux)

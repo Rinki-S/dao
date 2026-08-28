@@ -36,6 +36,10 @@ export function useDaoWorkspace() {
   const [activeView, setActiveView] = useState('home');
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [revealedProjectId, setRevealedProjectId] = useState('');
+  // The conversation a search hit asked for. Held here rather than in Chats
+  // because the surface that answers a search is not the one that ran it, and
+  // the id has to survive the switch between them.
+  const [revealedChatId, setRevealedChatId] = useState('');
 
   const currentWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === currentWorkspaceId) ?? null,
@@ -307,6 +311,11 @@ export function useDaoWorkspace() {
       setActiveView('tasks');
       return;
     }
+    if (result.entityType === 'chat') {
+      setRevealedChatId(result.entityId);
+      setActiveView('chats');
+      return;
+    }
     const entity = notes.find((note) => note.id === result.entityId);
     if (result.projectId) setRevealedProjectId(result.projectId);
     if (entity) openEntity(entity);
@@ -326,6 +335,8 @@ export function useDaoWorkspace() {
     selectedEntity,
     selectedNote,
     revealedProjectId,
+    revealedChatId,
+    setRevealedChatId,
     setActiveView,
     setRevealedProjectId,
     completeOnboarding,
