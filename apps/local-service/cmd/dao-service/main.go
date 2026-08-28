@@ -21,6 +21,7 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/tools"
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/trace"
 	"github.com/rinki-s/dao/apps/local-service/internal/database"
+	"github.com/rinki-s/dao/apps/local-service/internal/files"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/ai"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/chats"
@@ -92,6 +93,13 @@ func main() {
 	// Tasks used to be table rows. Their destination is a file, which SQL
 	// cannot write, so this runs here rather than as a goose migration.
 	if err := tasks.MigrateRowsToDocuments(db, taskRepo); err != nil {
+		log.Fatal(err)
+	}
+
+	// Names used to end in the row's identifier. Renaming files is not
+	// something SQL can do either, so this is here for the same reason — and
+	// it does nothing once the names are already plain.
+	if err := files.StripIdentifiers(db); err != nil {
 		log.Fatal(err)
 	}
 

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
@@ -258,10 +259,15 @@ func TestRepositoryUpdateMovesMarkdownFileWhenTitleChanges(t *testing.T) {
 		t.Fatalf("update note: %v", err)
 	}
 
-	wantPath := filepath.Join(workspaceRoot, "published-title-"+createdNote.ID+".md")
+	// The title, and nothing else. The identifier used to be appended here and
+	// is not any more: this folder is one a person opens in Finder.
+	wantPath := filepath.Join(workspaceRoot, "published-title.md")
 
 	if updatedNote.FilePath != wantPath {
 		t.Fatalf("FilePath = %q, want %q", updatedNote.FilePath, wantPath)
+	}
+	if strings.Contains(filepath.Base(updatedNote.FilePath), createdNote.ID) {
+		t.Errorf("the file name still carries the id: %q", filepath.Base(updatedNote.FilePath))
 	}
 
 	if _, err := os.Stat(createdNote.FilePath); !os.IsNotExist(err) {

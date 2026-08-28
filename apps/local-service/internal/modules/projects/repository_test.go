@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
@@ -142,8 +143,12 @@ func TestRepositoryUpdateMovesFolderAndCatchesUpDescendantPaths(t *testing.T) {
 		t.Fatalf("FolderPath unchanged at %q", renamed.FolderPath)
 	}
 
-	if filepath.Base(renamed.FolderPath) != "compiler-lab-"+parent.ID {
+	// The name, and nothing else — no identifier appended.
+	if filepath.Base(renamed.FolderPath) != "compiler-lab" {
 		t.Fatalf("FolderPath base = %q", filepath.Base(renamed.FolderPath))
+	}
+	if strings.Contains(filepath.Base(renamed.FolderPath), parent.ID) {
+		t.Errorf("the folder name still carries the id: %q", filepath.Base(renamed.FolderPath))
 	}
 
 	if _, err := os.Stat(parent.FolderPath); !os.IsNotExist(err) {

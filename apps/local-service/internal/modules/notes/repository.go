@@ -99,7 +99,7 @@ func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 		return Note{}, err
 	}
 
-	filePath := files.MarkdownNoteFilePath(parentDir, req.Title, id)
+	filePath := files.MarkdownNoteFilePath(parentDir, req.Title, "")
 
 	if err := os.WriteFile(filePath, []byte(req.Content), 0644); err != nil {
 		return Note{}, err
@@ -301,9 +301,9 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 	}
 
 	// The title is the file name and the folder is the directory, so renaming
-	// and moving are the same operation: recompute the path. The id is in the
-	// name, which is what makes the destination unique without a collision
-	// check.
+	// and moving are the same operation: recompute the path. The file this note
+	// already occupies is passed along, because a note keeping its title must
+	// keep its name rather than being numbered out of the way of itself.
 	previousPath := note.FilePath
 	parentDir := filepath.Dir(previousPath)
 
@@ -316,7 +316,7 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 		}
 	}
 
-	nextPath := files.MarkdownNoteFilePath(parentDir, note.Title, note.ID)
+	nextPath := files.MarkdownNoteFilePath(parentDir, note.Title, previousPath)
 	moved := nextPath != previousPath
 
 	if moved {

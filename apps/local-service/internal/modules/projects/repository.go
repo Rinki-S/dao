@@ -75,7 +75,7 @@ func (r *Repository) Create(req CreateProjectRequest) (Project, error) {
 		return Project{}, err
 	}
 
-	folderPath := files.ProjectFolderPath(parentPath, req.Name, id)
+	folderPath := files.ProjectFolderPath(parentPath, req.Name, "")
 
 	project := Project{
 		ID:          id,
@@ -216,7 +216,7 @@ func (r *Repository) Update(id string, req UpdateProjectRequest) (Project, error
 		}
 	}
 
-	nextPath := files.ProjectFolderPath(parentDir, project.Name, project.ID)
+	nextPath := files.ProjectFolderPath(parentDir, project.Name, previousPath)
 	moved := nextPath != previousPath
 
 	if moved {
