@@ -21,6 +21,7 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/tools"
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/trace"
 	"github.com/rinki-s/dao/apps/local-service/internal/database"
+	"github.com/rinki-s/dao/apps/local-service/internal/events"
 	"github.com/rinki-s/dao/apps/local-service/internal/files"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/activities"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/ai"
@@ -118,12 +119,22 @@ func main() {
 	watchCtx, stopWatching := context.WithCancel(context.Background())
 	defer stopWatching()
 
+	broker := events.NewBroker()
+	events.NewHandler(broker).RegisterRoutes(apiMux)
+
 	if roots, err := workspaceRoots(db); err != nil {
 		log.Printf("workspace roots: %v", err)
 	} else if _, err := watch.Watch(watchCtx, roots, watch.Options{
 		OnChange: func(paths []string) {
-			if _, err := noteRepo.Reconcile(paths); err != nil {
+			changed, err := noteRepo.Reconcile(paths)
+			if err != nil {
 				log.Printf("reconcile: %v", err)
+			}
+			// Only when something actually changed. A batch that turned out to
+			// be the app's own footprints would otherwise have the window
+			// reload in response to its own save.
+			if changed {
+				broker.Publish(events.WorkspaceChanged)
 			}
 		},
 	}); err != nil {

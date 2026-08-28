@@ -4,6 +4,7 @@ import { listActivities } from '@/features/activities/api.js';
 import { notifyActivityChanged } from '@/features/activities/events.js';
 import { ensureWelcomeNote } from '@/features/onboarding/welcome-note.js';
 import { createNote, deleteNote, listNotes, updateNote } from '@/features/notes/api.js';
+import { watchWorkspace } from '@/lib/workspace-events.js';
 import {
   createProject,
   deleteProject,
@@ -157,6 +158,17 @@ export function useDaoWorkspace() {
       cancelled = true;
     };
   }, [refreshData, restoreWorkspaceContext]);
+
+  // The workspace folder is a folder the user is invited to open, so what they
+  // do there has to reach the window without them thinking about it. The
+  // service watches the folder and says when it stopped matching; the answer to
+  // that is the same refetch every other change already uses.
+  //
+  // Subscribing rather than polling, and rather than refetching on focus:
+  // polling asks a question that is almost always answered "nothing", and
+  // focus misses everything that happens while the window is in front of you —
+  // which is most of it, if the other program is on another screen.
+  useEffect(() => watchWorkspace(() => void refreshData()), [refreshData]);
 
   async function completeOnboarding({ path, workspace }) {
     setStatus('loading');

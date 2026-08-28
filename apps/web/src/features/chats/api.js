@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api-client.js';
+import { readEvents } from '@/lib/sse.js';
 import {
   ConversationDetailSchema,
   ConversationSchema,
@@ -169,55 +170,4 @@ export async function sendMessage(
   }
 
   return done;
-}
-
-/**
- * Walk the server-sent events of a response body.
- *
- * The decoder is kept in streaming mode across chunks because a chunk boundary
- * can fall inside a multi-byte character — which is not an edge case for a
- * transcript in Chinese, it is most of them. Decoding each chunk on its own
- * would turn the split character into a replacement mark for good.
- */
-async function* readEvents(response) {
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      // A blank line ends an event. Anything after the last one is a partial
-      // event still arriving, so it stays in the buffer.
-      const blocks = buffer.split('\n\n');
-      buffer = blocks.pop() ?? '';
-
-      for (const block of blocks) {
-        const event = parseEvent(block);
-        if (event) yield event;
-      }
-    }
-  } finally {
-    // Releasing matters on the paths that leave early — a parse that throws, a
-    // caller that stops reading — where the body would otherwise stay locked.
-    reader.releaseLock();
-  }
-}
-
-function parseEvent(block) {
-  let name = '';
-  let data = '';
-
-  for (const line of block.split('\n')) {
-    if (line.startsWith('event: ')) name = line.slice('event: '.length);
-    else if (line.startsWith('data: ')) data = line.slice('data: '.length);
-  }
-
-  if (!name || !data) return null;
-
-  return { name, data: JSON.parse(data) };
 }
