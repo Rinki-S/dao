@@ -14,6 +14,17 @@ export const MESSAGE_STATUSES = ['ok', 'failed'];
 // rather than made optional. A component reading message.model should get a
 // string either way; `undefined` would be a second empty case to write a branch
 // for at every use.
+// One thing the model looked up before answering.
+//
+// The arguments come as the string the model wrote, not as an object: the
+// service stores what was actually sent, and a model can write arguments that
+// are not valid JSON. Whatever reads them has to cope with that rather than
+// having it parsed away here.
+export const ToolCallSchema = z.object({
+  name: z.string(),
+  input: z.string().default(''),
+});
+
 export const MessageSchema = z.object({
   id: z.string(),
   conversationId: z.string(),
@@ -27,6 +38,9 @@ export const MessageSchema = z.object({
   status: z.enum(MESSAGE_STATUSES),
   errorMessage: z.string().default(''),
   createdAt: z.string(),
+  // What the model did before it answered, in order. Absent on a turn that
+  // looked nothing up, and on every turn stored before this existed.
+  toolCalls: z.array(ToolCallSchema).default([]),
 });
 
 export const ConversationSchema = z.object({
@@ -52,6 +66,11 @@ export const StartEventSchema = z.object({
 export const DeltaEventSchema = z.object({
   text: z.string(),
 });
+
+// Sent when a tool starts, so the pause can be filled with what is causing it.
+// It carries no phrasing: how to say "searched your notes for parser" is this
+// side's business, where the rest of the product's words live.
+export const ToolEventSchema = ToolCallSchema;
 
 // The stream's terminal event carries the assistant row exactly as stored, so
 // what the screen shows after it is what a reload would show.

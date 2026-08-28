@@ -270,6 +270,16 @@ function streamChatReply(request, response, conversationId) {
       `event: start\ndata: ${JSON.stringify({ userMessage, assistantMessageId: assistantId })}\n\n`,
     );
 
+    // A tool runs before the reply starts, the way one does when the model
+    // looks something up first.
+    const toolCalls = [
+      { name: 'search_notes', input: JSON.stringify({ query: 'lexer' }) },
+      { name: 'read_tasks', input: '{}' },
+    ];
+    for (const call of toolCalls) {
+      response.write(`event: tool\ndata: ${JSON.stringify(call)}\n\n`);
+    }
+
     const words = QA_REPLY.split(' ');
     let index = 0;
 
@@ -295,6 +305,9 @@ function streamChatReply(request, response, conversationId) {
         outputTokens: words.length,
         status: 'ok',
         createdAt: now,
+        // The same calls on the stored turn, so what the pane shows while the
+        // reply arrives and what it shows on reload can be compared.
+        toolCalls,
       };
       stored.push(assistant);
 

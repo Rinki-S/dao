@@ -5,6 +5,7 @@ import {
   DeltaEventSchema,
   DoneEventSchema,
   StartEventSchema,
+  ToolEventSchema,
 } from './schemas.js';
 
 export async function listConversations(workspaceId) {
@@ -117,7 +118,11 @@ function outcomeFor(status) {
  * The callbacks report progress; the promise resolves with the assistant row
  * the stream ended on, which is the one the transcript now holds.
  */
-export async function sendMessage(conversationId, content, { onStart, onDelta, signal } = {}) {
+export async function sendMessage(
+  conversationId,
+  content,
+  { onStart, onDelta, onTool, signal } = {},
+) {
   const response = await apiFetch(`/api/chats/${encodeURIComponent(conversationId)}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -141,6 +146,9 @@ export async function sendMessage(conversationId, content, { onStart, onDelta, s
         break;
       case 'delta':
         onDelta?.(DeltaEventSchema.parse(event.data).text);
+        break;
+      case 'tool':
+        onTool?.(ToolEventSchema.parse(event.data));
         break;
       case 'done':
         done = DoneEventSchema.parse(event.data);

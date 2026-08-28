@@ -173,3 +173,114 @@ describe('ChatsWorkspace', () => {
     expect(screen.getByText('An answer.')).toBeInTheDocument();
   });
 });
+
+describe('what the model looked up', () => {
+  it('says what was searched for while it is happening', async () => {
+    api.sendMessage.mockImplementation(async (_id, content, { onStart, onTool, onDelta }) => {
+      onStart?.({ userMessage: message({ content }), assistantMessageId: 'message-2' });
+      onTool?.({ name: 'search_notes', input: '{"query":"parser"}' });
+      onDelta?.('You wrote about parsers.');
+      return assistant({
+        content: 'You wrote about parsers.',
+        toolCalls: [{ name: 'search_notes', input: '{"query":"parser"}' }],
+      });
+    });
+
+    await ask();
+
+    // The query, not just "searched your notes": only the specific claim is one
+    // the reader can check against what they know is in there.
+    expect(await screen.findByText('Searched your notes for “parser”')).toBeInTheDocument();
+  });
+
+  it('still says so after a reload', async () => {
+    // The question this app has to answer about itself is "did it read my
+    // notes?", and an answer that only appeared while it was being written does
+    // not answer it tomorrow.
+    api.listConversations.mockResolvedValue([
+      {
+        id: 'chat-1',
+        workspaceId: 'workspace-1',
+        title: 'Yesterday',
+        createdAt: '',
+        updatedAt: '',
+      },
+    ]);
+    api.getConversation.mockResolvedValue({
+      id: 'chat-1',
+      workspaceId: 'workspace-1',
+      title: 'Yesterday',
+      createdAt: '',
+      updatedAt: '',
+      messages: [
+        message({ content: 'what did I write?' }),
+        assistant({
+          toolCalls: [
+            { name: 'search_notes', input: '{"query":"parser"}' },
+            { name: 'read_tasks', input: '{}' },
+          ],
+        }),
+      ],
+    });
+
+    render(<ChatsWorkspace model={model} onOpenSettings={vi.fn()} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Yesterday' }));
+
+    expect(await screen.findByText('Searched your notes for “parser”')).toBeInTheDocument();
+    expect(screen.getByText('Read your task list')).toBeInTheDocument();
+  });
+
+  it('names a tool it has never heard of rather than hiding it', async () => {
+    // A newer service adding a tool should not make the model appear to have
+    // done nothing.
+    api.getConversation.mockResolvedValue({
+      id: 'chat-1',
+      workspaceId: 'workspace-1',
+      title: 'Yesterday',
+      createdAt: '',
+      updatedAt: '',
+      messages: [assistant({ toolCalls: [{ name: 'read_calendar', input: '{}' }] })],
+    });
+    api.listConversations.mockResolvedValue([
+      {
+        id: 'chat-1',
+        workspaceId: 'workspace-1',
+        title: 'Yesterday',
+        createdAt: '',
+        updatedAt: '',
+      },
+    ]);
+
+    render(<ChatsWorkspace model={model} onOpenSettings={vi.fn()} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Yesterday' }));
+
+    expect(await screen.findByText('Ran read_calendar')).toBeInTheDocument();
+  });
+
+  it('survives arguments that are not JSON', async () => {
+    // A model writes the arguments, so they arrive however it wrote them. The
+    // tool refused these; the line still has to render.
+    api.getConversation.mockResolvedValue({
+      id: 'chat-1',
+      workspaceId: 'workspace-1',
+      title: 'Yesterday',
+      createdAt: '',
+      updatedAt: '',
+      messages: [assistant({ toolCalls: [{ name: 'search_notes', input: '{"query":' }] })],
+    });
+    api.listConversations.mockResolvedValue([
+      {
+        id: 'chat-1',
+        workspaceId: 'workspace-1',
+        title: 'Yesterday',
+        createdAt: '',
+        updatedAt: '',
+      },
+    ]);
+
+    render(<ChatsWorkspace model={model} onOpenSettings={vi.fn()} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Yesterday' }));
+
+    expect(await screen.findByText('Searched your notes')).toBeInTheDocument();
+  });
+});

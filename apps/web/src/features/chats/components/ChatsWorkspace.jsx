@@ -5,6 +5,7 @@ import {
   IconMessageCircle,
   IconPlus,
   IconSend,
+  IconTool,
   IconTrash,
 } from '@tabler/icons-react';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert.jsx';
@@ -132,6 +133,67 @@ function RenameDialog({ conversation, open, onOpenChange, onSubmit }) {
 }
 
 /**
+ * What a tool did, in words.
+ *
+ * The service sends the name and the arguments and no phrasing, so this is
+ * where the sentence gets written. The query is shown rather than left out
+ * because "searched your notes" and "searched your notes for parser" are
+ * different claims, and only the second is one the reader can check against
+ * what they know is in there.
+ */
+function describeTool({ name, input }) {
+  // A model can write arguments that are not JSON. The tool will have refused
+  // them, and the name is still worth saying.
+  let args;
+  try {
+    args = JSON.parse(input || '{}');
+  } catch {
+    args = {};
+  }
+
+  switch (name) {
+    case 'search_notes':
+      return args.query ? `Searched your notes for “${args.query}”` : 'Searched your notes';
+    case 'read_note':
+      // The id is not shown: it means nothing to the person reading, and the
+      // title is not something this side was given.
+      return 'Read a note';
+    case 'read_tasks':
+      return 'Read your task list';
+    default:
+      // A tool this build has not heard of still gets a line. Saying nothing
+      // would hide that the model did something.
+      return `Ran ${name}`;
+  }
+}
+
+/**
+ * What the model looked up before answering.
+ *
+ * Shown for a stored turn as well as a live one. The question this app has to
+ * be able to answer about itself is "did it read my notes?", and an answer that
+ * only appeared while it was being written does not answer it tomorrow.
+ */
+function ToolActivity({ calls }) {
+  // Guarded rather than trusted. The schema defaults this to an empty array, so
+  // it is always there — but a turn is not worth losing over a missing field,
+  // and rendering nothing is a better failure than taking down the transcript
+  // it was meant to annotate.
+  if (!calls || calls.length === 0) return null;
+
+  return (
+    <ul className="flex flex-col gap-1">
+      {calls.map((call, index) => (
+        <li className="flex items-center gap-2 text-muted-foreground text-xs" key={index}>
+          <IconTool aria-hidden="true" className="size-3.5 shrink-0" />
+          <span className="truncate">{describeTool(call)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
  * One turn.
  *
  * What the user wrote stays text: they typed it, they know what it says, and a
@@ -152,6 +214,7 @@ function Turn({ message }) {
 
   return (
     <div className="flex flex-col gap-2">
+      <ToolActivity calls={message.toolCalls} />
       {message.content ? (
         <div className="flex flex-col gap-3 text-sm">
           <Markdown text={message.content} />
@@ -186,8 +249,10 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   const [selectedId, setSelectedId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
-  // The turn in flight: what the user just said, and the reply so far.
+  // The turn in flight: what the user just said, what is being looked up, and
+  // the reply so far.
   const [pending, setPending] = useState('');
+  const [activity, setActivity] = useState([]);
   const [streaming, setStreaming] = useState('');
   const [sending, setSending] = useState(false);
   const [outcome, setOutcome] = useState(null);
@@ -247,7 +312,7 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   // Following the answer as it is written is the whole point of streaming it.
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: 'end' });
-  }, [messages, streaming, pending]);
+  }, [messages, streaming, pending, activity]);
 
   function startNew() {
     loaded.current = null;
@@ -265,6 +330,7 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
 
     setDraft('');
     setPending(content);
+    setActivity([]);
     setStreaming('');
     setSending(true);
     setOutcome(null);
@@ -292,9 +358,14 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
           setMessages((current) => [...current, start.userMessage]);
         },
         onDelta: (text) => setStreaming((current) => current + text),
+        onTool: (call) => setActivity((current) => [...current, call]),
       });
 
       setMessages((current) => [...current, reply]);
+      // Cleared together with the streamed text: the stored turn that just
+      // landed carries the same calls, so leaving these would show each of them
+      // twice.
+      setActivity([]);
       setStreaming('');
 
       // Re-read rather than patched in place: the first turn gives a
@@ -304,6 +375,7 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
       setOutcome(error.outcome ?? CHAT_OUTCOMES.failed);
       setFailure(error.message);
       setPending('');
+      setActivity([]);
       setStreaming('');
       // Nothing was sent, so the words are handed back rather than lost to a
       // failure the user is about to be asked to do something about.
@@ -327,7 +399,7 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   const selected = conversations.find((item) => item.id === selectedId) ?? null;
   const refusal = outcome ? OUTCOMES[outcome] : null;
   const RefusalIcon = refusal?.icon ?? IconAlertTriangle;
-  const empty = messages.length === 0 && !pending && !streaming;
+  const empty = messages.length === 0 && !pending && !streaming && activity.length === 0;
 
   return (
     <section aria-label="Chats" className="flex h-full min-h-0">
@@ -430,6 +502,8 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
               </div>
             ) : null}
 
+            <ToolActivity calls={activity} />
+
             {/* Rendered while it streams, not only once it lands, so the reply
                 does not visibly re-lay-itself-out the moment it finishes. */}
             {streaming ? (
@@ -438,7 +512,7 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
               </div>
             ) : null}
 
-            {sending && !streaming ? <Spinner aria-hidden="true" /> : null}
+            {sending && !streaming && activity.length === 0 ? <Spinner aria-hidden="true" /> : null}
 
             {/* The reply is announced as a state, not as text. A live region
                 carrying every token as it lands would read the answer out one
