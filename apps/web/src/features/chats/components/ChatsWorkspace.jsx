@@ -505,10 +505,13 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
             <ToolActivity calls={activity} />
 
             {/* Rendered while it streams, not only once it lands, so the reply
-                does not visibly re-lay-itself-out the moment it finishes. */}
+                does not visibly re-lay-itself-out the moment it finishes.
+                final={false} is what tells the renderer that a half-written
+                fence is a fence still being written rather than a stray
+                backtick. */}
             {streaming ? (
               <div className="flex flex-col gap-3 text-sm">
-                <Markdown text={streaming} />
+                <Markdown final={false} text={streaming} />
               </div>
             ) : null}
 

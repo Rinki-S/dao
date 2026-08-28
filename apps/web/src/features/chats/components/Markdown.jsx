@@ -1,234 +1,126 @@
-import { Fragment, useMemo } from 'react';
-import { marked } from 'marked';
+import MarkstreamRender from 'markstream-react';
+// The self-contained stylesheet, not index.tailwind.css. That one omits the
+// utility classes the components emit — list-disc, my-8 — on the assumption
+// that the host's Tailwind supplies them. Tailwind v4 only generates the
+// utilities it finds by scanning source, and it cannot see a class name that
+// only exists inside a dependency's compiled JavaScript, so the lists came out
+// with no bullets. This variant carries its own, scoped to .markstream-react.
+import 'markstream-react/index.css';
 
 /**
  * Schemes a link in a model's reply is allowed to have.
  *
- * marked hands back whatever was written, `javascript:` included, so this is
- * not theoretical tidiness: it is the one place where text a model produced
- * would otherwise become something the browser executes. A link with any other
- * scheme is rendered as its own text, which is honest — the reader still sees
- * exactly what the model wrote.
+ * The parser hands back whatever was written, `javascript:` included, so this
+ * is the one line standing between text a model produced and something the
+ * browser runs. A link with any other scheme is rendered as its own text, which
+ * is honest — the reader still sees exactly what the model wrote.
  */
 const SAFE_SCHEMES = ['http:', 'https:', 'mailto:'];
 
-function safeHref(href) {
+function isSafeHref(href) {
   try {
-    // Relative URLs resolve against the page, which for an artifact of a chat
-    // reply is never meaningful, so a base is supplied only to let the parser
-    // work and the result is required to be one of the schemes above.
-    const url = new URL(href, 'https://invalid.invalid');
-    return SAFE_SCHEMES.includes(url.protocol) ? href : null;
+    // Parsed with no base, so the address has to carry its own scheme. Giving
+    // it one to resolve against would say yes to an empty string and to every
+    // relative path — and a relative link in a chat reply resolves against the
+    // app's own URL, which is not a place the model can have meant.
+    return SAFE_SCHEMES.includes(new URL(href).protocol);
   } catch {
-    return null;
+    return false;
   }
 }
 
-function Inline({ tokens }) {
-  return (
-    <>
-      {tokens.map((token, index) => (
-        <Fragment key={index}>{inlineNode(token)}</Fragment>
-      ))}
-    </>
-  );
-}
+/**
+ * An image, turned into a link to itself.
+ *
+ * Never rendered as an image. Loading one would send a request to whatever host
+ * the model named, from an app whose promise is that nothing leaves the device
+ * unasked — and a one-pixel image is how that gets abused. The alt text and the
+ * address are offered instead and the reader decides.
+ */
+function imageAsLink(image) {
+  const alt = image.alt || 'image';
 
-function inlineNode(token) {
-  switch (token.type) {
-    case 'text':
-    case 'escape':
-      return token.text;
-    case 'strong':
-      return (
-        <strong className="font-semibold">
-          <Inline tokens={token.tokens} />
-        </strong>
-      );
-    case 'em':
-      return (
-        <em>
-          <Inline tokens={token.tokens} />
-        </em>
-      );
-    case 'del':
-      return (
-        <del>
-          <Inline tokens={token.tokens} />
-        </del>
-      );
-    case 'codespan':
-      return (
-        <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]">{token.text}</code>
-      );
-    case 'br':
-      return <br />;
-    case 'link': {
-      const href = safeHref(token.href);
-      if (!href) return token.raw;
-
-      return (
-        <a
-          className="underline underline-offset-2"
-          href={href}
-          rel="noreferrer noopener"
-          target="_blank"
-        >
-          <Inline tokens={token.tokens} />
-        </a>
-      );
-    }
-    case 'image': {
-      // Not rendered as an image. Loading one would send a request to whatever
-      // host the model named, from an app whose promise is that nothing leaves
-      // the device unasked — and a one-pixel image is how that gets abused. The
-      // alt text and the address are shown instead, and the reader decides.
-      const href = safeHref(token.href);
-      const alt = token.text || 'image';
-
-      return href ? (
-        <a
-          className="underline underline-offset-2"
-          href={href}
-          rel="noreferrer noopener"
-          target="_blank"
-        >
-          {alt}
-        </a>
-      ) : (
-        alt
-      );
-    }
-    default:
-      // Raw HTML lands here and is shown as the text it is, never interpreted.
-      // So does anything this build does not know about: showing the source is
-      // always better than dropping it.
-      return token.raw ?? token.text ?? '';
+  if (!isSafeHref(image.src)) {
+    return { type: 'text', raw: image.raw, content: alt };
   }
+
+  return {
+    type: 'link',
+    raw: image.raw,
+    href: image.src,
+    title: image.title ?? null,
+    text: alt,
+    children: [{ type: 'text', raw: alt, content: alt }],
+  };
 }
 
-const HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+/**
+ * Rewrite every image in the tree, at any depth.
+ *
+ * Done on the parsed nodes rather than by disabling the parser's image rule,
+ * because this way the reader still gets something to click. It walks every
+ * array-valued field rather than a known list of them — a table keeps its cells
+ * under a different name from a paragraph's children, and an image missed
+ * because of a field name is an image that loads.
+ */
+function withoutImages(node) {
+  if (Array.isArray(node)) return node.map(withoutImages);
+  if (!node || typeof node !== 'object') return node;
+  if (node.type === 'image') return imageAsLink(node);
 
-function Block({ token }) {
-  switch (token.type) {
-    case 'space':
-      return null;
-    case 'paragraph':
-      return (
-        <p>
-          <Inline tokens={token.tokens} />
-        </p>
-      );
-    case 'heading': {
-      // Levels are capped rather than trusted: a reply that opens with a
-      // heading should not outrank the page's own, and h1 through h6 is the
-      // whole range marked can produce.
-      const Tag = HEADINGS[Math.min(token.depth, 6) - 1];
+  let changed = false;
+  const next = { ...node };
 
-      return (
-        <Tag className="font-heading font-semibold text-[1.05em]">
-          <Inline tokens={token.tokens} />
-        </Tag>
-      );
+  for (const [key, value] of Object.entries(node)) {
+    if (!Array.isArray(value)) continue;
+
+    const mapped = value.map(withoutImages);
+    if (mapped.some((item, index) => item !== value[index])) {
+      next[key] = mapped;
+      changed = true;
     }
-    case 'code':
-      // The container scrolls rather than the page: a long line of code must
-      // not make the whole transcript scroll sideways.
-      return (
-        <pre className="overflow-x-auto rounded-md bg-muted p-3">
-          <code className="font-mono text-xs">{token.text}</code>
-        </pre>
-      );
-    case 'blockquote':
-      return (
-        <blockquote className="border-s-2 ps-3 text-muted-foreground">
-          <Blocks tokens={token.tokens} />
-        </blockquote>
-      );
-    case 'list': {
-      const Tag = token.ordered ? 'ol' : 'ul';
-
-      return (
-        <Tag
-          className={token.ordered ? 'list-decimal ps-5' : 'list-disc ps-5'}
-          start={token.ordered && token.start !== '' ? token.start : undefined}
-        >
-          {token.items.map((item, index) => (
-            <li key={index}>
-              <Blocks tokens={item.tokens} />
-            </li>
-          ))}
-        </Tag>
-      );
-    }
-    case 'table':
-      return (
-        <div className="overflow-x-auto">
-          {/* Sized to its content rather than stretched to the pane: a
-              two-column table pulled to full width puts its second column an
-              inch from its first, which reads as two unrelated lists. The
-              wrapper is what handles a table too wide to fit. */}
-          <table className="border-collapse text-start">
-            <thead>
-              <tr>
-                {token.header.map((cell, index) => (
-                  <th className="border-b p-2 text-start font-semibold" key={index}>
-                    <Inline tokens={cell.tokens} />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {token.rows.map((row, rowIndex) => (
-                <tr key={rowIndex}>
-                  {row.map((cell, index) => (
-                    <td className="border-b p-2" key={index}>
-                      <Inline tokens={cell.tokens} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-    case 'hr':
-      return <hr className="border-border" />;
-    case 'text':
-      // What a tight list item's content arrives as.
-      return token.tokens ? <Inline tokens={token.tokens} /> : token.text;
-    default:
-      return <p className="whitespace-pre-wrap">{token.raw}</p>;
   }
+
+  // The node itself is returned when nothing under it changed, so the renderer
+  // can keep treating it as the same object between streamed parses.
+  return changed ? next : node;
 }
 
-function Blocks({ tokens }) {
-  return (
-    <>
-      {tokens.map((token, index) => (
-        <Block key={index} token={token} />
-      ))}
-    </>
-  );
-}
+const PARSE_OPTIONS = {
+  // Links are only emitted when this passes; the rest render as their own text.
+  validateLink: isSafeHref,
+  postTransformNodes: (nodes) => nodes.map(withoutImages),
+};
 
 /**
  * A model's reply, rendered.
  *
- * Markdown becomes React elements, never an HTML string. That is the whole
- * safety argument: there is no dangerouslySetInnerHTML anywhere below, so there
- * is no sanitiser to configure correctly and no way for a tag in the model's
- * output to become a tag in the document. The two places where text could still
- * turn into behaviour — a link's scheme and an image's address — are handled
- * explicitly above.
+ * markstream is built for exactly this input — a Markdown document that arrives
+ * a token at a time and is invalid at almost every moment in between. Telling
+ * it whether the stream has ended is the whole reason it is here: while `final`
+ * is false an unclosed fence is a fence still being written, and when it turns
+ * true the same trailing characters become literal text. A renderer that cannot
+ * tell those apart has to guess, and guesses differently on every keystroke.
  *
- * Re-lexed on every render, which during a stream means once per delta. The
- * text is a few kilobytes at most and lexing it is microseconds; the
- * alternative is keeping a parse tree in sync with a string that changes forty
- * times a second, which is a real bug in exchange for an imaginary saving.
+ * Three things are pinned here rather than left at their defaults, and they are
+ * the same three the hand-written renderer this replaces existed to get right:
+ *
+ * `htmlPolicy="escape"` renders raw HTML in a reply as the text it is. The
+ * library's default is "safe", which sanitises and renders — right for content
+ * an application controls, and this is content a model wrote.
+ *
+ * `validateLink` refuses any scheme a browser should not follow.
+ *
+ * `postTransformNodes` turns images into links so that nothing in a reply
+ * causes a request to a host the model chose.
  */
-export function Markdown({ text }) {
-  const tokens = useMemo(() => marked.lexer(text), [text]);
-
-  return <Blocks tokens={tokens} />;
+export function Markdown({ text, final = true }) {
+  return (
+    <MarkstreamRender
+      content={text}
+      final={final}
+      htmlPolicy="escape"
+      parseOptions={PARSE_OPTIONS}
+    />
+  );
 }
