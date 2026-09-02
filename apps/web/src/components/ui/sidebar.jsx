@@ -134,8 +134,16 @@ export function SidebarProvider({
   return (
     <SidebarContext.Provider value={contextValue}>
       <div
+        // A height rather than a minimum. `min-h-svh` upstream leaves this
+        // element's height auto, and auto propagates: every descendant that
+        // asks for `h-full` or `flex-1` measures against a parent that grows
+        // with its own content, so no `overflow-auto` below ever has a bounded
+        // box to scroll inside. A long note simply made the whole shell taller
+        // until `#root`'s `overflow: hidden` cut it off, with no scrollbar
+        // anywhere. The window is the one thing here with a fixed size, so it
+        // is where the measuring has to start.
         className={cn(
-          'group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar',
+          'group/sidebar-wrapper flex h-svh w-full has-data-[variant=inset]:bg-sidebar',
           className,
         )}
         data-slot="sidebar-wrapper"
