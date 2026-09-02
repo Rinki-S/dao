@@ -1,4 +1,13 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, powerMonitor, shell } from 'electron'
+import {
+    app,
+    BrowserWindow,
+    dialog,
+    ipcMain,
+    nativeTheme,
+    powerMonitor,
+    screen,
+    shell,
+} from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -31,10 +40,30 @@ let isStoppingLocalService = false
 let restartLocalServicePromise = null
 let mainWindow = null
 
+/**
+ * How big the window opens the first time.
+ *
+ * A fixed 1488x1024 was most of a laptop screen and nearly all of a small one,
+ * which is a decision the app has no business making — an editor that opens
+ * maximised has taken the desktop over rather than joined it.
+ *
+ * So: a comfortable size, capped to a fraction of the display it opens on. The
+ * cap is what keeps it a window on a 13" screen; the fixed sizes are what stop
+ * it growing to fill a 5K one. The minimums win over both, since below them the
+ * sidebar and the editor's measure stop fitting side by side at all.
+ */
+function defaultWindowSize() {
+    const { width, height } = screen.getPrimaryDisplay().workAreaSize
+
+    return {
+        width: Math.max(960, Math.min(1200, Math.round(width * 0.76))),
+        height: Math.max(640, Math.min(820, Math.round(height * 0.8))),
+    }
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 1488,
-        height: 1024,
+        ...defaultWindowSize(),
         minWidth: 960,
         minHeight: 640,
         icon: appIconPath,
