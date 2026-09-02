@@ -198,6 +198,110 @@ func TestReconcileForgetsANoteWhoseFileWasDeleted(t *testing.T) {
 	}
 }
 
+// Deleting a note leaves its file in the folder, so the file outlives the note
+// and anything that writes to it later brings the app back to this path. It has
+// to come back as the note it was: a second row for one file splits the note's
+// identity in two, and every link and search result still points at the half
+// nothing can reach.
+func TestReconcileRevivesADeletedNoteRatherThanDuplicatingIt(t *testing.T) {
+	repo, indexer, _, _ := reconcileFixture(t)
+
+	note, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		Title:       "Parking queue ordering",
+		Content:     "first draft",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	if err := repo.Delete(note.ID); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	// The file is still there — deleting the note never touched it. Somebody
+	// opens it in another program and writes to it.
+	if err := os.WriteFile(note.FilePath, []byte("second draft"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	later := time.Now().Add(time.Hour)
+	if err := os.Chtimes(note.FilePath, later, later); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+
+	changed, err := repo.Reconcile([]string{note.FilePath})
+	if err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if !changed {
+		t.Fatal("a deleted note's file coming back was not reported as a change")
+	}
+
+	notes, err := repo.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(notes) != 1 {
+		t.Fatalf("got %d notes, want exactly the one that came back", len(notes))
+	}
+
+	// The same note, not a stranger wearing its file.
+	if notes[0].ID != note.ID {
+		t.Errorf("ID = %q, want the original %q", notes[0].ID, note.ID)
+	}
+	if notes[0].Title != "Parking queue ordering" {
+		t.Errorf("Title = %q — read back out of the file name instead of kept", notes[0].Title)
+	}
+	if notes[0].CreatedAt != note.CreatedAt {
+		t.Errorf("CreatedAt = %q, want the original %q", notes[0].CreatedAt, note.CreatedAt)
+	}
+
+	// Deleting took it out of the index; it is only findable again if this put
+	// it back, with what the file says now.
+	if len(indexer.replacedEntries) == 0 {
+		t.Fatal("the revived note was not put back in the search index")
+	}
+	last := indexer.replacedEntries[len(indexer.replacedEntries)-1]
+	if last.EntityID != note.ID || last.Body != "second draft" {
+		t.Errorf("reindexed as %+v", last)
+	}
+}
+
+// The ordinary end state: the note is deleted and so is its file. Nothing to
+// bring back, and nothing to report.
+func TestReconcileLeavesADeletedNoteWithNoFileAlone(t *testing.T) {
+	repo, _, _, _ := reconcileFixture(t)
+
+	note, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		Title:       "Temporary",
+		Content:     "x",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	if err := repo.Delete(note.ID); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if err := os.Remove(note.FilePath); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+
+	changed, err := repo.Reconcile([]string{note.FilePath})
+	if err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if changed {
+		t.Error("a deleted note whose file is also gone was reported as a change")
+	}
+
+	notes, _ := repo.List()
+	if len(notes) != 0 {
+		t.Errorf("a note came back from nothing: %+v", notes)
+	}
+}
+
 // Everything else in the folder is somebody else's business.
 func TestReconcileIgnoresWhatIsNotANote(t *testing.T) {
 	repo, _, workspaceRoot, _ := reconcileFixture(t)

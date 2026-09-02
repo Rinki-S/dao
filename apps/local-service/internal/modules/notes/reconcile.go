@@ -15,11 +15,12 @@ import (
 // Reconcile brings the notes table in line with what is actually on disk at the
 // given paths.
 //
-// The watcher says what changed; this decides what that means. Four cases, and
+// The watcher says what changed; this decides what that means. Five cases, and
 // they are the whole of it:
 //
 //	a note's file was edited   -> the note is newer than the app thought
 //	a note's file is gone      -> the note is gone
+//	a deleted note's file back -> the note it used to be, not a new one
 //	a file nobody knows about  -> a new note
 //	a path with neither        -> nothing to do
 //
@@ -53,17 +54,77 @@ func (r *Repository) reconcileOne(path string) (bool, error) {
 
 	info, statErr := os.Stat(path)
 	exists := statErr == nil && !info.IsDir()
+	deleted := found && note.DeletedAt != nil
 
 	switch {
-	case found && exists:
+	case found && !deleted && exists:
 		return r.refresh(note, info)
-	case found && !exists:
+	case found && !deleted && !exists:
 		return true, r.Delete(note.ID)
+	case deleted && exists:
+		return r.revive(note, info)
 	case !found && exists:
 		return r.adopt(path, info)
 	}
 
+	// A deleted note whose file is also gone is the ordinary end state, and the
+	// only case left.
 	return false, nil
+}
+
+// revive brings back a note that was deleted but whose file somebody edited
+// again.
+//
+// Deleting a note only marks the row; the file stays where the person put it.
+// So a deleted note leaves a real Markdown file in the workspace, and the next
+// time anything writes to it the watcher reports a path the app has a row for —
+// just not a live one. Adopting it would insert a *second* row for one file,
+// under a new identifier, with the title read back out of the file name; the
+// note would return as a stranger, and every link, recent and search result
+// pointing at the original would go on pointing at a row nothing can reach.
+//
+// Reviving is the truthful reading. The file was never a new file — it is the
+// same one, with the same history, and somebody has just said they still want
+// it by writing to it.
+func (r *Repository) revive(note Note, info os.FileInfo) (bool, error) {
+	content, err := os.ReadFile(note.FilePath)
+	if err != nil {
+		return false, err
+	}
+
+	now := info.ModTime().UTC().Format(time.RFC3339)
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`
+		UPDATE notes
+		SET deleted_at = NULL, updated_at = ?, version = version + 1, sync_status = 'local'
+		WHERE id = ?
+	`, now, note.ID); err != nil {
+		return false, err
+	}
+
+	// Deleting took the note out of the index, so it has to go back in.
+	// Replace rather than insert: the delete is the only thing that should have
+	// removed it, and this must not depend on that having happened.
+	if err := r.indexer.ReplaceTx(tx, search.IndexEntry{
+		EntityType:  "note",
+		EntityID:    note.ID,
+		WorkspaceID: note.WorkspaceID,
+		ProjectID:   note.ProjectID,
+		Title:       note.Title,
+		Body:        string(content),
+		CreatedAt:   note.CreatedAt,
+		UpdatedAt:   now,
+	}); err != nil {
+		return false, err
+	}
+
+	return true, tx.Commit()
 }
 
 // refresh records that a note's file was edited somewhere else.
@@ -213,11 +274,22 @@ func titleFromFileName(path string) string {
 	return strings.ToUpper(name[:1]) + name[1:]
 }
 
+// byPath finds the note a file belongs to, deleted or not.
+//
+// Deliberately unfiltered. Every other lookup in the app wants live notes and
+// nothing else, but this one is asking "does this app already know this file?",
+// and a deleted note knows its file perfectly well — hiding it here is what
+// turns a revival into a duplicate.
+//
+// Live rows sort first so that a workspace which already collected a duplicate
+// pair for one path resolves to the one the interface is showing.
 func (r *Repository) byPath(path string) (Note, bool, error) {
 	note, err := scanNote(r.db.QueryRow(`
 		SELECT `+noteSelectColumns+`
 		FROM notes
-		WHERE file_path = ? AND deleted_at IS NULL
+		WHERE file_path = ?
+		ORDER BY (deleted_at IS NULL) DESC
+		LIMIT 1
 	`, path))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Note{}, false, nil
