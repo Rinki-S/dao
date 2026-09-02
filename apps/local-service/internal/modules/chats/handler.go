@@ -1,7 +1,6 @@
 package chats
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/agent"
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm"
 	"github.com/rinki-s/dao/apps/local-service/internal/httpx"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/proposals"
 )
 
 // Handler serves conversations and runs a turn.
@@ -33,8 +33,35 @@ type Handler struct {
 	// Nil means the model is offered nothing and answers from the conversation
 	// alone, which is what a build with no tools wired up should do rather than
 	// crash.
-	newTools func(workspaceID string) []agent.Tool
+	//
+	// The conversation is passed as well as the workspace because a tool that
+	// prepares a change has to record it somewhere findable, and where a change
+	// waits is in the conversation that asked for it.
+	newTools func(workspaceID string, conversationID string) []agent.Tool
+
+	// proposals is where changes wait, and applyChange is what performs one.
+	//
+	// Split in two on purpose. Reading and resolving a proposal is bookkeeping
+	// this module can do; writing to somebody's note is the notes module's
+	// business, and chat is handed the ability to ask rather than the tables to
+	// do it with. The function returns what the model should be told, because
+	// the only true account of what happened is the one from the code that made
+	// it happen.
+	proposals   *proposals.Repository
+	applyChange func(proposals.Proposal) (string, error)
 }
+
+// maxTurnSteps bounds a whole turn, however many times it is picked up again.
+//
+// A turn used to be one run, and the loop's own bound was the whole story. A
+// turn can now stop for a person and carry on, and each continuation is a fresh
+// run that would otherwise be handed the full bound again — so propose, apply,
+// propose, apply is a loop with no end that costs money on every lap.
+//
+// Sixteen is two full runs' worth. Not a measured number: it is the point past
+// which a single question has stopped being a single question, and the person
+// who asked it can always ask again.
+const maxTurnSteps = 16
 
 func NewHandler(
 	repo *Repository,
@@ -45,8 +72,25 @@ func NewHandler(
 }
 
 // WithTools gives the model something to look things up with.
-func (h *Handler) WithTools(newTools func(workspaceID string) []agent.Tool) *Handler {
+func (h *Handler) WithTools(
+	newTools func(workspaceID string, conversationID string) []agent.Tool,
+) *Handler {
 	h.newTools = newTools
+
+	return h
+}
+
+// WithProposals lets a turn stop for a person and carry on afterwards.
+//
+// Without it the model can still be offered writing tools by whoever builds
+// them, but nothing here would know how to answer one — so the sensible build
+// is to wire both or neither, and the tools package already refuses to offer a
+// writing tool to a workspace with nowhere to record a proposal.
+func (h *Handler) WithProposals(
+	repo *proposals.Repository, apply func(proposals.Proposal) (string, error),
+) *Handler {
+	h.proposals = repo
+	h.applyChange = apply
 
 	return h
 }
@@ -58,6 +102,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/chats/{id}", h.rename)
 	mux.HandleFunc("DELETE /api/chats/{id}", h.delete)
 	mux.HandleFunc("POST /api/chats/{id}/messages", h.send)
+	mux.HandleFunc("POST /api/chats/{id}/proposals/{proposalId}", h.resolve)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -183,6 +228,19 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Saying something else instead of answering is an answer: no.
+	//
+	// Not tidying-up. A tool call with no result is one the transcript cannot
+	// be read back with, so leaving it would make this very turn fail on the
+	// wire over a decision the person declined to make. Abandoning it is what
+	// lets them just carry on talking, which is the thing they were trying to
+	// do — and the model is told plainly that nothing was written, so it does
+	// not go on believing the change happened.
+	if err := h.abandonWaitingChange(conversationID); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "failed to set aside the proposed change")
+		return
+	}
+
 	user, err := h.repo.Append(conversationID, Message{Role: RoleUser, Content: content})
 	if err != nil {
 		httpx.Error(w, statusFor(err), messageFor(err, "failed to store the message"))
@@ -225,125 +283,14 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 		AssistantMessageID: assistant.ID,
 	})
 
-	var reply strings.Builder
-	var used []ToolCall
-
-	var tools []agent.Tool
-	if h.newTools != nil {
-		tools = h.newTools(conversation.WorkspaceID)
-	}
-
-	loop := &agent.Loop{
-		Client: client,
-		Tools:  tools,
-		OnText: func(chunk string) error {
-			// The context, not the write, is what reports a browser that has
-			// gone away: a write to a closed connection is buffered by the
-			// kernel and succeeds for some time after there is nobody there.
-			// Returning an error here is what stops work nobody is waiting for.
-			if err := r.Context().Err(); err != nil {
-				return err
-			}
-
-			reply.WriteString(chunk)
-
-			return writeEvent(w, flusher, EventDelta, DeltaEvent{Text: chunk})
-		},
-		OnToolStart: func(id string, name string, input json.RawMessage) {
-			// Recorded and announced in the same place, so what the reader was
-			// told and what the transcript keeps cannot disagree.
-			//
-			// Recorded at the start, when there is no result yet, because a run
-			// that dies mid-tool should still show what was being attempted.
-			// The result is filled in below when there is one.
-			used = append(used, ToolCall{
-				ID:     id,
-				Name:   name,
-				Input:  string(input),
-				Status: ToolCallPending,
-			})
-			_ = writeEvent(w, flusher, EventTool, ToolEvent{Name: name, Input: string(input)})
-		},
-		OnToolEnd: func(id string, _ string, output string, failed bool) {
-			// What the model was told. Not shown to the reader — the line
-			// announcing the call is what they see — but it is the whole of
-			// what the model knows on the next turn, so the transcript is only
-			// replayable if it is kept.
-			status := ToolCallOK
-			if failed {
-				status = ToolCallFailed
-			}
-
-			for i := range used {
-				if used[i].ID == id && used[i].Status == ToolCallPending {
-					used[i].Output = output
-					used[i].Status = status
-					return
-				}
-			}
-		},
-	}
-
-	result, runErr := loop.Run(r.Context(), BuildContext(history), llm.Options{MaxTokens: chatMaxTokens})
-
-	// The deltas are the answer; the result's text is the same words gathered by
-	// the loop. They are only read the other way round when a call that
-	// succeeded reported no deltas at all, which an endpoint claiming to be
-	// OpenAI-compatible is entirely capable of doing. Not after a failure: the
-	// result can carry more than the caller was actually handed, and storing
-	// that as the reply would record an answer the user never saw.
-	text := reply.String()
-	if text == "" && runErr == nil {
-		text = result.Text
-	}
-
-	finished := Message{
-		Content:      text,
-		Model:        model,
-		Wire:         wire,
-		InputTokens:  result.Usage.InputTokens,
-		OutputTokens: result.Usage.OutputTokens,
-		Status:       StatusOK,
-		ToolCalls:    used,
-	}
-	switch {
-	case errors.Is(runErr, context.Canceled):
-		// The reader closed the stream, which in this app means they pressed
-		// stop. Nothing went wrong, so nothing is recorded as having gone
-		// wrong: the text that arrived is kept and the turn says it was ended
-		// rather than that it broke.
-		//
-		// A dropped connection lands here too and is called the same thing.
-		// From this side the two are identical — the reader stopped reading —
-		// and guessing which one it was would mean inventing a distinction the
-		// service cannot see.
-		finished.Status = StatusStopped
-	case runErr != nil:
-		finished.Status = StatusFailed
-		finished.ErrorMessage = runErr.Error()
-	case result.StepsExhausted:
-		// Not a broken reply — the model was still looking things up when it
-		// ran out of rope. Marked failed because whatever it had said by then
-		// is not the answer to the question, and presenting it as one would be
-		// the transcript's own claim rather than the model's.
-		finished.Status = StatusFailed
-		finished.ErrorMessage = fmt.Sprintf(
-			"the model was still looking things up after %d steps and was stopped", result.Steps,
-		)
-	}
-
-	stored, err := h.repo.Finish(assistant.ID, finished)
-	if err != nil {
-		// The reply happened even if recording it did not. The client is told
-		// what arrived and that it was not kept, rather than being left holding
-		// text the next reload will contradict.
-		stored = assistant
-		stored.Content = text
-		stored.Status = StatusFailed
-		stored.ErrorMessage = "the reply could not be saved"
-	}
-
-	writeEvent(w, flusher, EventDone, stored)
+	h.runTurn(w, r, flusher, turnRun{
+		client:       client,
+		conversation: conversation,
+		assistant:    assistant,
+		history:      history,
+		wire:         wire,
+		model:        model,
+	})
 }
 
 // writeEvent sends one server-sent event.

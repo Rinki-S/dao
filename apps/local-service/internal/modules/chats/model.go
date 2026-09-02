@@ -1,5 +1,7 @@
 package chats
 
+import "github.com/rinki-s/dao/apps/local-service/internal/modules/proposals"
+
 // Roles a stored turn can have.
 //
 // There is no system role. The system prompt belongs to the build that sent
@@ -111,13 +113,33 @@ type Message struct {
 	// the turn so that reloading a conversation still shows how its answers
 	// were arrived at, rather than only what they were.
 	ToolCalls []ToolCall `json:"toolCalls,omitempty"`
+
+	// Steps is how many times the model was asked to produce this turn.
+	//
+	// Kept because a turn can be picked up again after a proposed change is
+	// answered, and each continuation is a fresh run with a fresh bound. Without
+	// a record of what the earlier runs spent, propose-apply-propose-apply is a
+	// loop with no end that costs money on every lap.
+	//
+	// Sent with the rest even though nothing displays it. The stream's terminal
+	// event carries the stored row so that what the client holds is what a
+	// reload shows, and a field held back would make that true only of the
+	// fields somebody remembered to include.
+	Steps int `json:"steps"`
 }
 
 // ConversationDetail is a conversation together with its turns, which is how
 // the app always wants to read one.
+//
+// And with the changes it proposed. A change the model prepared belongs to the
+// conversation as much as the words around it do — it is shown in the thread,
+// answered in the thread, and one of them may be the thing the conversation is
+// currently stopped on. Fetched separately it would be a second request whose
+// answer could disagree with the first.
 type ConversationDetail struct {
 	Conversation
-	Messages []Message `json:"messages"`
+	Messages  []Message            `json:"messages"`
+	Proposals []proposals.Proposal `json:"proposals"`
 }
 
 type CreateConversationRequest struct {
@@ -135,17 +157,23 @@ type SendMessageRequest struct {
 	Content string `json:"content"`
 }
 
-// The three events a turn's stream can carry.
+// The events a turn's stream can carry.
 //
 // Every stream that opens ends with done, whether the reply succeeded or not,
 // and done carries the assistant row exactly as it was stored. That is the
 // property worth having: what the client shows after done is what a reload
 // would show, so a failure needs no separate rendering path invented for it.
+//
+// Proposal keeps that property rather than breaking it. A change the model
+// prepared is part of the conversation's state, so it is stored and comes back
+// on a reload with everything else — this only saves the client from having to
+// go and ask for what it was just told.
 const (
-	EventStart = "start"
-	EventDelta = "delta"
-	EventTool  = "tool"
-	EventDone  = "done"
+	EventStart    = "start"
+	EventDelta    = "delta"
+	EventTool     = "tool"
+	EventProposal = "proposal"
+	EventDone     = "done"
 )
 
 // ToolEvent says that the model is looking something up.

@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/proposals"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
 
@@ -31,10 +32,23 @@ type Repository struct {
 	// tables hold, and a nil indexer is also the honest answer for a build that
 	// has no search.
 	indexer search.Indexer
+
+	// proposals is where changes the model prepared wait, read so that a
+	// conversation comes back with them. Optional for the same reason the
+	// indexer is: a build without it has no proposals, and an empty list is the
+	// honest answer rather than a missing field.
+	proposals *proposals.Repository
 }
 
 func NewRepository(db *sql.DB, nextID func() string, indexer search.Indexer) *Repository {
 	return &Repository{db: db, nextID: nextID, now: time.Now, indexer: indexer}
+}
+
+// WithProposals lets a conversation come back with the changes it proposed.
+func (r *Repository) WithProposals(repo *proposals.Repository) *Repository {
+	r.proposals = repo
+
+	return r
 }
 
 func (r *Repository) timestamp() string {
@@ -211,7 +225,7 @@ func (r *Repository) Messages(conversationID string) ([]Message, error) {
 // stop agreeing is that someone adds a column to one of them.
 const messageColumns = `id, conversation_id, role, content, position,
 	       model, wire, input_tokens, output_tokens,
-	       status, error_message, created_at, tool_calls`
+	       status, error_message, created_at, tool_calls, steps`
 
 // reindexTx rewrites a conversation's search entry from what the tables now
 // hold.
@@ -297,6 +311,7 @@ func scanMessage(row scanner) (Message, error) {
 		&message.Position, &message.Model, &message.Wire,
 		&message.InputTokens, &message.OutputTokens,
 		&message.Status, &message.ErrorMessage, &message.CreatedAt, &toolCalls,
+		&message.Steps,
 	); err != nil {
 		return Message{}, err
 	}
@@ -352,7 +367,96 @@ func (r *Repository) Detail(conversationID string) (ConversationDetail, error) {
 		return ConversationDetail{}, err
 	}
 
-	return ConversationDetail{Conversation: conversation, Messages: messages}, nil
+	// Nil when this build cannot propose changes, which reads as an empty list
+	// and is exactly right: a conversation in such a build has none.
+	var waiting []proposals.Proposal
+	if r.proposals != nil {
+		if waiting, err = r.proposals.ForConversation(conversationID); err != nil {
+			return ConversationDetail{}, err
+		}
+	}
+
+	return ConversationDetail{
+		Conversation: conversation,
+		Messages:     messages,
+		Proposals:    waiting,
+	}, nil
+}
+
+// AnswerToolCall records what a call that was waiting on a person came to.
+//
+// The one write in this package that goes back and changes a turn already
+// finished, and it is what makes carrying on possible at all. A call left
+// pending is one BuildContext refuses to send, so the model would be handed a
+// conversation with a hole where its own request used to be. Filling the answer
+// in puts the exchange back together, and the next run reads the transcript the
+// same way every other run does — there is no separate path for a resumed turn,
+// which is the point of doing it here rather than at the call site.
+//
+// Reports whether it found the call. Not finding it is not an error the caller
+// can do anything about, but it does mean the conversation cannot be continued,
+// and that is worth being told rather than discovering on the wire.
+func (r *Repository) AnswerToolCall(
+	conversationID string, toolCallID string, output string, failed bool,
+) (bool, error) {
+	messages, err := r.Messages(conversationID)
+	if err != nil {
+		return false, err
+	}
+
+	status := ToolCallOK
+	if failed {
+		status = ToolCallFailed
+	}
+
+	for _, message := range messages {
+		for index, call := range message.ToolCalls {
+			if call.ID != toolCallID || call.Status != ToolCallPending {
+				continue
+			}
+
+			message.ToolCalls[index].Output = output
+			message.ToolCalls[index].Status = status
+
+			encoded, err := encodeToolCalls(message.ToolCalls)
+			if err != nil {
+				return false, err
+			}
+
+			if _, err := r.db.Exec(
+				`UPDATE chat_messages SET tool_calls = ? WHERE id = ?`, encoded, message.ID,
+			); err != nil {
+				return false, err
+			}
+
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// StepsSinceLastUserTurn is what the turn in progress has already spent.
+//
+// A turn is not one run any more. The model can propose a change, stop, and
+// carry on once somebody has decided, and each continuation is a fresh run that
+// would otherwise get the full bound again — so the thing to count is every run
+// since the person last said something, not the runs of any one of them.
+func (r *Repository) StepsSinceLastUserTurn(conversationID string) (int, error) {
+	messages, err := r.Messages(conversationID)
+	if err != nil {
+		return 0, err
+	}
+
+	spent := 0
+	for index := len(messages) - 1; index >= 0; index-- {
+		if messages[index].Role == RoleUser {
+			break
+		}
+		spent += messages[index].Steps
+	}
+
+	return spent, nil
 }
 
 // Append adds a turn to the end of a conversation.
@@ -477,11 +581,11 @@ func (r *Repository) Finish(messageID string, message Message) (Message, error) 
 		UPDATE chat_messages
 		SET content = ?, model = ?, wire = ?,
 		    input_tokens = ?, output_tokens = ?,
-		    status = ?, error_message = ?, tool_calls = ?
+		    status = ?, error_message = ?, tool_calls = ?, steps = ?
 		WHERE id = ?
 	`, message.Content, message.Model, message.Wire,
 		message.InputTokens, message.OutputTokens,
-		status, message.ErrorMessage, toolCalls, messageID)
+		status, message.ErrorMessage, toolCalls, message.Steps, messageID)
 	if err != nil {
 		return Message{}, err
 	}

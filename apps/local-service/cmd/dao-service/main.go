@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -28,6 +29,7 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/chats"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/notes"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/projects"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/proposals"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/settings"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/tasks"
@@ -145,11 +147,17 @@ func main() {
 	// through the ai module itself. Which provider is configured, and whether it
 	// still is a minute from now, stays one module's business; chat is handed
 	// the ability to ask, not the settings behind it.
+	proposalRepo := proposals.NewRepository(db)
+
 	chats.NewHandler(
-		chats.NewRepository(db, func() string { return ulid.Make().String() }, searchRepo),
+		chats.NewRepository(db, func() string { return ulid.Make().String() }, searchRepo).
+			WithProposals(proposalRepo),
 		aiHandler.Client,
 		aiHandler.Describe,
-	).WithTools(workspaceTools(searchRepo, noteRepo, taskRepo)).RegisterRoutes(apiMux)
+	).
+		WithTools(workspaceTools(searchRepo, noteRepo, taskRepo, proposalRepo)).
+		WithProposals(proposalRepo, applyChange(noteRepo)).
+		RegisterRoutes(apiMux)
 
 	// Registered last: the harness reads notes and tasks, so it is wired once
 	// the repositories that own them exist.
@@ -221,17 +229,21 @@ func main() {
 	}
 }
 
-// workspaceTools builds the read-only tools a chat in one workspace is given.
+// workspaceTools builds the tools a chat in one workspace is given.
 //
 // The workspace comes from the conversation the request is for, and closes over
 // every function below. There is no argument by which a model could name a
-// different one, and this is the only place that could stop being true.
+// different one, and this is the only place that could stop being true. The
+// conversation is bound the same way and for the same reason: a change the
+// model prepares waits in the conversation that asked for it, and neither the
+// model nor a later request can name a different one.
 func workspaceTools(
 	searchRepo *search.Repository,
 	noteRepo *notes.Repository,
 	taskRepo *tasks.Repository,
-) func(string) []agent.Tool {
-	return func(workspaceID string) []agent.Tool {
+	proposalRepo *proposals.Repository,
+) func(string, string) []agent.Tool {
+	return func(workspaceID string, conversationID string) []agent.Tool {
 		return tools.New(tools.Workspace{
 			SearchNotes: func(query string) ([]tools.NoteMatch, error) {
 				results, err := searchRepo.Search(query)
@@ -283,7 +295,72 @@ func workspaceTools(
 
 				return document.Content, nil
 			},
+			// The one thing that lets the model ask to change anything, and it
+			// only records the asking. Nothing here writes.
+			ProposeEdit: func(edit tools.ProposedEdit) error {
+				// Checked here as well as when the tool read the note, because
+				// this is the call that ends in somebody's file being written.
+				// The read that came before it proves nothing about the id in
+				// front of us now.
+				note, err := noteRepo.Get(edit.NoteID)
+				if err != nil || note.WorkspaceID != workspaceID {
+					return fmt.Errorf("no note %q in this workspace", edit.NoteID)
+				}
+
+				_, err = proposalRepo.Create(proposals.CreateRequest{
+					WorkspaceID:       workspaceID,
+					ConversationID:    conversationID,
+					ToolCallID:        edit.ToolCallID,
+					Kind:              proposals.KindEditNote,
+					TargetID:          edit.NoteID,
+					Title:             note.Title,
+					Before:            edit.Before,
+					After:             edit.After,
+					ExpectedUpdatedAt: edit.ExpectedUpdatedAt,
+				})
+
+				return err
+			},
 		})
+	}
+}
+
+// applyChange writes a change somebody agreed to, and says what happened.
+//
+// The only place a proposal turns into a file being written, and it works from
+// the stored row rather than from anything a request carried: what is written
+// is what was shown. The expectation the proposal was worked out against is
+// passed straight through to the same check a save from the editor goes through,
+// so a note edited in between is refused here exactly as it would be there.
+//
+// What it returns is what the model is told, and it is written from what
+// actually happened rather than from what was intended. A model told a change
+// landed will go on describing the workspace as though it had.
+func applyChange(noteRepo *notes.Repository) func(proposals.Proposal) (string, error) {
+	return func(proposal proposals.Proposal) (string, error) {
+		if proposal.Kind != proposals.KindEditNote {
+			return "", fmt.Errorf("this build cannot apply a %q change", proposal.Kind)
+		}
+
+		_, err := noteRepo.UpdateContent(
+			proposal.TargetID, proposal.After, proposal.ExpectedUpdatedAt,
+		)
+
+		var conflict *notes.Conflict
+		if errors.As(err, &conflict) {
+			// Not a failure of the change but of its moment. Said in those
+			// terms so the model reads it and stops, rather than trying the
+			// same replacement against a note that has moved on.
+			return "", fmt.Errorf(
+				"the note changed after this was prepared, so nothing was written. " +
+					"Read it again before proposing anything else",
+			)
+		}
+		if err != nil {
+			return "", err
+		}
+
+		return fmt.Sprintf("The change to %q was applied.", proposal.Title), nil
 	}
 }
 

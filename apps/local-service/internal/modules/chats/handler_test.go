@@ -484,7 +484,7 @@ func withTools(t *testing.T, client llm.Client, tool agent.Tool) (*Handler, *Rep
 	t.Helper()
 
 	handler, repo := newHandler(t, client, nil)
-	handler.WithTools(func(string) []agent.Tool { return []agent.Tool{tool} })
+	handler.WithTools(func(string, string) []agent.Tool { return []agent.Tool{tool} })
 
 	return handler, repo
 }
