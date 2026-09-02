@@ -206,6 +206,12 @@ body,
 html {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  /* Iosevka Aile is drawn on a narrow frame but spaced for its own metrics,
+     which reads loose at interface sizes. Pulled in by 2% of the current size,
+     so it stays proportional as text gets larger rather than closing up
+     headings and opening up captions. Inherited, so a Tailwind tracking
+     utility still wins wherever one is set deliberately. */
+  letter-spacing: -0.02em;
 }
 
 body {
