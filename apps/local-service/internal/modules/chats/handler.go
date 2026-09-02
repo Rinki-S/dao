@@ -249,11 +249,38 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 
 			return writeEvent(w, flusher, EventDelta, DeltaEvent{Text: chunk})
 		},
-		OnToolStart: func(name string, input json.RawMessage) {
+		OnToolStart: func(id string, name string, input json.RawMessage) {
 			// Recorded and announced in the same place, so what the reader was
 			// told and what the transcript keeps cannot disagree.
-			used = append(used, ToolCall{Name: name, Input: string(input)})
+			//
+			// Recorded at the start, when there is no result yet, because a run
+			// that dies mid-tool should still show what was being attempted.
+			// The result is filled in below when there is one.
+			used = append(used, ToolCall{
+				ID:     id,
+				Name:   name,
+				Input:  string(input),
+				Status: ToolCallPending,
+			})
 			_ = writeEvent(w, flusher, EventTool, ToolEvent{Name: name, Input: string(input)})
+		},
+		OnToolEnd: func(id string, _ string, output string, failed bool) {
+			// What the model was told. Not shown to the reader — the line
+			// announcing the call is what they see — but it is the whole of
+			// what the model knows on the next turn, so the transcript is only
+			// replayable if it is kept.
+			status := ToolCallOK
+			if failed {
+				status = ToolCallFailed
+			}
+
+			for i := range used {
+				if used[i].ID == id && used[i].Status == ToolCallPending {
+					used[i].Output = output
+					used[i].Status = status
+					return
+				}
+			}
 		},
 	}
 

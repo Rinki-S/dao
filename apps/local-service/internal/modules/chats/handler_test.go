@@ -543,6 +543,20 @@ func TestATurnThatUsesAToolSaysSoAndKeepsTheRecord(t *testing.T) {
 		t.Errorf("the arguments were not kept: %+v", final.ToolCalls[0])
 	}
 
+	// The model's own id for the call, and what the tool told it. Neither is
+	// for the reader — nobody wants to look at a call id — but together they
+	// are what lets this turn be read back to a model on the next one, which
+	// nothing else in the transcript can supply.
+	if final.ToolCalls[0].ID != "call-1" {
+		t.Errorf("the call's id was not kept: %+v", final.ToolCalls[0])
+	}
+	if final.ToolCalls[0].Output != "Parser recovery strategy.md" {
+		t.Errorf("what the model was told was not kept: %+v", final.ToolCalls[0])
+	}
+	if final.ToolCalls[0].Status != ToolCallOK {
+		t.Errorf("status = %q, want %q", final.ToolCalls[0].Status, ToolCallOK)
+	}
+
 	stored, err := repo.Messages(conversation.ID)
 	if err != nil {
 		t.Fatalf("Messages: %v", err)

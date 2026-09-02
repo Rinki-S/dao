@@ -41,14 +41,51 @@ type Conversation struct {
 	UpdatedAt   string `json:"updatedAt"`
 }
 
+// What became of a call. Empty means a call recorded before this app kept
+// track, which is treated as having succeeded — it is what the reader was shown
+// at the time, and there is nothing else to go on.
+const (
+	ToolCallOK      = "ok"
+	ToolCallFailed  = "failed"
+	ToolCallPending = "pending"
+)
+
 // ToolCall is one thing the model did before it answered.
 //
 // The arguments are kept beside the name because "searched your notes" and
 // "searched your notes for parser" are different claims, and only the second is
 // one the reader can check.
+//
+// It carries the result and the model's own id for the call as well, which it
+// did not use to. Those are not for the reader — nobody wants to look at a tool
+// call's id — they are what lets the transcript be read back *to the model*.
+// Without them a stored conversation can only be replayed as prose, and a model
+// that is handed its own half-finished tool call with no answer to it is handed
+// something the wire rejects outright.
 type ToolCall struct {
+	// ID is the model's identifier for this call. Empty on calls recorded
+	// before this was kept, which is why replay skips them rather than
+	// inventing one: a fabricated id pairs a result with a call that was never
+	// made.
+	ID    string `json:"id,omitempty"`
 	Name  string `json:"name"`
 	Input string `json:"input"`
+
+	// Output is what the tool said, which is what the model was told. Kept
+	// because on the next turn it is the only record of what the model knows.
+	Output string `json:"output,omitempty"`
+
+	// Status is ok, failed, or pending. Pending is a call waiting on a person:
+	// the tool proposed something rather than doing it, and until that is
+	// answered the call has no result to replay.
+	Status string `json:"status,omitempty"`
+}
+
+// Answered reports whether this call can be replayed to a model. A call with no
+// id cannot be paired with its result, and a pending one has no result yet;
+// either way the pair is left out rather than sent half-formed.
+func (c ToolCall) Answered() bool {
+	return c.ID != "" && c.Status != ToolCallPending
 }
 
 // Message is one turn.

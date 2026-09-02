@@ -279,11 +279,11 @@ func TestTheLoopReportsWhatItIsDoing(t *testing.T) {
 			prose.WriteString(chunk)
 			return nil
 		},
-		OnToolStart: func(name string, input json.RawMessage) {
-			started = append(started, name+" "+string(input))
+		OnToolStart: func(id, name string, input json.RawMessage) {
+			started = append(started, id+" "+name+" "+string(input))
 		},
-		OnToolEnd: func(name, output string, failed bool) {
-			ended = append(ended, name+" "+output)
+		OnToolEnd: func(id, name, output string, failed bool) {
+			ended = append(ended, id+" "+name+" "+output)
 		},
 	})
 
@@ -292,10 +292,13 @@ func TestTheLoopReportsWhatItIsDoing(t *testing.T) {
 	if prose.String() != "Let me look. done" {
 		t.Errorf("streamed %q", prose.String())
 	}
-	if len(started) != 1 || started[0] != `search_notes {"query":"parser"}` {
+	// The id travels with both reports. A surface that only displays has no use
+	// for it, but one that stores the exchange cannot pair a result with the
+	// call it answers without it.
+	if len(started) != 1 || started[0] != `call-1 search_notes {"query":"parser"}` {
 		t.Errorf("start reports = %v", started)
 	}
-	if len(ended) != 1 || ended[0] != "search_notes one note" {
+	if len(ended) != 1 || ended[0] != "call-1 search_notes one note" {
 		t.Errorf("end reports = %v", ended)
 	}
 }

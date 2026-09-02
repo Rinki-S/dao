@@ -26,6 +26,17 @@ export const MESSAGE_STATUSES = ['ok', 'failed', 'stopped'];
 export const ToolCallSchema = z.object({
   name: z.string(),
   input: z.string().default(''),
+
+  // What the model was told, and whether the call is finished.
+  //
+  // None of this is shown: the line announcing the call is what a reader wants,
+  // and nobody wants to look at a call's id. It is here because the service
+  // keeps it — the transcript is what gets read back to the model on the next
+  // turn — and because `pending` is how a call says it is waiting on a person
+  // rather than still running, which is a thing this surface will have to show.
+  id: z.string().default(''),
+  output: z.string().default(''),
+  status: z.string().default(''),
 });
 
 export const MessageSchema = z.object({
@@ -73,7 +84,14 @@ export const DeltaEventSchema = z.object({
 // Sent when a tool starts, so the pause can be filled with what is causing it.
 // It carries no phrasing: how to say "searched your notes for parser" is this
 // side's business, where the rest of the product's words live.
-export const ToolEventSchema = ToolCallSchema;
+//
+// Its own shape rather than the stored call's, which it used to share. A call
+// that is starting has no result and no outcome yet, and the two only looked
+// alike while neither of them was kept.
+export const ToolEventSchema = z.object({
+  name: z.string(),
+  input: z.string().default(''),
+});
 
 // The stream's terminal event carries the assistant row exactly as stored, so
 // what the screen shows after it is what a reload would show.

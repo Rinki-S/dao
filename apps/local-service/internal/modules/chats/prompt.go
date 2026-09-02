@@ -1,6 +1,8 @@
 package chats
 
 import (
+	"encoding/json"
+
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm"
 )
 
@@ -9,7 +11,9 @@ import (
 // been produced by wording the build no longer uses.
 //
 // 2: the model can reach the workspace's notes and tasks.
-const ChatPromptVersion = "2"
+// 3: a turn's tool calls and their results are replayed to the model, so it
+// sees what it looked up on earlier turns rather than only what it then said.
+const ChatPromptVersion = "3"
 
 // The prompt lives with the chat feature rather than in ai/harness.
 //
@@ -45,19 +49,71 @@ const chatMaxTokens = 4096
 // before a stream that then failed with nothing to show, and it is not merely
 // noise: the Anthropic wire rejects a message whose text block is empty, so
 // sending one would fail the next turn because an earlier one failed.
+//
+// An assistant turn that used tools is rebuilt as the model originally said it
+// — its prose and its calls in one turn — followed by a turn carrying the
+// results. That pairing is not decoration. Both wires reject a tool call with
+// no answer to it, so a call and its result travel together or neither goes.
+//
+// Which is why calls the app cannot vouch for are dropped rather than patched
+// up: one recorded before results were kept has no output to give, and one
+// still waiting on a person has no output yet. Their prose stays, because the
+// model did say it. Only the unanswerable half is left out.
 func BuildContext(messages []Message) llm.Context {
 	request := llm.Context{SystemPrompt: chatSystemPrompt}
 
 	for _, message := range messages {
-		if message.Content == "" {
+		answered := answeredCalls(message)
+
+		if message.Content == "" && len(answered) == 0 {
 			continue
+		}
+
+		content := []llm.ContentBlock{}
+		if message.Content != "" {
+			content = append(content, llm.TextBlock(message.Content))
+		}
+		for _, call := range answered {
+			content = append(content, llm.ToolCallBlock(call.ID, call.Name, json.RawMessage(call.Input)))
 		}
 
 		request.Messages = append(request.Messages, llm.Message{
 			Role:    llm.Role(message.Role),
-			Content: []llm.ContentBlock{llm.TextBlock(message.Content)},
+			Content: content,
+		})
+
+		if len(answered) == 0 {
+			continue
+		}
+
+		// The results come back as a user turn, which is what both wires call
+		// the side of the conversation that is not the model — even when what
+		// it is saying is a tool's output rather than a person's words.
+		results := make([]llm.ContentBlock, 0, len(answered))
+		for _, call := range answered {
+			results = append(results, llm.ToolResultBlock(call.ID, call.Output, call.Status == ToolCallFailed))
+		}
+
+		request.Messages = append(request.Messages, llm.Message{
+			Role:    llm.RoleUser,
+			Content: results,
 		})
 	}
 
 	return request
+}
+
+func answeredCalls(message Message) []ToolCall {
+	if message.Role != string(llm.RoleAssistant) {
+		return nil
+	}
+
+	answered := make([]ToolCall, 0, len(message.ToolCalls))
+	for _, call := range message.ToolCalls {
+		if call.Answered() {
+			answered = append(answered, call)
+		}
+	}
+
+	return answered
 }

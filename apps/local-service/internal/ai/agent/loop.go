@@ -42,8 +42,13 @@ type Loop struct {
 	// OnToolStart and OnToolEnd report what is being done, for a surface that
 	// wants to say so while it happens. Neither can refuse: a callback that
 	// could stop a run would make the display part of the control flow.
-	OnToolStart func(name string, input json.RawMessage)
-	OnToolEnd   func(name string, output string, failed bool)
+	//
+	// Both carry the model's id for the call. A surface that only displays has
+	// no use for it, but one that stores the exchange does: the id is what
+	// pairs a result with the call it answers, and a transcript that has lost
+	// that pairing cannot be read back to a model at all.
+	OnToolStart func(id string, name string, input json.RawMessage)
+	OnToolEnd   func(id string, name string, output string, failed bool)
 }
 
 // Result is what a whole answer came to.
@@ -172,7 +177,7 @@ func (l *Loop) run(
 		}
 
 		if l.OnToolStart != nil {
-			l.OnToolStart(call.Name, call.Input)
+			l.OnToolStart(call.ID, call.Name, call.Input)
 		}
 
 		output, failed := l.one(ctx, tools, call)
@@ -185,7 +190,7 @@ func (l *Loop) run(
 		}
 
 		if l.OnToolEnd != nil {
-			l.OnToolEnd(call.Name, output, failed)
+			l.OnToolEnd(call.ID, call.Name, output, failed)
 		}
 
 		results = append(results, llm.ToolResultBlock(call.ID, output, failed))
