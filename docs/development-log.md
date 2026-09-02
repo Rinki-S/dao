@@ -792,9 +792,11 @@ Validation:
 - Go `test ./...` and `vet ./...` pass; renderer formatting, lint, 257 tests and production build pass; 92 desktop tests pass
 - each part verified against the running app and the real workspace folder, including the failure paths: a save refused with the text on disk while the file was left as the other program wrote it, a folder delete refused by the name of a stray PDF with nothing moved on either side, and a note whose file could not be removed left intact along with its file
 
-## Later Milestone: Tools That Write
+## Milestone in progress: Tools That Write
 
-Recommended branch:
+Status: the service is complete and tested; the interface is not built.
+
+Branch:
 
 ```txt
 feat/ai-write
@@ -806,9 +808,41 @@ Goal:
 The model can propose a change to a note or the task list, and a human agrees to it before anything is written.
 ```
 
-Planned scope:
+### Decisions taken, so they are not reopened
 
-- keep every existing tool read-only; a writing tool is a different shape, not a flag on an existing one
-- follow the summary run's shape: produce something, show it, and wait to be told to keep it
-- show the change before it is applied, as a diff against what is on disk
-- never write without a confirmation that names what will change
+- **Targeted replace**, not a whole new body. The model sends `old_text` and `new_text`, and the change is refused unless `old_text` appears exactly once. Chosen knowing a small local model gets exact quoting wrong often; the answer to that is the recovery path below, not a different shape.
+- **Confirmed inline in the transcript**, where it was asked for, rather than in the note editor or a separate queue.
+- **The model finds out.** Answering a change carries the turn on, so it can check its work or follow up. This is why the transcript had to become replayable.
+- **Saying something else abandons a waiting change.** Not a convenience: an unanswered tool call cannot be replayed, so without it the next message fails on the wire.
+- **A turn has a step ceiling of its own** (`maxTurnSteps`, 16), because a continuation handed the loop's full bound again makes propose-apply-propose-apply endless.
+
+### Done
+
+- a stored tool call carries the model's id, the tool's output, and `ok` / `failed` / `pending`, and `BuildContext` replays calls with the results that answer them — a call with no id or no result is dropped rather than sent half-formed
+- `proposals`: a change worked out and not made, keyed to the conversation and to the model's own call id, holding both texts and the `updated_at` it was worked out against
+- `agent.ErrAwaitingApproval` stops the loop; a tool now receives the whole `agent.Call`, because one that waits has to record something findable later
+- `internal/diff`: line-level LCS, common ends trimmed first
+- `edit_note`: exactly-one-match, and a miss is answered with the line the model was reaching for, found by flattening whitespace on both sides — the failure it cannot see by re-reading its own attempt
+- `POST /api/chats/{id}/proposals/{proposalId}` applies or discards from the stored row, answers the waiting call, and runs the loop again over the mended transcript
+
+### Next: the interface
+
+What the renderer is given:
+
+- `GET /api/chats/{id}` now returns `proposals` beside `messages`. A proposal is
+  `{id, conversationId, toolCallId, kind, targetId, title, before, after, status, createdAt}`.
+- the stream gained a `proposal` event, sent before `done` when a turn stopped.
+- a waiting turn is one whose `toolCalls[].status === 'pending'`; join it to its proposal on `toolCallId`.
+- `POST /api/chats/{id}/proposals/{proposalId}` with `{"decision":"apply"|"discard"}` returns the same event stream a message does, and `readEvents` already reads it. Its `start` event carries no `userMessage`, because nobody said anything.
+
+To build:
+
+- a card in the transcript: the note's title, the diff, Discard and Apply
+- rehydrate from `proposals` on load, so a decision survives a reload
+- send the decision, then stream the continuation into the same conversation
+
+One loose end to close first: `internal/diff` is written and tested but nothing calls it. Serialise the diff onto the proposal when it is read, so that what is drawn is computed by the same code that would compute it anywhere else, rather than a second implementation in JavaScript.
+
+### After that
+
+`create_note`, `edit_tasks` and `rename`/`move`/`delete` — the same machinery pointed at different targets, each needing its own confirmation because there is no diff to draw for a note being created and no content to compare for one being renamed.
