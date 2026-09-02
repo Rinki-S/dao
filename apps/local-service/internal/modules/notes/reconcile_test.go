@@ -198,11 +198,13 @@ func TestReconcileForgetsANoteWhoseFileWasDeleted(t *testing.T) {
 	}
 }
 
-// Deleting a note leaves its file in the folder, so the file outlives the note
-// and anything that writes to it later brings the app back to this path. It has
-// to come back as the note it was: a second row for one file splits the note's
-// identity in two, and every link and search result still points at the half
-// nothing can reach.
+// A file can appear again at a deleted note's path — restored from a backup,
+// checked back out, put back by whatever wrote it in the first place, or simply
+// left over from before deleting a note took its file with it.
+//
+// It has to come back as the note it was. A second row for one file splits the
+// note's identity in two, and every link and search result still points at the
+// half nothing can reach.
 func TestReconcileRevivesADeletedNoteRatherThanDuplicatingIt(t *testing.T) {
 	repo, indexer, _, _ := reconcileFixture(t)
 
@@ -219,8 +221,7 @@ func TestReconcileRevivesADeletedNoteRatherThanDuplicatingIt(t *testing.T) {
 		t.Fatalf("delete: %v", err)
 	}
 
-	// The file is still there — deleting the note never touched it. Somebody
-	// opens it in another program and writes to it.
+	// Something puts a file back at that path.
 	if err := os.WriteFile(note.FilePath, []byte("second draft"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -281,11 +282,10 @@ func TestReconcileLeavesADeletedNoteWithNoFileAlone(t *testing.T) {
 		t.Fatalf("create: %v", err)
 	}
 
+	// Deleting takes the file with it, so this is what the folder looks like
+	// afterwards without any help.
 	if err := repo.Delete(note.ID); err != nil {
 		t.Fatalf("delete: %v", err)
-	}
-	if err := os.Remove(note.FilePath); err != nil {
-		t.Fatalf("remove: %v", err)
 	}
 
 	changed, err := repo.Reconcile([]string{note.FilePath})

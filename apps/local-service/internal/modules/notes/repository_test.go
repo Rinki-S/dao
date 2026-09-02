@@ -472,6 +472,85 @@ func TestRepositoryDeleteSoftDeletesNoteAndRemovesSearchIndex(t *testing.T) {
 	if indexer.deletedEntries[0].entityType != "note" || indexer.deletedEntries[0].entityID != createdNote.ID {
 		t.Fatalf("deleted search entry = %#v", indexer.deletedEntries[0])
 	}
+
+	// In a workspace that is a folder of Markdown files, the file is the note.
+	// A row marked deleted beside a file still sitting in the folder is not a
+	// deleted note; it is a hidden one.
+	if _, err := os.Stat(createdNote.FilePath); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the file is still in the workspace: Stat err = %v", err)
+	}
+}
+
+// The watcher deletes a note precisely because its file is already gone, so a
+// missing file is the ordinary case rather than a failure.
+func TestDeletingANoteWhoseFileIsAlreadyGone(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+
+	note, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		Title:       "Gone Already",
+		Content:     "x",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	if err := os.Remove(note.FilePath); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+
+	if err := repo.Delete(note.ID); err != nil {
+		t.Fatalf("delete note: %v", err)
+	}
+
+	notes, _ := repo.List()
+	if len(notes) != 0 {
+		t.Errorf("the note survived: %+v", notes)
+	}
+}
+
+// The file is removed before the row is committed, so a removal that cannot
+// happen takes the whole delete with it. The alternative is an app insisting a
+// note is gone while its file is still in the folder — which is exactly what
+// the dialog asking for this promises will not happen.
+func TestANoteWhoseFileCannotBeRemovedIsNotDeleted(t *testing.T) {
+	db := openNotesTestDB(t)
+	workspaceRoot := t.TempDir()
+	insertNotesTestWorkspace(t, db, "workspace-1", workspaceRoot)
+
+	repo := NewRepository(db, &captureIndexer{}, activities.NewRepository(db))
+
+	note, err := repo.Create(CreateNoteRequest{
+		WorkspaceID: "workspace-1",
+		Title:       "Held Open",
+		Content:     "still here",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	// Unlinking needs write permission on the directory, not on the file.
+	if err := os.Chmod(workspaceRoot, 0o500); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(workspaceRoot, 0o755) })
+
+	if err := repo.Delete(note.ID); err == nil {
+		t.Fatal("deleting a note whose file could not be removed reported success")
+	}
+
+	// Both halves still intact: the note is listed and the file is on disk.
+	notes, _ := repo.List()
+	if len(notes) != 1 {
+		t.Errorf("got %d notes, want the one that could not be deleted", len(notes))
+	}
+	if _, err := os.Stat(note.FilePath); err != nil {
+		t.Errorf("the file went anyway: Stat err = %v", err)
+	}
 }
 
 func TestHandlerDeleteNote(t *testing.T) {

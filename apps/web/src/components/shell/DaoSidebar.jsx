@@ -361,8 +361,14 @@ function NoteRow({ active, nested = false, note, onOpen, onRename, onDelete }) {
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete “{noteFileName(note)}”?</AlertDialogTitle>
+            {/* Says where and says how final, because both are surprising. The
+                note is a file somebody can see in Finder, and deleting it here
+                really unlinks it rather than putting it in the Trash — so the
+                usual way back does not exist, and that has to be said before
+                the button is pressed rather than discovered after. */}
             <AlertDialogDescription>
-              The note file will be removed from this workspace. This cannot be undone.
+              This deletes the file from your workspace folder. It does not go to the Trash, so it
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -409,7 +409,33 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 	return note, nil
 }
 
+// Delete removes a note: its row, its place in the search index, and its file.
+//
+// The file goes too, because in a workspace that is a folder of Markdown files
+// the file is the note. Marking only the row left a real file behind that the
+// app had stopped showing — invisible, still findable by everything else on the
+// machine, and waiting to come back the moment anything wrote to it.
+//
+// It goes before the commit rather than after. Removing it after means a
+// removal that fails leaves the app insisting the note is gone while the file
+// is still in the folder, which is the one thing the dialog that asked for this
+// promises will not happen. Removing it first means a removal that fails aborts
+// the whole delete and says so, with nothing destroyed.
+//
+// That leaves one window: the file goes and the commit then fails. The note is
+// still listed, pointing at nothing — and the watcher already knows what that
+// means, so the next event forgets it. The window resolves itself, and it
+// resolves onto the outcome that was asked for.
 func (r *Repository) Delete(id string) error {
+	var filePath string
+	// Read before the transaction so an unknown note fails here, where nothing
+	// has been begun, rather than partway through one.
+	if err := r.db.QueryRow(`
+		SELECT file_path FROM notes WHERE id = ? AND deleted_at IS NULL
+	`, id).Scan(&filePath); err != nil {
+		return err
+	}
+
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	tx, err := r.db.Begin()
@@ -436,6 +462,13 @@ func (r *Repository) Delete(id string) error {
 	}
 
 	if err := r.indexer.DeleteTx(tx, "note", id); err != nil {
+		return err
+	}
+
+	// A file that is already gone is not a failure. Somebody deleting it in the
+	// folder is another way of asking for exactly this, and it is how the
+	// watcher asks.
+	if err := os.Remove(filePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 
