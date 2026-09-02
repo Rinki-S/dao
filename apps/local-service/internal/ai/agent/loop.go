@@ -267,7 +267,7 @@ func (l *Loop) one(
 		), true, false
 	}
 
-	output, err := tool.Run(ctx, call.Input)
+	output, err := tool.Run(ctx, Call{ID: call.ID, Input: call.Input})
 	if errors.Is(err, ErrAwaitingApproval) {
 		return "", false, true
 	}

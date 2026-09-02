@@ -474,7 +474,7 @@ func (s *stubTool) Definition() llm.ToolDefinition {
 	}
 }
 
-func (s *stubTool) Run(context.Context, json.RawMessage) (string, error) {
+func (s *stubTool) Run(context.Context, agent.Call) (string, error) {
 	s.runs++
 
 	return s.answer, nil

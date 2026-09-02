@@ -27,7 +27,7 @@ func find(t *testing.T, tools []agent.Tool, name string) agent.Tool {
 func run(t *testing.T, tool agent.Tool, input string) (string, error) {
 	t.Helper()
 
-	return tool.Run(context.Background(), json.RawMessage(input))
+	return tool.Run(context.Background(), agent.Call{ID: "call-1", Input: json.RawMessage(input)})
 }
 
 func TestSearchListsMatchesWithTheIdsNeededToReadThem(t *testing.T) {

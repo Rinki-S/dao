@@ -14,6 +14,19 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm"
 )
 
+// Call is one invocation: what the model asked for, and which asking it was.
+//
+// The id is the model's own, and a tool that only computes an answer has no use
+// for it. One that prepares something and waits does: what it records has to be
+// findable again when a person decides, and the id is the only thing that will
+// still identify this exact request by then. Passed in the open rather than
+// smuggled through the context, because a tool's inputs should be visible in
+// its signature.
+type Call struct {
+	ID    string
+	Input json.RawMessage
+}
+
 // Tool is something the model can ask to have run.
 //
 // Run returns a string because that is what goes back to the model, and the
@@ -24,10 +37,11 @@ import (
 // An error means the tool could not do its job. It is reported to the model
 // rather than raised to the caller — see the loop for why — so the message is
 // written for the model to act on: what went wrong, and what it might try
-// instead.
+// instead. The exception is ErrAwaitingApproval, which is not something the
+// model can act on at all and stops the run instead.
 type Tool interface {
 	Definition() llm.ToolDefinition
-	Run(ctx context.Context, input json.RawMessage) (string, error)
+	Run(ctx context.Context, call Call) (string, error)
 }
 
 // Definitions is what the tools look like to a model.

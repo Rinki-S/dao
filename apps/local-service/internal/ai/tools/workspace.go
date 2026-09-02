@@ -54,6 +54,16 @@ type Workspace struct {
 	ReadNote func(id string) (NoteContent, error)
 	// ReadTasks returns the workspace's task list as it stands.
 	ReadTasks func() (string, error)
+
+	// ProposeEdit records a change to a note for somebody to agree to, and does
+	// not make it.
+	//
+	// Nil is not an oversight and not a degraded mode: a workspace built without
+	// it gets no writing tools at all, so a surface that has not thought about
+	// confirmation cannot offer one by forgetting to. The read tools are always
+	// there; this is the only thing that decides whether the model can ask to
+	// change anything.
+	ProposeEdit func(ProposedEdit) error
 }
 
 // maxMatches bounds a search result.
@@ -72,13 +82,24 @@ const maxMatches = 10
 // file will answer about the end of the file unless told it did not get one.
 const maxNoteRunes = 12000
 
-// New returns the read-only tools for one workspace.
+// New returns the tools for one workspace.
+//
+// The reading tools always. A writing one only when the workspace was given
+// somewhere to put a proposal, so that offering the model a way to change a
+// note is a thing a caller does on purpose rather than a thing it gets by
+// default and has to remember to take away.
 func New(workspace Workspace) []agent.Tool {
-	return []agent.Tool{
+	tools := []agent.Tool{
 		&searchNotes{workspace: workspace},
 		&readNote{workspace: workspace},
 		&readTasks{workspace: workspace},
 	}
+
+	if workspace.ProposeEdit != nil {
+		tools = append(tools, &editNote{workspace: workspace})
+	}
+
+	return tools
 }
 
 type searchNotes struct{ workspace Workspace }
@@ -104,11 +125,11 @@ func (t *searchNotes) Definition() llm.ToolDefinition {
 	}
 }
 
-func (t *searchNotes) Run(_ context.Context, input json.RawMessage) (string, error) {
+func (t *searchNotes) Run(_ context.Context, call agent.Call) (string, error) {
 	var arguments struct {
 		Query string `json:"query"`
 	}
-	if err := json.Unmarshal(input, &arguments); err != nil {
+	if err := json.Unmarshal(call.Input, &arguments); err != nil {
 		return "", fmt.Errorf("could not read the arguments: %v", err)
 	}
 
@@ -170,11 +191,11 @@ func (t *readNote) Definition() llm.ToolDefinition {
 	}
 }
 
-func (t *readNote) Run(_ context.Context, input json.RawMessage) (string, error) {
+func (t *readNote) Run(_ context.Context, call agent.Call) (string, error) {
 	var arguments struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(input, &arguments); err != nil {
+	if err := json.Unmarshal(call.Input, &arguments); err != nil {
 		return "", fmt.Errorf("could not read the arguments: %v", err)
 	}
 
@@ -228,7 +249,7 @@ func (t *readTasks) Definition() llm.ToolDefinition {
 	}
 }
 
-func (t *readTasks) Run(_ context.Context, _ json.RawMessage) (string, error) {
+func (t *readTasks) Run(_ context.Context, _ agent.Call) (string, error) {
 	content, err := t.workspace.ReadTasks()
 	if err != nil {
 		return "", fmt.Errorf("the task list could not be read: %v", err)

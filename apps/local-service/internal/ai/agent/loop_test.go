@@ -29,9 +29,9 @@ func (s *stub) Definition() llm.ToolDefinition {
 	}
 }
 
-func (s *stub) Run(_ context.Context, input json.RawMessage) (string, error) {
+func (s *stub) Run(_ context.Context, call Call) (string, error) {
 	s.runs++
-	s.inputs = append(s.inputs, string(input))
+	s.inputs = append(s.inputs, string(call.Input))
 
 	return s.answer, s.err
 }
