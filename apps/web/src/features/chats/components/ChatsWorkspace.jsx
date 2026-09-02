@@ -399,11 +399,16 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   return (
     <section aria-label="Chats" className="flex h-full min-h-0 flex-col">
       {/* The surface's own top bar, and the only one now that the conversation
-          list lives in the app's sidebar. Same shape as Today and Search, which
-          is what keeps the traffic lights optically centred and leaves the band
-          draggable. */}
+          list lives in the app's sidebar. Same height and inset as Today and
+          Search, which is what keeps the traffic lights optically centred and
+          leaves the band draggable.
+
+          px-4 rather than their px-2, because what sits here is not a fixed
+          label naming the view — it is the conversation's own title, content
+          rather than chrome, and at 8px it reads as having fallen against the
+          sidebar's edge instead of starting there. */}
       <header
-        className={cn('flex h-12 shrink-0 items-center gap-2 border-b px-2', titlebarInset.padding)}
+        className={cn('flex h-12 shrink-0 items-center gap-2 border-b px-4', titlebarInset.padding)}
       >
         <div className={cn(titlebarInset.drag, 'flex min-w-0 flex-1 items-baseline')}>
           <h1 className="truncate font-heading font-semibold text-sm">
