@@ -736,6 +736,62 @@ Validation:
 - each milestone verified against a copy of the real database, with a fake provider standing in for the model
 - browser visual QA in both appearances
 
+## Milestone: The Workspace Folder
+
+Status: complete
+
+Branch:
+
+```txt
+feat/workspace-folder
+```
+
+Goal:
+
+```txt
+The folder and the app describe the same thing, whichever one you change.
+```
+
+Everything before this treated the folder as somewhere the app kept its output. A
+note was a row that happened to have a file. That reading held only while nothing
+else touched the folder, and it broke in every direction at once: files carried
+identifiers nobody could read, edits made elsewhere were invisible until a restart
+and then silently overwritten, deleting a note left the file behind, and deleting a
+folder left the whole directory. The app was not wrong about its rows. It was wrong
+about what a note is.
+
+The file is the note. Everything below follows from taking that literally.
+
+Completed scope:
+
+- name files after their titles, with a number for a collision, so what is in the folder is readable by a person and not only by the app; migrate the existing ones, deepest first, rewriting the stored paths of everything underneath
+- watch the workspace folder, debounced, and tell the difference between somebody else's edit and the app's own save by comparing file mtime against the row's `updated_at`
+- reconcile what the watcher reports, in five cases and no more: a file edited elsewhere refreshes its note and reindexes it, a file gone forgets it, a file back at a deleted note's path revives that note rather than adopting a duplicate of it, a file nobody knows about becomes a note titled from its name, and anything else does nothing
+- refuse a save that would write over an edit made in another program: the caller sends what it read, the service compares it against both the row and the file's mtime, and answers a mismatch with 409 and the text on disk
+- answer that refusal in the editor as news rather than as an error, with keep mine, take theirs, and show both — because choosing against a version you cannot see is a coin toss dressed as consent
+- tell the window when the folder changed, over one server-sent event stream carrying no payload, so the renderer refetches what it needs instead of trusting a second description of the same data
+- delete the file when the note is deleted, and say before the button is pressed that it does not go to the Trash
+- empty a folder onto the workspace root before removing it — notes with their files, subfolders whole — and refuse, by the name of what is in the way, when it still holds something the app did not put there
+
+Also in this branch:
+
+- give the shell a height instead of a minimum, so that every `overflow-auto` beneath it has a bounded box to scroll inside; the editor, Today, Search, Chats and the sidebar were all inert for the same reason
+- move the conversation list into the app's own sidebar, replacing Recents and the workspace tree while Chats is the active view, and lift the list and the selection into a provider the sidebar and the pane share
+- open the window at a size capped to a fraction of the display, rather than at very nearly the display
+- pull the interface's letter spacing in by 2%
+
+What this milestone is worth remembering for:
+
+- **Filesystem work goes before the commit.** A rename or a removal that fails aborts the transaction and reports it, with nothing destroyed. The reverse order — commit, then touch the disk — means a failure leaves the app describing a folder that is not there, which is the one outcome every confirmation dialog rules out.
+- **`os.Remove`, never `os.RemoveAll`.** A folder that is still not empty after the app takes its own things out is holding something the app did not put there. Refusing is an answer somebody can act on; recursively deleting their file because it was in the way is not.
+- **Derived beats cleared.** State that carries what it belongs to — a transcript that knows its conversation, a list that knows its workspace — answers "is this still current?" on the render it happens. An effect that clears answers one render late, which is long enough to show one conversation's turns under another's title.
+- **A second row for one file is worse than a wrong row.** It splits the note's identity, and every link, recent and search result goes on pointing at the half nothing can reach.
+
+Validation:
+
+- Go `test ./...` and `vet ./...` pass; renderer formatting, lint, 257 tests and production build pass; 92 desktop tests pass
+- each part verified against the running app and the real workspace folder, including the failure paths: a save refused with the text on disk while the file was left as the other program wrote it, a folder delete refused by the name of a stray PDF with nothing moved on either side, and a note whose file could not be removed left intact along with its file
+
 ## Later Milestone: Tools That Write
 
 Recommended branch:
