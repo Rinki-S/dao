@@ -1,41 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   IconAlertTriangle,
   IconInfoCircle,
   IconMessageCircle,
   IconPlayerStop,
-  IconPlus,
   IconSend,
   IconTool,
-  IconTrash,
 } from '@tabler/icons-react';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert.jsx';
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogPopup,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog.jsx';
 import { Button } from '@/components/ui/button.jsx';
-import {
-  ContextMenu,
-  ContextMenuItem,
-  ContextMenuPopup,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu.jsx';
-import {
-  Dialog,
-  DialogClose,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-} from '@/components/ui/dialog.jsx';
 import {
   Empty,
   EmptyDescription,
@@ -43,23 +16,14 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty.jsx';
-import { Field, FieldLabel } from '@/components/ui/field.jsx';
-import { Input } from '@/components/ui/input.jsx';
 import { ScrollArea } from '@/components/ui/scroll-area.jsx';
 import { Spinner } from '@/components/ui/spinner.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
 import { useTitlebarInset } from '@/components/shell/use-titlebar-inset.js';
 import { cn } from '@/lib/utils';
 import { Markdown } from './Markdown.jsx';
-import {
-  CHAT_OUTCOMES,
-  createConversation,
-  deleteConversation,
-  getConversation,
-  listConversations,
-  renameConversation,
-  sendMessage,
-} from '../api.js';
+import { useConversations } from '../use-conversations.js';
+import { CHAT_OUTCOMES, createConversation, getConversation, sendMessage } from '../api.js';
 
 // Each refusal, with the variant that says what kind of thing it is. No model
 // connected is not a breakage, so it does not get an error's colour.
@@ -91,47 +55,6 @@ const OUTCOMES = {
     description: 'It was deleted somewhere else. Start a new one.',
   },
 };
-
-function RenameDialog({ conversation, open, onOpenChange, onSubmit }) {
-  const [value, setValue] = useState('');
-  // The dialog stays mounted so it can animate out, so the field is seeded on
-  // each open rather than by a fresh mount.
-  const [wasOpen, setWasOpen] = useState(open);
-  if (open !== wasOpen) {
-    setWasOpen(open);
-    if (open) setValue(conversation?.title ?? '');
-  }
-
-  async function submit(event) {
-    event.preventDefault();
-    const title = value.trim();
-    if (!title) return;
-    await onSubmit(title);
-    onOpenChange(false);
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPopup>
-        <DialogHeader>
-          <DialogTitle>Rename conversation</DialogTitle>
-        </DialogHeader>
-        <form className="contents" onSubmit={submit}>
-          <DialogPanel>
-            <Field>
-              <FieldLabel>Title</FieldLabel>
-              <Input autoFocus value={value} onChange={(event) => setValue(event.target.value)} />
-            </Field>
-          </DialogPanel>
-          <DialogFooter>
-            <DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
-            <Button type="submit">Save</Button>
-          </DialogFooter>
-        </form>
-      </DialogPopup>
-    </Dialog>
-  );
-}
 
 /**
  * What a tool did, in words.
@@ -254,14 +177,32 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   const titlebarInset = useTitlebarInset();
   const workspaceId = model.currentWorkspace?.id ?? '';
 
-  const [conversations, setConversations] = useState([]);
-  // Opens on the conversation a search hit asked for, read once as this pane
-  // mounts — which is the only moment it can arrive, since running a search
-  // means being on a different surface. The same shape the sidebar uses to open
-  // a revealed project, and for the same reason: an effect that assigned it
-  // afterwards would be a second render deciding what the first should have.
-  const [selectedId, setSelectedId] = useState(() => model.revealedChatId || null);
-  const [messages, setMessages] = useState([]);
+  // Which conversation is open, and the list it came from, belong to the
+  // sidebar as much as to this pane, so both read them from the same place.
+  const { selected, selectedId, select, refresh } = useConversations();
+
+  // The transcript and the last refusal, each tagged with the conversation it
+  // belongs to.
+  //
+  // Tagged rather than cleared, because the pane is no longer what leaves a
+  // conversation — New chat and Delete are both in the sidebar now, and neither
+  // can reach in here to empty anything. Asking "is this still about what is
+  // open?" answers that on the render it happens, where an effect would answer
+  // it one render late and show the previous conversation's turns underneath
+  // the new one's title.
+  const [transcript, setTranscript] = useState({ id: null, messages: [] });
+  const [problem, setProblem] = useState({ id: null, outcome: null, failure: '' });
+
+  // Memoised only so its identity is stable: the effect that follows the answer
+  // down the page depends on it, and a fresh [] every render would scroll on
+  // every render.
+  const messages = useMemo(
+    () => (transcript.id === selectedId ? transcript.messages : []),
+    [transcript, selectedId],
+  );
+  const outcome = problem.id === selectedId ? problem.outcome : null;
+  const failure = problem.id === selectedId ? problem.failure : '';
+
   const [draft, setDraft] = useState('');
   // The turn in flight: what the user just said, what is being looked up, and
   // the reply so far.
@@ -269,10 +210,6 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   const [activity, setActivity] = useState([]);
   const [streaming, setStreaming] = useState('');
   const [sending, setSending] = useState(false);
-  const [outcome, setOutcome] = useState(null);
-  const [failure, setFailure] = useState('');
-  const [renaming, setRenaming] = useState(null);
-  const [deleting, setDeleting] = useState(null);
 
   const bottom = useRef(null);
   // The turn in flight, in refs as well as in state.
@@ -292,28 +229,10 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   // still being streamed with the half-written row the service holds.
   const loaded = useRef(null);
 
+  // Nothing to load for a conversation that does not exist yet, and nothing to
+  // clear for one that was left: what is shown is derived above. So this only
+  // ever reads.
   useEffect(() => {
-    if (!workspaceId) return undefined;
-
-    let cancelled = false;
-
-    listConversations(workspaceId)
-      .then((next) => {
-        if (!cancelled) setConversations(next);
-      })
-      .catch(() => {
-        if (!cancelled) setConversations([]);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceId]);
-
-  useEffect(() => {
-    // Nothing to load for a conversation that does not exist yet. Clearing the
-    // pane is the job of whoever left it — starting a new chat, or deleting the
-    // one that was open — so this effect only ever reads.
     if (!selectedId || loaded.current === selectedId) return undefined;
 
     let cancelled = false;
@@ -321,10 +240,10 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
 
     getConversation(selectedId)
       .then((detail) => {
-        if (!cancelled) setMessages(detail.messages);
+        if (!cancelled) setTranscript({ id: selectedId, messages: detail.messages });
       })
       .catch(() => {
-        if (!cancelled) setMessages([]);
+        if (!cancelled) setTranscript({ id: selectedId, messages: [] });
       });
 
     return () => {
@@ -332,20 +251,20 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
     };
   }, [selectedId]);
 
+  // One turn onto the end of a conversation's transcript. The id travels with
+  // it so a reply that lands after the reader has moved on is filed against the
+  // conversation it belongs to rather than appended to whatever is on screen.
+  function addTurn(conversationId, message) {
+    setTranscript((current) => ({
+      id: conversationId,
+      messages: current.id === conversationId ? [...current.messages, message] : [message],
+    }));
+  }
+
   // Following the answer as it is written is the whole point of streaming it.
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: 'end' });
   }, [messages, streaming, pending, activity]);
-
-  function startNew() {
-    // Whatever a search asked for, the reader has moved on from it.
-    model.setRevealedChatId('');
-    loaded.current = null;
-    setSelectedId(null);
-    setMessages([]);
-    setOutcome(null);
-    setFailure('');
-  }
 
   async function submit(event) {
     event.preventDefault();
@@ -358,18 +277,21 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
     setActivity([]);
     setStreaming('');
     setSending(true);
-    setOutcome(null);
-    setFailure('');
+    setProblem({ id: selectedId, outcome: null, failure: '' });
 
     running.current = new AbortController();
     streamed.current = '';
     streamedTools.current = [];
     assistantId.current = '';
 
+    // Hoisted out of the try so the catch can file what it builds against the
+    // conversation the turn was actually sent to, which may have been created
+    // by this send rather than selected before it.
+    let conversationId = selectedId;
+
     try {
       // Lazily, so the list only ever holds conversations with something in
       // them. The id is needed before the turn can be sent either way.
-      let conversationId = selectedId;
       if (!conversationId) {
         const conversation = await createConversation(workspaceId);
         conversationId = conversation.id;
@@ -377,7 +299,8 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
         // conversation, which is empty, and reading it back would race the
         // turn about to be streamed into it.
         loaded.current = conversation.id;
-        setSelectedId(conversation.id);
+        setTranscript({ id: conversation.id, messages: [] });
+        select(conversation.id);
       }
 
       const reply = await sendMessage(conversationId, content, {
@@ -386,7 +309,7 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
         onStart: (start) => {
           assistantId.current = start.assistantMessageId;
           setPending('');
-          setMessages((current) => [...current, start.userMessage]);
+          addTurn(conversationId, start.userMessage);
         },
         onDelta: (text) => {
           streamed.current += text;
@@ -399,7 +322,7 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
         signal: running.current.signal,
       });
 
-      setMessages((current) => [...current, reply]);
+      addTurn(conversationId, reply);
       // Cleared together with the streamed text: the stored turn that just
       // landed carries the same calls, so leaving these would show each of them
       // twice.
@@ -408,47 +331,47 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
 
       // Re-read rather than patched in place: the first turn gives a
       // conversation its title, and every turn changes the order of the list.
-      setConversations(await listConversations(workspaceId));
+      await refresh();
     } catch (error) {
       // Stopping is not a failure, and it is the one path with no done event to
       // end on — the reader ended the stream, so nothing arrives after it. The
       // turn is built from what they were actually shown, which is also what
       // the service stored on its side of the same connection.
       if (error.name === 'AbortError') {
-        setMessages((current) => [
-          ...current,
-          {
-            id: assistantId.current || 'stopped',
-            conversationId: selectedId ?? '',
-            role: 'assistant',
-            content: streamed.current,
-            position: current.length,
-            model: '',
-            wire: '',
-            inputTokens: 0,
-            outputTokens: 0,
-            status: 'stopped',
-            errorMessage: '',
-            createdAt: '',
-            // Carried onto the turn rather than dropped with the live lines.
-            // The service stored them, so a reload shows them; the pane should
-            // not disagree with itself for the rest of the session.
-            toolCalls: streamedTools.current,
-          },
-        ]);
+        addTurn(conversationId, {
+          id: assistantId.current || 'stopped',
+          conversationId: conversationId ?? '',
+          role: 'assistant',
+          content: streamed.current,
+          position: messages.length,
+          model: '',
+          wire: '',
+          inputTokens: 0,
+          outputTokens: 0,
+          status: 'stopped',
+          errorMessage: '',
+          createdAt: '',
+          // Carried onto the turn rather than dropped with the live lines.
+          // The service stored them, so a reload shows them; the pane should
+          // not disagree with itself for the rest of the session.
+          toolCalls: streamedTools.current,
+        });
         setPending('');
         setActivity([]);
         setStreaming('');
 
         // A stopped turn still made a conversation, and one missing from the
         // list until the next reload is one the reader cannot get back to.
-        setConversations(await listConversations(workspaceId));
+        await refresh();
 
         return;
       }
 
-      setOutcome(error.outcome ?? CHAT_OUTCOMES.failed);
-      setFailure(error.message);
+      setProblem({
+        id: conversationId,
+        outcome: error.outcome ?? CHAT_OUTCOMES.failed,
+        failure: error.message,
+      });
       setPending('');
       setActivity([]);
       setStreaming('');
@@ -469,239 +392,144 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
     running.current?.abort();
   }
 
-  async function rename(title) {
-    const updated = await renameConversation(renaming.id, title);
-    setConversations((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-  }
-
-  async function remove(conversation) {
-    await deleteConversation(conversation.id);
-    setConversations((current) => current.filter((item) => item.id !== conversation.id));
-    if (conversation.id === selectedId) startNew();
-  }
-
-  const selected = conversations.find((item) => item.id === selectedId) ?? null;
   const refusal = outcome ? OUTCOMES[outcome] : null;
   const RefusalIcon = refusal?.icon ?? IconAlertTriangle;
   const empty = messages.length === 0 && !pending && !streaming && activity.length === 0;
 
   return (
-    <section aria-label="Chats" className="flex h-full min-h-0">
-      <div className="flex w-60 shrink-0 flex-col border-e">
-        <header
-          className={cn(
-            'flex h-12 shrink-0 items-center gap-2 border-b px-2',
-            titlebarInset.padding,
-          )}
-        >
-          <div className={cn(titlebarInset.drag, 'flex min-w-0 flex-1 items-baseline')}>
-            <h1 className="font-heading font-semibold text-sm">Chats</h1>
-          </div>
-          <Button
-            aria-label="New chat"
-            disabled={!workspaceId}
-            size="icon-sm"
-            variant="ghost"
-            onClick={startNew}
-          >
-            <IconPlus aria-hidden="true" />
-          </Button>
-        </header>
-
-        <ScrollArea className="min-h-0 flex-1" overscrollContain>
-          <ul className="flex flex-col gap-0.5 p-2">
-            {conversations.map((conversation) => (
-              <li key={conversation.id}>
-                <ContextMenu>
-                  <ContextMenuTrigger>
-                    <button
-                      aria-current={conversation.id === selectedId ? 'true' : undefined}
-                      className={cn(
-                        'w-full truncate rounded-md px-2 py-1.5 text-start text-sm hover:bg-accent',
-                        conversation.id === selectedId && 'bg-accent',
-                      )}
-                      type="button"
-                      onClick={() => {
-                        model.setRevealedChatId('');
-                        setSelectedId(conversation.id);
-                      }}
-                    >
-                      {conversation.title || 'Untitled'}
-                    </button>
-                  </ContextMenuTrigger>
-                  <ContextMenuPopup>
-                    <ContextMenuItem onClick={() => setRenaming(conversation)}>
-                      Rename
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem
-                      variant="destructive"
-                      onClick={() => setDeleting(conversation)}
-                    >
-                      <IconTrash aria-hidden="true" />
-                      Delete
-                    </ContextMenuItem>
-                  </ContextMenuPopup>
-                </ContextMenu>
-              </li>
-            ))}
-          </ul>
-        </ScrollArea>
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
-          <h2 className="truncate font-heading font-semibold text-sm">
+    <section aria-label="Chats" className="flex h-full min-h-0 flex-col">
+      {/* The surface's own top bar, and the only one now that the conversation
+          list lives in the app's sidebar. Same shape as Today and Search, which
+          is what keeps the traffic lights optically centred and leaves the band
+          draggable. */}
+      <header
+        className={cn('flex h-12 shrink-0 items-center gap-2 border-b px-2', titlebarInset.padding)}
+      >
+        <div className={cn(titlebarInset.drag, 'flex min-w-0 flex-1 items-baseline')}>
+          <h1 className="truncate font-heading font-semibold text-sm">
             {/* Three states, not two. Nothing selected is a new chat; a
                 conversation whose title has not been derived yet is untitled,
-                and calling that "New chat" would give the row in the list and
-                the header above it two different names for one thing. */}
+                and calling that "New chat" would give the row in the sidebar
+                and the header above it two different names for one thing. */}
             {selected ? selected.title || 'Untitled' : 'New chat'}
-          </h2>
-        </header>
+          </h1>
+        </div>
+      </header>
 
-        <ScrollArea className="min-h-0 flex-1" overscrollContain>
-          <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
-            {empty ? (
-              <Empty>
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <IconMessageCircle aria-hidden="true" />
-                  </EmptyMedia>
-                  <EmptyTitle>Ask the model something</EmptyTitle>
-                  <EmptyDescription>
-                    This conversation is sent to the provider configured in Settings. Your notes and
-                    tasks are not.
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : null}
+      <ScrollArea className="min-h-0 flex-1" overscrollContain>
+        <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
+          {empty ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <IconMessageCircle aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>Ask the model something</EmptyTitle>
+                <EmptyDescription>
+                  This conversation is sent to the provider configured in Settings. Your notes and
+                  tasks are not.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : null}
 
-            {messages.map((message) => (
-              <Turn key={message.id} message={message} />
-            ))}
+          {messages.map((message) => (
+            <Turn key={message.id} message={message} />
+          ))}
 
-            {pending ? (
-              <div className="flex justify-end">
-                <p className="max-w-[85%] whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 text-sm opacity-64">
-                  {pending}
-                </p>
-              </div>
-            ) : null}
+          {pending ? (
+            <div className="flex justify-end">
+              <p className="max-w-[85%] whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 text-sm opacity-64">
+                {pending}
+              </p>
+            </div>
+          ) : null}
 
-            <ToolActivity calls={activity} />
+          <ToolActivity calls={activity} />
 
-            {/* Rendered while it streams, not only once it lands, so the reply
+          {/* Rendered while it streams, not only once it lands, so the reply
                 does not visibly re-lay-itself-out the moment it finishes.
                 final={false} is what tells the renderer that a half-written
                 fence is a fence still being written rather than a stray
                 backtick. */}
-            {streaming ? <Markdown final={false} text={streaming} /> : null}
+          {streaming ? <Markdown final={false} text={streaming} /> : null}
 
-            {sending && !streaming && activity.length === 0 ? <Spinner aria-hidden="true" /> : null}
+          {sending && !streaming && activity.length === 0 ? <Spinner aria-hidden="true" /> : null}
 
-            {/* The reply is announced as a state, not as text. A live region
+          {/* The reply is announced as a state, not as text. A live region
                 carrying every token as it lands would read the answer out one
                 fragment at a time. */}
-            <p aria-live="polite" className="sr-only" role="status">
-              {sending ? 'Writing a reply' : ''}
-            </p>
+          <p aria-live="polite" className="sr-only" role="status">
+            {sending ? 'Writing a reply' : ''}
+          </p>
 
-            {refusal ? (
-              <Alert variant={refusal.variant}>
-                <RefusalIcon />
-                <AlertTitle>{refusal.title}</AlertTitle>
-                <AlertDescription>{refusal.description}</AlertDescription>
-                {refusal.settings ? (
-                  <AlertAction>
-                    <Button size="xs" variant="outline" onClick={onOpenSettings}>
-                      Open Settings
-                    </Button>
-                  </AlertAction>
-                ) : null}
-              </Alert>
-            ) : null}
+          {refusal ? (
+            <Alert variant={refusal.variant}>
+              <RefusalIcon />
+              <AlertTitle>{refusal.title}</AlertTitle>
+              <AlertDescription>{refusal.description}</AlertDescription>
+              {refusal.settings ? (
+                <AlertAction>
+                  <Button size="xs" variant="outline" onClick={onOpenSettings}>
+                    Open Settings
+                  </Button>
+                </AlertAction>
+              ) : null}
+            </Alert>
+          ) : null}
 
-            {outcome && !refusal ? (
-              <Alert variant="error">
-                <IconAlertTriangle />
-                <AlertTitle>The reply did not arrive</AlertTitle>
-                <AlertDescription>{failure}</AlertDescription>
-              </Alert>
-            ) : null}
+          {outcome && !refusal ? (
+            <Alert variant="error">
+              <IconAlertTriangle />
+              <AlertTitle>The reply did not arrive</AlertTitle>
+              <AlertDescription>{failure}</AlertDescription>
+            </Alert>
+          ) : null}
 
-            <div ref={bottom} />
-          </div>
-        </ScrollArea>
+          <div ref={bottom} />
+        </div>
+      </ScrollArea>
 
-        <form className="shrink-0 border-t p-4" onSubmit={submit}>
-          <div className="mx-auto flex max-w-3xl items-end gap-2">
-            <Textarea
-              aria-label="Message"
-              disabled={!workspaceId}
-              placeholder="Ask something…"
-              size="sm"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                // Enter sends, Shift+Enter breaks the line. The other way round
-                // is defensible, but every other chat works this way and muscle
-                // memory is not something to be clever with.
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-            />
-            {/* The same corner, so the button that started the reply is the
+      <form className="shrink-0 border-t p-4" onSubmit={submit}>
+        <div className="mx-auto flex max-w-3xl items-end gap-2">
+          <Textarea
+            aria-label="Message"
+            disabled={!workspaceId}
+            placeholder="Ask something…"
+            size="sm"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              // Enter sends, Shift+Enter breaks the line. The other way round
+              // is defensible, but every other chat works this way and muscle
+              // memory is not something to be clever with.
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+          />
+          {/* The same corner, so the button that started the reply is the
                 button that ends it — and type="button" while it stops, or
                 pressing it would submit the form it sits in. It is never
                 disabled: the moment a reply is worth stopping is exactly the
                 moment it is running. */}
-            {sending ? (
-              <Button aria-label="Stop" size="icon" type="button" variant="outline" onClick={stop}>
-                <IconPlayerStop aria-hidden="true" />
-              </Button>
-            ) : (
-              <Button
-                aria-label="Send"
-                disabled={!draft.trim() || !workspaceId}
-                size="icon"
-                type="submit"
-              >
-                <IconSend aria-hidden="true" />
-              </Button>
-            )}
-          </div>
-        </form>
-      </div>
-
-      <RenameDialog
-        conversation={renaming}
-        open={Boolean(renaming)}
-        onOpenChange={(open) => !open && setRenaming(null)}
-        onSubmit={rename}
-      />
-
-      <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogPopup>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete “{deleting?.title || 'Untitled'}”?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The conversation and every turn in it will be removed. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="ghost" />}>Cancel</AlertDialogClose>
-            <AlertDialogClose
-              render={<Button variant="destructive" />}
-              onClick={() => remove(deleting)}
+          {sending ? (
+            <Button aria-label="Stop" size="icon" type="button" variant="outline" onClick={stop}>
+              <IconPlayerStop aria-hidden="true" />
+            </Button>
+          ) : (
+            <Button
+              aria-label="Send"
+              disabled={!draft.trim() || !workspaceId}
+              size="icon"
+              type="submit"
             >
-              Delete conversation
-            </AlertDialogClose>
-          </AlertDialogFooter>
-        </AlertDialogPopup>
-      </AlertDialog>
+              <IconSend aria-hidden="true" />
+            </Button>
+          )}
+        </div>
+      </form>
     </section>
   );
 }

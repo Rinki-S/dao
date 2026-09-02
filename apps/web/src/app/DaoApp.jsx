@@ -15,6 +15,7 @@ import { WindowSidebarTrigger } from '@/components/shell/WindowSidebarTrigger.js
 import { TitlebarPeekContext } from '@/components/shell/use-titlebar-inset.js';
 import { Spinner } from '@/components/ui/spinner.jsx';
 import { ChatsWorkspace } from '@/features/chats/components/ChatsWorkspace.jsx';
+import { ConversationsProvider } from '@/features/chats/components/ConversationsProvider.jsx';
 import { CommandPalette } from '@/features/command-palette/components/CommandPalette.jsx';
 import { NoteEditorPanel } from '@/features/notes/components/NoteEditorPanel.jsx';
 import { TodayWorkspace } from '@/features/ai/components/TodayWorkspace.jsx';
@@ -101,31 +102,35 @@ export function DaoApp() {
   })();
 
   return (
-    <SidebarProvider>
-      <TitlebarPeekContext.Provider value={sidebarPeek}>
-        <CommandPalette model={model} onOpenSettings={() => setSettingsOpen(true)} />
-        <DaoSidebar
-          model={model}
-          peeking={sidebarPeek}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onPeekChange={setSidebarPeek}
-        />
-        <WindowSidebarTrigger peeking={sidebarPeek} onPeekChange={setSidebarPeek} />
-        <SidebarInset>
-          <div className="min-h-0 flex-1 overflow-hidden">{content}</div>
-        </SidebarInset>
-        <SettingsDialog
-          appearance={appearance}
-          model={model}
-          open={settingsOpen}
-          onAppearanceChange={setAppearance}
-          onOpenChange={setSettingsOpen}
-          onReplayOnboarding={() => {
-            setSettingsOpen(false);
-            setReplayOnboarding(true);
-          }}
-        />
-      </TitlebarPeekContext.Provider>
-    </SidebarProvider>
+    // Above the sidebar as well as the workspace: the two are siblings, and the
+    // conversation list is now shown by one and added to by the other.
+    <ConversationsProvider model={model}>
+      <SidebarProvider>
+        <TitlebarPeekContext.Provider value={sidebarPeek}>
+          <CommandPalette model={model} onOpenSettings={() => setSettingsOpen(true)} />
+          <DaoSidebar
+            model={model}
+            peeking={sidebarPeek}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onPeekChange={setSidebarPeek}
+          />
+          <WindowSidebarTrigger peeking={sidebarPeek} onPeekChange={setSidebarPeek} />
+          <SidebarInset>
+            <div className="min-h-0 flex-1 overflow-hidden">{content}</div>
+          </SidebarInset>
+          <SettingsDialog
+            appearance={appearance}
+            model={model}
+            open={settingsOpen}
+            onAppearanceChange={setAppearance}
+            onOpenChange={setSettingsOpen}
+            onReplayOnboarding={() => {
+              setSettingsOpen(false);
+              setReplayOnboarding(true);
+            }}
+          />
+        </TitlebarPeekContext.Provider>
+      </SidebarProvider>
+    </ConversationsProvider>
   );
 }

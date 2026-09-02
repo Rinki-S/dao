@@ -2,7 +2,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SidebarProvider } from '@/components/ui/sidebar.jsx';
+import { ChatHistory } from './ChatHistory.jsx';
 import { ChatsWorkspace } from './ChatsWorkspace.jsx';
+import { ConversationsProvider } from './ConversationsProvider.jsx';
 import { CHAT_OUTCOMES, ChatError } from '../api.js';
 
 // The error class and the outcome names stay real: they are the contract
@@ -73,8 +76,27 @@ function assistant(overrides = {}) {
   };
 }
 
+/**
+ * The surface as it is actually assembled: the pane, and the sidebar section
+ * that lists its conversations. They are separate components sharing one
+ * provider, and half of what is worth testing lives in the seam between them —
+ * New chat and Delete are pressed on one side and answered on the other.
+ */
+function renderChats(overrides = {}) {
+  const current = { ...model, ...overrides };
+
+  return render(
+    <ConversationsProvider model={current}>
+      <SidebarProvider>
+        <ChatHistory />
+        <ChatsWorkspace model={current} onOpenSettings={vi.fn()} />
+      </SidebarProvider>
+    </ConversationsProvider>,
+  );
+}
+
 async function ask(text = 'a question') {
-  render(<ChatsWorkspace model={model} onOpenSettings={vi.fn()} />);
+  renderChats();
   await userEvent.type(screen.getByLabelText('Message'), text);
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
 }
@@ -102,7 +124,7 @@ describe('ChatsWorkspace', () => {
   });
 
   it('creates the conversation only when there is something to put in it', async () => {
-    render(<ChatsWorkspace model={model} onOpenSettings={vi.fn()} />);
+    renderChats();
     await userEvent.click(screen.getByRole('button', { name: 'New chat' }));
 
     // A conversation started by opening the pane would leave a row behind every
@@ -171,7 +193,7 @@ describe('ChatsWorkspace', () => {
       messages: [message({ content: 'an older question' }), assistant()],
     });
 
-    render(<ChatsWorkspace model={model} onOpenSettings={vi.fn()} />);
+    renderChats();
     await userEvent.click(await screen.findByRole('button', { name: 'Yesterday' }));
 
     expect(await screen.findByText('an older question')).toBeInTheDocument();
@@ -228,7 +250,7 @@ describe('what the model looked up', () => {
       ],
     });
 
-    render(<ChatsWorkspace model={model} onOpenSettings={vi.fn()} />);
+    renderChats();
     await userEvent.click(await screen.findByRole('button', { name: 'Yesterday' }));
 
     expect(await screen.findByText('Searched your notes for “parser”')).toBeInTheDocument();
@@ -256,7 +278,7 @@ describe('what the model looked up', () => {
       },
     ]);
 
-    render(<ChatsWorkspace model={model} onOpenSettings={vi.fn()} />);
+    renderChats();
     await userEvent.click(await screen.findByRole('button', { name: 'Yesterday' }));
 
     expect(await screen.findByText('Ran read_calendar')).toBeInTheDocument();
@@ -283,7 +305,7 @@ describe('what the model looked up', () => {
       },
     ]);
 
-    render(<ChatsWorkspace model={model} onOpenSettings={vi.fn()} />);
+    renderChats();
     await userEvent.click(await screen.findByRole('button', { name: 'Yesterday' }));
 
     expect(await screen.findByText('Searched your notes')).toBeInTheDocument();
@@ -363,11 +385,70 @@ it('opens the conversation a search hit asked for', async () => {
     messages: [message({ content: 'the question I searched for' })],
   });
 
-  render(
-    <ChatsWorkspace model={{ ...model, revealedChatId: 'chat-9' }} onOpenSettings={vi.fn()} />,
-  );
+  renderChats({ revealedChatId: 'chat-9' });
 
   // Opened without anybody clicking it.
   expect(await screen.findByText('the question I searched for')).toBeInTheDocument();
   expect(api.getConversation).toHaveBeenCalledWith('chat-9');
+});
+
+// The list is in the app's sidebar and the transcript is in the pane, so every
+// one of these crosses between two components that only share a provider.
+describe('the sidebar and the pane, on the same conversation', () => {
+  const yesterday = {
+    id: 'chat-1',
+    workspaceId: 'workspace-1',
+    title: 'Yesterday',
+    createdAt: '',
+    updatedAt: '',
+  };
+
+  beforeEach(() => {
+    api.listConversations.mockResolvedValue([yesterday]);
+    api.getConversation.mockResolvedValue({
+      ...yesterday,
+      messages: [message({ content: 'an older question' })],
+    });
+  });
+
+  it('names the open conversation above the transcript', async () => {
+    renderChats();
+    await userEvent.click(await screen.findByRole('button', { name: 'Yesterday' }));
+
+    // The row and the header are two views of one thing and must not disagree.
+    expect(await screen.findByRole('heading', { name: 'Yesterday' })).toBeInTheDocument();
+  });
+
+  it('empties the pane when the sidebar starts a new chat', async () => {
+    renderChats();
+    await userEvent.click(await screen.findByRole('button', { name: 'Yesterday' }));
+    await screen.findByText('an older question');
+
+    await userEvent.click(screen.getByRole('button', { name: 'New chat' }));
+
+    // Nothing in the pane can be reached from the button that did this, so a
+    // transcript left behind would sit under a header that says New chat.
+    await waitFor(() => expect(screen.queryByText('an older question')).toBeNull());
+    expect(screen.getByRole('heading', { name: 'New chat' })).toBeInTheDocument();
+  });
+
+  it('empties the pane when the open conversation is deleted', async () => {
+    api.deleteConversation.mockResolvedValue(undefined);
+
+    renderChats();
+    await userEvent.click(await screen.findByRole('button', { name: 'Yesterday' }));
+    await screen.findByText('an older question');
+
+    await userEvent.pointer({
+      keys: '[MouseRight]',
+      target: screen.getByRole('button', { name: 'Yesterday' }),
+    });
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete conversation' }));
+
+    await waitFor(() => expect(api.deleteConversation).toHaveBeenCalledWith('chat-1'));
+    await waitFor(() => expect(screen.queryByText('an older question')).toBeNull());
+    // Gone from the list as well as from the pane.
+    expect(screen.queryByRole('button', { name: 'Yesterday' })).toBeNull();
+  });
 });
