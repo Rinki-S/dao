@@ -400,3 +400,91 @@ func TestOtherRefusalsAreNotRetriedWithoutTools(t *testing.T) {
 		})
 	}
 }
+
+// A tool that will not act without a person stops the run rather than reporting
+// a failure the model would try to work around.
+func TestAToolWaitingOnAPersonStopsTheRun(t *testing.T) {
+	edit := &stub{name: "edit_note", err: ErrAwaitingApproval}
+	model := llmtest.Sequence(
+		llmtest.Turn{
+			Text:  "I can change that. ",
+			Calls: llmtest.ToolCall("call-1", "edit_note", `{"noteId":"n1"}`).Calls,
+		},
+		// Never reached. Asking again would spend money on a turn whose answer
+		// cannot arrive until somebody has decided.
+		llmtest.Turn{Text: "Done.", Stop: llm.StopEnd},
+	)
+
+	result := run(t, &Loop{Client: model, Tools: []Tool{edit}})
+
+	if !result.Suspended {
+		t.Fatal("the run did not report that it stopped")
+	}
+	if result.AwaitingCallID != "call-1" {
+		t.Errorf("waiting on %q, want call-1", result.AwaitingCallID)
+	}
+	if result.Steps != 1 {
+		t.Errorf("steps = %d, want the model asked once", result.Steps)
+	}
+
+	// The prose so far is real and worth showing. Stopping is not failing.
+	if result.Text != "I can change that. " {
+		t.Errorf("text = %q", result.Text)
+	}
+}
+
+// Anything asked for after the tool that is waiting is not run: it was asked
+// against a workspace that is about to change, and the model can ask again once
+// it knows what happened.
+func TestNothingAfterTheWaitingToolIsRun(t *testing.T) {
+	edit := &stub{name: "edit_note", err: ErrAwaitingApproval}
+	search := &stub{name: "search_notes", answer: "a note"}
+
+	calls := llmtest.ToolCall("call-1", "edit_note", `{}`).Calls
+	calls = append(calls, llmtest.ToolCall("call-2", "search_notes", `{}`).Calls...)
+
+	model := llmtest.Sequence(
+		llmtest.Turn{Calls: calls},
+		llmtest.Turn{Text: "Done.", Stop: llm.StopEnd},
+	)
+
+	result := run(t, &Loop{Client: model, Tools: []Tool{edit, search}})
+
+	if !result.Suspended || result.AwaitingCallID != "call-1" {
+		t.Fatalf("result = %+v", result)
+	}
+	if search.runs != 0 {
+		t.Errorf("a tool behind the waiting one ran %d times", search.runs)
+	}
+}
+
+// Nothing ended, so nothing is reported as having ended. A surface told the
+// call finished would say so, and the only true thing to say is that it is
+// waiting.
+func TestAWaitingToolIsNotReportedAsFinished(t *testing.T) {
+	edit := &stub{name: "edit_note", err: ErrAwaitingApproval}
+	model := llmtest.Sequence(
+		llmtest.Turn{Calls: llmtest.ToolCall("call-1", "edit_note", `{}`).Calls},
+	)
+
+	var started, ended []string
+
+	run(t, &Loop{
+		Client: model,
+		Tools:  []Tool{edit},
+		OnToolStart: func(id, name string, _ json.RawMessage) {
+			started = append(started, id)
+		},
+		OnToolEnd: func(id, name, output string, failed bool) {
+			ended = append(ended, id)
+		},
+	})
+
+	// Announced, because it did start and the reader should see it.
+	if len(started) != 1 || started[0] != "call-1" {
+		t.Errorf("start reports = %v", started)
+	}
+	if len(ended) != 0 {
+		t.Errorf("a waiting call was reported as finished: %v", ended)
+	}
+}

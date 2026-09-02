@@ -11,6 +11,21 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm"
 )
 
+// ErrAwaitingApproval is a tool saying it has prepared something and will not
+// do it without a person.
+//
+// Returned from Run like any other error, and handled like no other. Every
+// other failure goes back to the model as a result it can act on, because the
+// model is what has to do something about it. This one the model cannot act on
+// at all: there is nothing to try differently and nothing to say that would
+// change the answer. The only thing that resolves it is somebody deciding, and
+// that happens on a different connection, minutes or days from now.
+//
+// So the run stops here rather than continuing without the tool. What it was
+// stopped on is the tool's own business to have recorded; the loop only reports
+// that it stopped and which call it stopped on.
+var ErrAwaitingApproval = errors.New("waiting for a person to decide")
+
 // defaultMaxSteps bounds one answer.
 //
 // Not a safety margin around a number anybody measured — a model that has asked
@@ -68,6 +83,16 @@ type Result struct {
 	// something has already gone wrong, to produce a confident-sounding reply
 	// from a model that had not finished looking.
 	StepsExhausted bool
+
+	// Suspended means a tool prepared something and is waiting for a person.
+	//
+	// Not a failure and not an ending. The answer so far is real and worth
+	// showing, and the conversation is expected to carry on from here once
+	// somebody has decided — which is why AwaitingCallID comes with it. That is
+	// the call the eventual result has to answer, and a resumed run that
+	// answered a different one would be answering a question nobody asked.
+	Suspended      bool
+	AwaitingCallID string
 
 	// Usage is summed across steps, because that is what the exchange cost.
 	Usage llm.Usage
@@ -136,9 +161,19 @@ func (l *Loop) Run(ctx context.Context, request llm.Context, opts llm.Options) (
 		// missing the call has nothing for them to answer.
 		messages = append(messages, llm.Message{Role: llm.RoleAssistant, Content: response.Content})
 
-		results, err := l.run(ctx, tools, calls)
+		results, awaiting, err := l.run(ctx, tools, calls)
 		if err != nil {
 			return result, err
+		}
+
+		// Stopped rather than finished. The prose so far is the answer as far
+		// as it goes, and the caller now has a call id to bring a result back
+		// for whenever somebody has decided.
+		if awaiting != "" {
+			result.Suspended = true
+			result.AwaitingCallID = awaiting
+
+			return result, nil
 		}
 
 		messages = append(messages, llm.Message{Role: llm.RoleUser, Content: results})
@@ -163,9 +198,14 @@ func (l *Loop) text(chunk string) error {
 // be faster and would throw away the only ordering information there is: a
 // model that asks to read a file and then search it said those in that order,
 // and nothing here knows whether that mattered.
+// The second return is the id of a call that is waiting on a person, empty when
+// none is. Anything the model asked for after that one is not run: the person
+// has not decided yet, and the calls behind it were asked against a workspace
+// that is about to change. The model can ask again once it knows what happened,
+// which is the whole point of being able to carry on.
 func (l *Loop) run(
 	ctx context.Context, tools map[string]Tool, calls []llm.ContentBlock,
-) ([]llm.ContentBlock, error) {
+) ([]llm.ContentBlock, string, error) {
 	results := make([]llm.ContentBlock, 0, len(calls))
 
 	for _, call := range calls {
@@ -173,20 +213,27 @@ func (l *Loop) run(
 		// several slow tools should stop when the reader has gone, not finish
 		// the set first.
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return nil, "", err
 		}
 
 		if l.OnToolStart != nil {
 			l.OnToolStart(call.ID, call.Name, call.Input)
 		}
 
-		output, failed := l.one(ctx, tools, call)
+		output, failed, awaiting := l.one(ctx, tools, call)
 
 		// A cancelled context is the caller leaving, not a tool failing. Fed
 		// back to the model as a result it would try again, and again, against
 		// a connection that is already gone.
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return nil, "", err
+		}
+
+		// No OnToolEnd: nothing ended. The tool prepared something and stopped,
+		// and reporting a result here would tell a surface that the call was
+		// finished when the only true thing to say is that it is waiting.
+		if awaiting {
+			return results, call.ID, nil
 		}
 
 		if l.OnToolEnd != nil {
@@ -196,7 +243,7 @@ func (l *Loop) run(
 		results = append(results, llm.ToolResultBlock(call.ID, output, failed))
 	}
 
-	return results, nil
+	return results, "", nil
 }
 
 // one runs a single call, turning every way it can go wrong into something the
@@ -205,9 +252,11 @@ func (l *Loop) run(
 // Failures go back as results rather than up as errors because the model is
 // what has to do something about them. Told that no note has that name it asks
 // for a different one; handed nothing, it writes what the note would have said.
+// The third return says the tool is waiting on a person, which is the one
+// outcome that is neither a result nor a failure.
 func (l *Loop) one(
 	ctx context.Context, tools map[string]Tool, call llm.ContentBlock,
-) (string, bool) {
+) (string, bool, bool) {
 	tool, known := tools[call.Name]
 	if !known {
 		// It happens: a model will invent a tool that ought to exist. Saying
@@ -215,22 +264,25 @@ func (l *Loop) one(
 		return fmt.Sprintf(
 			"No tool named %q. The tools available are: %s.",
 			call.Name, names(l.Tools),
-		), true
+		), true, false
 	}
 
 	output, err := tool.Run(ctx, call.Input)
+	if errors.Is(err, ErrAwaitingApproval) {
+		return "", false, true
+	}
 	if err != nil {
-		return err.Error(), true
+		return err.Error(), true, false
 	}
 
 	// An empty result is a result, and one the model has to be told about in
 	// words: a search that found nothing reads as a broken tool otherwise, and
 	// the model fills the silence.
 	if output == "" {
-		return "(the tool returned nothing)", false
+		return "(the tool returned nothing)", false, false
 	}
 
-	return output, false
+	return output, false, false
 }
 
 func names(tools []Tool) string {
