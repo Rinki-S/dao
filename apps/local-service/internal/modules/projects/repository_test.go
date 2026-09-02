@@ -311,6 +311,219 @@ func TestRepositoryDeleteKeepsNotesByUnassigningThem(t *testing.T) {
 	}
 }
 
+// "Notes stay in the workspace root, but the folder itself will be removed" is
+// what the confirm button says. Both halves are about the folder somebody opens
+// in Finder, so both have to be true there and not only in the database.
+func TestDeletingAFolderEmptiesItOntoDiskAndRemovesTheDirectory(t *testing.T) {
+	db := openProjectsTestDB(t)
+	root := t.TempDir()
+	insertProjectsTestWorkspace(t, db, "workspace-1", root)
+	insertProjectsTestProject(t, db, "project-1", "workspace-1", "Compiler Lab", "")
+	insertProjectsTestNote(t, db, "note-1", "workspace-1", "project-1", "Parsing")
+
+	var folderPath, before string
+	if err := db.QueryRow(
+		`SELECT folder_path FROM projects WHERE id = 'project-1'`,
+	).Scan(&folderPath); err != nil {
+		t.Fatalf("read folder: %v", err)
+	}
+	if err := db.QueryRow(`SELECT file_path FROM notes WHERE id = 'note-1'`).Scan(&before); err != nil {
+		t.Fatalf("read note path: %v", err)
+	}
+
+	repo := NewRepository(db, search.NewRepository(db), activities.NewRepository(db))
+	if err := repo.Delete("project-1", DeleteProjectRequest{DeleteNotes: false}); err != nil {
+		t.Fatalf("delete project: %v", err)
+	}
+
+	var after string
+	if err := db.QueryRow(`SELECT file_path FROM notes WHERE id = 'note-1'`).Scan(&after); err != nil {
+		t.Fatalf("read note path: %v", err)
+	}
+
+	// At the root, where the row has always claimed it was.
+	if filepath.Dir(after) != root {
+		t.Errorf("note file is at %q, want it in %q", after, root)
+	}
+	if _, err := os.Stat(after); err != nil {
+		t.Errorf("nothing at the note's new path: %v", err)
+	}
+	if _, err := os.Stat(before); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the note is still in the deleted folder too: Stat err = %v", err)
+	}
+	if _, err := os.Stat(folderPath); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the folder is still on disk: Stat err = %v", err)
+	}
+}
+
+// A subfolder used to keep a parent that no longer existed, which took it out
+// of the tree the sidebar builds: in the database, absent from the app, and on
+// disk inside a directory the app said it had removed.
+func TestDeletingAFolderLiftsItsSubfoldersToTheRoot(t *testing.T) {
+	db := openProjectsTestDB(t)
+	root := t.TempDir()
+	insertProjectsTestWorkspace(t, db, "workspace-1", root)
+	insertProjectsTestProject(t, db, "parent", "workspace-1", "Parent", "")
+
+	repo := NewRepository(db, search.NewRepository(db), activities.NewRepository(db))
+
+	parentID := "parent"
+	child, err := repo.Create(CreateProjectRequest{
+		WorkspaceID: "workspace-1",
+		ParentID:    &parentID,
+		Name:        "Child",
+	})
+	if err != nil {
+		t.Fatalf("create child: %v", err)
+	}
+
+	// A note inside the child, to prove the move carries what is under it.
+	insertProjectsTestNoteAt(
+		t, db, "note-1", "workspace-1", child.ID, "Deep",
+		filepath.Join(child.FolderPath, "deep.md"),
+	)
+	if err := os.WriteFile(filepath.Join(child.FolderPath, "deep.md"), []byte("x"), 0644); err != nil {
+		t.Fatalf("write note file: %v", err)
+	}
+
+	if err := repo.Delete("parent", DeleteProjectRequest{DeleteNotes: false}); err != nil {
+		t.Fatalf("delete parent: %v", err)
+	}
+
+	var childParent *string
+	var childPath string
+	if err := db.QueryRow(
+		`SELECT parent_id, folder_path FROM projects WHERE id = ?`, child.ID,
+	).Scan(&childParent, &childPath); err != nil {
+		t.Fatalf("read child: %v", err)
+	}
+
+	if childParent != nil {
+		t.Errorf("child still points at a deleted parent: %v", *childParent)
+	}
+	if filepath.Dir(childPath) != root {
+		t.Errorf("child folder is at %q, want it in %q", childPath, root)
+	}
+	if _, err := os.Stat(childPath); err != nil {
+		t.Errorf("the child folder is not where its row says: %v", err)
+	}
+
+	// The note travelled with the directory, and its stored path caught up.
+	var notePath string
+	if err := db.QueryRow(`SELECT file_path FROM notes WHERE id = 'note-1'`).Scan(&notePath); err != nil {
+		t.Fatalf("read note path: %v", err)
+	}
+	if filepath.Dir(notePath) != childPath {
+		t.Errorf("note file is at %q, want it under %q", notePath, childPath)
+	}
+	if _, err := os.Stat(notePath); err != nil {
+		t.Errorf("nothing at the note's new path: %v", err)
+	}
+}
+
+// Removing the directory is os.Remove and not os.RemoveAll, and the difference
+// is the whole point: whatever is left in there is something this app did not
+// put there, and deleting somebody's file because it was in the way is not a
+// thing to do quietly.
+func TestAFolderHoldingSomethingTheAppDidNotPutThereIsNotDeleted(t *testing.T) {
+	db := openProjectsTestDB(t)
+	root := t.TempDir()
+	insertProjectsTestWorkspace(t, db, "workspace-1", root)
+	insertProjectsTestProject(t, db, "project-1", "workspace-1", "Scans", "")
+
+	var folderPath string
+	if err := db.QueryRow(
+		`SELECT folder_path FROM projects WHERE id = 'project-1'`,
+	).Scan(&folderPath); err != nil {
+		t.Fatalf("read folder: %v", err)
+	}
+
+	stranger := filepath.Join(folderPath, "receipt.pdf")
+	if err := os.WriteFile(stranger, []byte("%PDF"), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	repo := NewRepository(db, search.NewRepository(db), activities.NewRepository(db))
+	if err := repo.Delete("project-1", DeleteProjectRequest{DeleteNotes: false}); err == nil {
+		t.Fatal("deleted a folder that still held a file the app does not manage")
+	}
+
+	// Nothing happened: the file is there, the folder is there, and so is the
+	// row, so the app and the folder still agree with each other.
+	if _, err := os.Stat(stranger); err != nil {
+		t.Errorf("the file was removed anyway: %v", err)
+	}
+
+	var deletedAt *string
+	if err := db.QueryRow(
+		`SELECT deleted_at FROM projects WHERE id = 'project-1'`,
+	).Scan(&deletedAt); err != nil {
+		t.Fatalf("read project: %v", err)
+	}
+	if deletedAt != nil {
+		t.Error("the folder was deleted in the database but not on disk")
+	}
+}
+
+// .DS_Store is not a reason to refuse. macOS writes one into any folder that
+// has been looked at, and it comes back on sight.
+func TestAFolderHoldingOnlyOperatingSystemLeftoversIsDeleted(t *testing.T) {
+	db := openProjectsTestDB(t)
+	root := t.TempDir()
+	insertProjectsTestWorkspace(t, db, "workspace-1", root)
+	insertProjectsTestProject(t, db, "project-1", "workspace-1", "Looked At", "")
+
+	var folderPath string
+	if err := db.QueryRow(
+		`SELECT folder_path FROM projects WHERE id = 'project-1'`,
+	).Scan(&folderPath); err != nil {
+		t.Fatalf("read folder: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(folderPath, ".DS_Store"), []byte("x"), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	repo := NewRepository(db, search.NewRepository(db), activities.NewRepository(db))
+	if err := repo.Delete("project-1", DeleteProjectRequest{DeleteNotes: false}); err != nil {
+		t.Fatalf("delete project: %v", err)
+	}
+
+	if _, err := os.Stat(folderPath); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the folder is still on disk: Stat err = %v", err)
+	}
+}
+
+// Asking for the notes to go too takes their files with them, the same bargain
+// deleting one note on its own strikes.
+func TestDeletingAFolderWithItsNotesRemovesTheirFiles(t *testing.T) {
+	db := openProjectsTestDB(t)
+	insertProjectsTestWorkspace(t, db, "workspace-1", t.TempDir())
+	insertProjectsTestProject(t, db, "project-1", "workspace-1", "Project", "")
+	insertProjectsTestNote(t, db, "note-1", "workspace-1", "project-1", "Note")
+
+	var notePath, folderPath string
+	if err := db.QueryRow(`SELECT file_path FROM notes WHERE id = 'note-1'`).Scan(&notePath); err != nil {
+		t.Fatalf("read note path: %v", err)
+	}
+	if err := db.QueryRow(
+		`SELECT folder_path FROM projects WHERE id = 'project-1'`,
+	).Scan(&folderPath); err != nil {
+		t.Fatalf("read folder: %v", err)
+	}
+
+	repo := NewRepository(db, search.NewRepository(db), activities.NewRepository(db))
+	if err := repo.Delete("project-1", DeleteProjectRequest{DeleteNotes: true}); err != nil {
+		t.Fatalf("delete project: %v", err)
+	}
+
+	if _, err := os.Stat(notePath); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the note file survived: Stat err = %v", err)
+	}
+	if _, err := os.Stat(folderPath); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the folder is still on disk: Stat err = %v", err)
+	}
+}
+
 func TestRepositoryDeleteCanDeleteProjectNotes(t *testing.T) {
 	db := openProjectsTestDB(t)
 	insertProjectsTestWorkspace(t, db, "workspace-1", t.TempDir())
@@ -495,8 +708,11 @@ func insertProjectsTestWorkspace(t *testing.T, db *sql.DB, id string, rootPath s
 func insertProjectsTestProject(t *testing.T, db *sql.DB, id string, workspaceID string, name string, description string) {
 	t.Helper()
 
-	// A real directory, because renaming a folder now moves it.
-	folderPath := filepath.Join(t.TempDir(), id)
+	// A real directory inside the workspace it belongs to. Renaming a folder
+	// moves it, and deleting one now moves what it holds up to the workspace
+	// root and then removes the directory — neither of which means anything if
+	// the folder is off in a temporary directory of its own.
+	folderPath := filepath.Join(projectsTestWorkspaceRoot(t, db, workspaceID), id)
 	if err := os.MkdirAll(folderPath, 0755); err != nil {
 		t.Fatalf("create project folder: %v", err)
 	}
@@ -529,13 +745,41 @@ func insertProjectsTestNoteAt(t *testing.T, db *sql.DB, id string, workspaceID s
 	}
 }
 
+func projectsTestWorkspaceRoot(t *testing.T, db *sql.DB, workspaceID string) string {
+	t.Helper()
+
+	var rootPath string
+	if err := db.QueryRow(
+		`SELECT root_path FROM workspaces WHERE id = ?`, workspaceID,
+	).Scan(&rootPath); err != nil {
+		t.Fatalf("read workspace root: %v", err)
+	}
+
+	return rootPath
+}
+
 func insertProjectsTestNote(t *testing.T, db *sql.DB, id string, workspaceID string, projectID string, title string) {
 	t.Helper()
+
+	var folderPath string
+	if err := db.QueryRow(
+		`SELECT folder_path FROM projects WHERE id = ?`, projectID,
+	).Scan(&folderPath); err != nil {
+		t.Fatalf("read project folder: %v", err)
+	}
+
+	// A real file in the folder that holds it. Deleting the folder moves this
+	// one, so a path pointing at nothing would be testing bookkeeping and
+	// nothing else.
+	filePath := filepath.Join(folderPath, id+".md")
+	if err := os.WriteFile(filePath, []byte(title), 0644); err != nil {
+		t.Fatalf("write note file: %v", err)
+	}
 
 	_, err := db.Exec(`
 		INSERT INTO notes (id, workspace_id, project_id, title, file_path, content_type, note_type, created_at, updated_at, deleted_at, version, sync_status)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, id, workspaceID, projectID, title, "/tmp/"+id+".md", "markdown", "project", "2026-05-26T00:00:00Z", "2026-05-26T00:00:00Z", nil, 1, "local")
+	`, id, workspaceID, projectID, title, filePath, "markdown", "project", "2026-05-26T00:00:00Z", "2026-05-26T00:00:00Z", nil, 1, "local")
 	if err != nil {
 		t.Fatalf("insert note: %v", err)
 	}

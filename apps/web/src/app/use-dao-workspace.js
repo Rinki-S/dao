@@ -242,9 +242,26 @@ export function useDaoWorkspace() {
     setProjects((current) => current.map((item) => (item.id === updated.id ? updated : item)));
   }
 
+  // Deleting a folder removes the directory, so it can now be refused: one that
+  // still holds a file Dao did not put there is not deleted, because deleting
+  // it would take that file with it. A refusal that showed nothing would read
+  // as the button being broken.
   async function removeProject(project) {
-    await deleteProject(project.id, { deleteNotes: false });
-    setProjects((current) => current.filter((item) => item.id !== project.id));
+    try {
+      await deleteProject(project.id, { deleteNotes: false });
+    } catch (deleteError) {
+      toastManager.add({
+        type: 'error',
+        title: `Could not delete “${project.name}”`,
+        description: messageFrom(deleteError, 'The folder was left where it was.'),
+      });
+      return;
+    }
+
+    // The whole set is refetched: the folder's notes moved to the workspace
+    // root and its subfolders moved with them, so more rows changed than the
+    // one that was deleted.
+    await refreshData();
     setRevealedProjectId('');
   }
 
@@ -284,8 +301,22 @@ export function useDaoWorkspace() {
     notifyActivityChanged();
   }
 
+  // Deleting a note removes its file, so this can fail on something real — a
+  // read-only folder, a file another program is holding. Nothing is deleted
+  // when it does, and saying so is the difference between that and a button
+  // that does nothing.
   async function removeNote(note) {
-    await deleteNote(note.id);
+    try {
+      await deleteNote(note.id);
+    } catch (deleteError) {
+      toastManager.add({
+        type: 'error',
+        title: `Could not delete “${note.title}”`,
+        description: messageFrom(deleteError, 'The note and its file were left alone.'),
+      });
+      return;
+    }
+
     const nextNotes = notes.filter((item) => item.id !== note.id);
     setNotes(nextNotes);
     const nextRecents = pruneRecents(readRecents(), { notes: nextNotes });

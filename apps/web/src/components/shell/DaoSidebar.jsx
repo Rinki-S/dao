@@ -544,8 +544,13 @@ function ProjectFolder({
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete folder “{project.name}”?</AlertDialogTitle>
+            {/* Says what survives before what does not, because that is the
+                order the worry arrives in. Subfolders are named too: they move
+                as well, and somebody who has filed work two deep should not
+                have to guess that from a sentence about notes. */}
             <AlertDialogDescription>
-              Notes stay in the workspace root, but the folder itself will be removed.
+              Its notes and any folders inside it move to the workspace root. The folder itself is
+              removed from your workspace folder.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
