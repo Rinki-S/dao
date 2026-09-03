@@ -156,7 +156,7 @@ func main() {
 		aiHandler.Describe,
 	).
 		WithTools(workspaceTools(searchRepo, noteRepo, taskRepo, proposalRepo)).
-		WithProposals(proposalRepo, applyChange(noteRepo)).
+		WithProposals(proposalRepo, applyChange(noteRepo, taskRepo)).
 		RegisterRoutes(apiMux)
 
 	// Registered last: the harness reads notes and tasks, so it is wired once
@@ -287,13 +287,16 @@ func workspaceTools(
 					UpdatedAt: note.UpdatedAt,
 				}, nil
 			},
-			ReadTasks: func() (string, error) {
+			ReadTasks: func() (tools.TaskList, error) {
 				document, err := taskRepo.Get(workspaceID)
 				if err != nil {
-					return "", err
+					return tools.TaskList{}, err
 				}
 
-				return document.Content, nil
+				return tools.TaskList{
+					Content:   document.Content,
+					UpdatedAt: document.UpdatedAt,
+				}, nil
 			},
 			// The one thing that lets the model ask to change anything, and it
 			// only records the asking. Nothing here writes.
@@ -346,32 +349,100 @@ func workspaceTools(
 // What it returns is what the model is told, and it is written from what
 // actually happened rather than from what was intended. A model told a change
 // landed will go on describing the workspace as though it had.
-func applyChange(noteRepo *notes.Repository) func(proposals.Proposal) (string, error) {
+func applyChange(
+	noteRepo *notes.Repository, taskRepo *tasks.Repository,
+) func(proposals.Proposal) (string, error) {
 	return func(proposal proposals.Proposal) (string, error) {
-		if proposal.Kind != proposals.KindEditNote {
+		switch proposal.Kind {
+		case proposals.KindEditNote:
+			return applyNoteEdit(noteRepo, proposal)
+		case proposals.KindCreateNote:
+			return applyNoteCreate(noteRepo, proposal)
+		case proposals.KindEditTasks:
+			return applyTaskEdit(taskRepo, proposal)
+		default:
+			// A row written by a build that knew more kinds than this one. Said
+			// as a refusal rather than attempted, because the one thing worse
+			// than not performing a change is performing a different one.
 			return "", fmt.Errorf("this build cannot apply a %q change", proposal.Kind)
 		}
-
-		_, err := noteRepo.UpdateContent(
-			proposal.TargetID, proposal.After, proposal.ExpectedUpdatedAt,
-		)
-
-		var conflict *notes.Conflict
-		if errors.As(err, &conflict) {
-			// Not a failure of the change but of its moment. Said in those
-			// terms so the model reads it and stops, rather than trying the
-			// same replacement against a note that has moved on.
-			return "", fmt.Errorf(
-				"the note changed after this was prepared, so nothing was written. " +
-					"Read it again before proposing anything else",
-			)
-		}
-		if err != nil {
-			return "", err
-		}
-
-		return fmt.Sprintf("The change to %q was applied.", proposal.Title), nil
 	}
+}
+
+func applyNoteEdit(noteRepo *notes.Repository, proposal proposals.Proposal) (string, error) {
+	_, err := noteRepo.UpdateContent(
+		proposal.TargetID, proposal.After, proposal.ExpectedUpdatedAt,
+	)
+
+	var conflict *notes.Conflict
+	if errors.As(err, &conflict) {
+		// Not a failure of the change but of its moment. Said in those terms so
+		// the model reads it and stops, rather than trying the same replacement
+		// against a note that has moved on.
+		return "", fmt.Errorf(
+			"the note changed after this was prepared, so nothing was written. " +
+				"Read it again before proposing anything else",
+		)
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("The change to %q was applied.", proposal.Title), nil
+}
+
+// applyNoteCreate makes the note the model wrote.
+//
+// The only kind with no staleness check, because there is nothing it could be
+// stale against: no note exists, so nothing can have moved on underneath it.
+// Two notes with one title is not a conflict either — a title is not an id
+// here, and refusing would be this code deciding something the person who just
+// said yes is better placed to decide.
+func applyNoteCreate(noteRepo *notes.Repository, proposal proposals.Proposal) (string, error) {
+	// At the workspace root, not in a project. Which folder a note belongs in is
+	// a judgement about how somebody keeps their own work, and the model has no
+	// way to see the folders and no business guessing — it can be moved in one
+	// drag, which is cheaper than getting it wrong invisibly.
+	created, err := noteRepo.Create(notes.CreateNoteRequest{
+		WorkspaceID: proposal.WorkspaceID,
+		Title:       proposal.Title,
+		Content:     proposal.After,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	// The id goes back because the model may well want to read or extend what it
+	// just made, and it has no other way to learn it.
+	return fmt.Sprintf("The note %q was created, with id %s.", created.Title, created.ID), nil
+}
+
+// applyTaskEdit writes the task list, if it is still the one that was shown.
+//
+// The check is here rather than inside the repository, which takes no
+// expectation and overwrites for every caller. That is defensible for the task
+// editor, whose reads and writes are seconds apart; it is not defensible for a
+// change that sits waiting on a person for as long as they take to answer. So
+// this path does the comparison it needs and refuses on its own, and the
+// repository's contract is left alone.
+func applyTaskEdit(taskRepo *tasks.Repository, proposal proposals.Proposal) (string, error) {
+	current, err := taskRepo.Get(proposal.WorkspaceID)
+	if err != nil {
+		return "", err
+	}
+
+	if proposal.ExpectedUpdatedAt != "" && current.UpdatedAt != proposal.ExpectedUpdatedAt {
+		return "", fmt.Errorf(
+			"the task list changed after this was prepared, so nothing was written. " +
+				"Read it again before proposing anything else",
+		)
+	}
+
+	if _, err := taskRepo.Update(proposal.WorkspaceID, proposal.After); err != nil {
+		return "", err
+	}
+
+	return "The change to the task list was applied.", nil
 }
 
 func openDatabase() (*sql.DB, error) {

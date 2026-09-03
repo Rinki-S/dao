@@ -72,8 +72,7 @@ func (t *editNote) Definition() llm.ToolDefinition {
 		Name: "edit_note",
 		Description: "Propose a change to one note, by replacing an exact piece of its text. " +
 			"Read the note first with read_note, and copy old_text from what you read, " +
-			"character for character. The change is NOT made: it is shown to the person " +
-			"whose workspace this is, and they decide. Do not say you have changed anything.",
+			"character for character." + doesNotWrite,
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -137,20 +136,14 @@ func (t *editNote) Run(_ context.Context, call agent.Call) (string, error) {
 		)
 	}
 
-	switch count := strings.Count(note.Content, arguments.OldText); count {
-	case 1:
-		// The one case that can be agreed to.
-	case 0:
-		return "", fmt.Errorf("%s", noMatch(note, arguments.OldText))
-	default:
-		return "", fmt.Errorf(
-			"that text appears %d times in %q, so it is not clear which one to change. "+
-				"Include more of the surrounding lines in old_text so that it matches exactly one place",
-			count, note.Title,
-		)
+	after, err := document{
+		name:    note.Title,
+		content: note.Content,
+		reread:  "read_note",
+	}.replaceOnce(arguments.OldText, arguments.NewText)
+	if err != nil {
+		return "", err
 	}
-
-	after := strings.Replace(note.Content, arguments.OldText, arguments.NewText, 1)
 
 	if err := t.workspace.Propose(Proposed{
 		ToolCallID:        call.ID,
@@ -168,7 +161,45 @@ func (t *editNote) Run(_ context.Context, call agent.Call) (string, error) {
 	return "", agent.ErrAwaitingApproval
 }
 
-// noMatch tells a model that quoted the note wrongly what is actually there.
+// document is a piece of text a tool can propose a targeted change to.
+//
+// It carries the name to call it by and the tool that hands back its exact
+// text, because both of those go into what a model is told when its quoting was
+// wrong, and "read it again" without saying with what is advice a model cannot
+// act on.
+type document struct {
+	name    string
+	content string
+	reread  string
+}
+
+// replaceOnce works out what a targeted replacement would do.
+//
+// Shared by every tool that changes text somebody already wrote, because the
+// rule is the same wherever it applies and two copies of it would be two rules.
+// Only an unambiguous match can be agreed to: "somewhere in the document" is
+// not a change anybody can say yes to, so more than one match is a refusal
+// rather than a guess at which one was meant.
+//
+// Everything it refuses is phrased for the model, because the model is what can
+// fix it — including the count, which is what tells it to quote more lines
+// rather than to try the same string again.
+func (d document) replaceOnce(oldText string, newText string) (string, error) {
+	switch count := strings.Count(d.content, oldText); count {
+	case 1:
+		return strings.Replace(d.content, oldText, newText, 1), nil
+	case 0:
+		return "", fmt.Errorf("%s", d.noMatch(oldText))
+	default:
+		return "", fmt.Errorf(
+			"that text appears %d times in %q, so it is not clear which one to change. "+
+				"Include more of the surrounding lines in old_text so that it matches exactly one place",
+			count, d.name,
+		)
+	}
+}
+
+// noMatch tells a model that quoted the document wrongly what is actually there.
 //
 // The common failure by a wide margin is spacing, and the model cannot see that
 // from "not found" — the two strings look identical when it re-reads its own
@@ -177,14 +208,14 @@ func (t *editNote) Run(_ context.Context, call agent.Call) (string, error) {
 // cannot see and no other.
 //
 // Comparing that way round matters: looking for the model's text inside the
-// note finds nothing, because the model's text is the wrong one. It is the
-// note's line, normalised, that has to be recognised as the thing the model was
-// reaching for.
-func noMatch(note NoteContent, attempted string) string {
+// document finds nothing, because the model's text is the wrong one. It is the
+// document's line, normalised, that has to be recognised as the thing the model
+// was reaching for.
+func (d document) noMatch(attempted string) string {
 	wanted := flattenSpaces(strings.SplitN(attempted, "\n", 2)[0])
 
 	if wanted != "" {
-		for _, line := range strings.Split(note.Content, "\n") {
+		for _, line := range strings.Split(d.content, "\n") {
 			if !strings.Contains(flattenSpaces(line), wanted) {
 				continue
 			}
@@ -192,17 +223,17 @@ func noMatch(note NoteContent, attempted string) string {
 			nearby, _ := clip(line, maxNearbyRunes)
 
 			return fmt.Sprintf(
-				"old_text does not appear in %q. The note has this line, which is nearly it: %q. "+
+				"old_text does not appear in %q. It has this line, which is nearly it: %q. "+
 					"Copy it exactly, including the spacing",
-				note.Title, nearby,
+				d.name, nearby,
 			)
 		}
 	}
 
 	return fmt.Sprintf(
-		"old_text does not appear in %q. Read the note again with read_note and copy the text "+
-			"to replace from what it returns, character for character",
-		note.Title,
+		"old_text does not appear in %q. Read it again with %s and copy the text to replace "+
+			"from what it returns, character for character",
+		d.name, d.reread,
 	)
 }
 

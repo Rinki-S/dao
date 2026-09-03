@@ -37,6 +37,16 @@ type NoteContent struct {
 	UpdatedAt string
 }
 
+// TaskList is the workspace's task list, read.
+//
+// Carries when it was last written for the same reason a note does: a change to
+// it is worked out against a moment, sits waiting for however long a person
+// takes to answer, and must not be written over whatever happened in between.
+type TaskList struct {
+	Content   string
+	UpdatedAt string
+}
+
 // Workspace is what the tools can reach, as functions rather than as
 // repositories.
 //
@@ -53,7 +63,7 @@ type Workspace struct {
 	// note in this workspace.
 	ReadNote func(id string) (NoteContent, error)
 	// ReadTasks returns the workspace's task list as it stands.
-	ReadTasks func() (string, error)
+	ReadTasks func() (TaskList, error)
 
 	// Propose records a change for somebody to agree to, and does not make it.
 	//
@@ -101,7 +111,11 @@ func New(workspace Workspace) []agent.Tool {
 	}
 
 	if workspace.Propose != nil {
-		tools = append(tools, &editNote{workspace: workspace})
+		tools = append(tools,
+			&editNote{workspace: workspace},
+			&createNote{workspace: workspace},
+			&editTasks{workspace: workspace},
+		)
 	}
 
 	return tools
@@ -255,12 +269,12 @@ func (t *readTasks) Definition() llm.ToolDefinition {
 }
 
 func (t *readTasks) Run(_ context.Context, _ agent.Call) (string, error) {
-	content, err := t.workspace.ReadTasks()
+	list, err := t.workspace.ReadTasks()
 	if err != nil {
 		return "", fmt.Errorf("the task list could not be read: %v", err)
 	}
 
-	clipped, truncated := clip(content, maxNoteRunes)
+	clipped, truncated := clip(list.Content, maxNoteRunes)
 	if strings.TrimSpace(clipped) == "" {
 		return "The task list is empty.", nil
 	}

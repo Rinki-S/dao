@@ -169,7 +169,9 @@ func TestALongNoteSaysThatItWasCut(t *testing.T) {
 
 func TestReadTasksReturnsTheList(t *testing.T) {
 	tools := New(Workspace{
-		ReadTasks: func() (string, error) { return "- [ ] write the release notes", nil },
+		ReadTasks: func() (TaskList, error) {
+			return TaskList{Content: "- [ ] write the release notes"}, nil
+		},
 	})
 
 	output, err := run(t, find(t, tools, "read_tasks"), `{}`)
@@ -183,7 +185,7 @@ func TestReadTasksReturnsTheList(t *testing.T) {
 
 func TestAnEmptyTaskListSaysSo(t *testing.T) {
 	tools := New(Workspace{
-		ReadTasks: func() (string, error) { return "   \n", nil },
+		ReadTasks: func() (TaskList, error) { return TaskList{Content: "   \n"}, nil },
 	})
 
 	output, err := run(t, find(t, tools, "read_tasks"), `{}`)
