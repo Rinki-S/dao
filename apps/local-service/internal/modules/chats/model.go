@@ -193,9 +193,14 @@ type ToolEvent struct {
 // StartEvent opens the stream. The user's turn comes back because the server
 // assigned its id, position and timestamp, and the assistant's id comes back so
 // the client has somewhere to put the deltas that follow.
+//
+// A pointer, because a turn picked up after somebody answered a proposed change
+// begins with nobody having said anything. A zero Message here would go out as
+// a turn with no role and no content, which the client would have to recognise
+// as meaning absent — and a field that is missing says that already.
 type StartEvent struct {
-	UserMessage        Message `json:"userMessage"`
-	AssistantMessageID string  `json:"assistantMessageId"`
+	UserMessage        *Message `json:"userMessage,omitempty"`
+	AssistantMessageID string   `json:"assistantMessageId"`
 }
 
 // DeltaEvent is one piece of the reply as it arrives.

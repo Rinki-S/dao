@@ -350,3 +350,97 @@ var errNoteMoved = &staticError{"the note changed after this was prepared"}
 type staticError struct{ text string }
 
 func (e *staticError) Error() string { return e.text }
+
+// What the interface is actually handed.
+//
+// The renderer joins a change to the turn that asked for it on the call's id,
+// draws the comparison the service computed, and files a continuation under no
+// user turn at all. Each of those is a claim about this wire, so each is checked
+// here rather than only in the shapes the Go side passes around.
+func TestTheWireCarriesWhatTheInterfaceDrawsFrom(t *testing.T) {
+	model := llmtest.Sequence(
+		llmtest.Turn{
+			Text:  "I can fix that. ",
+			Calls: llmtest.ToolCall("call-1", "edit_note", `{}`).Calls,
+		},
+		llmtest.Turn{Text: "Done.", Stop: llm.StopEnd},
+	)
+
+	handler, repo, proposalRepo, _, _ := proposingHandler(t, model)
+	conversation := newConversation(t, repo)
+
+	stream := send(t, handler, conversation.ID, "fix the port").Body.String()
+
+	// The change goes out before the turn it belongs to, so there is never a
+	// render holding a stopped conversation with nothing to answer.
+	proposalAt := strings.Index(stream, "event: proposal")
+	doneAt := strings.Index(stream, "event: done")
+	if proposalAt < 0 || doneAt < 0 || proposalAt > doneAt {
+		t.Fatalf("proposal at %d, done at %d in:\n%s", proposalAt, doneAt, stream)
+	}
+
+	waiting, _, err := proposalRepo.Waiting(conversation.ID)
+	if err != nil {
+		t.Fatalf("Waiting: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, httptest.NewRequest(
+		http.MethodGet, "/api/chats/"+conversation.ID, nil,
+	))
+
+	var detail struct {
+		Messages []struct {
+			ToolCalls []ToolCall `json:"toolCalls"`
+		} `json:"messages"`
+		Proposals []struct {
+			ID         string `json:"id"`
+			ToolCallID string `json:"toolCallId"`
+			Kind       string `json:"kind"`
+			Title      string `json:"title"`
+			Status     string `json:"status"`
+			Diff       []struct {
+				Op   string `json:"op"`
+				Text string `json:"text"`
+			} `json:"diff"`
+		} `json:"proposals"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &detail); err != nil {
+		t.Fatalf("read the conversation: %v", err)
+	}
+
+	if len(detail.Proposals) != 1 {
+		t.Fatalf("the conversation came back with %d changes", len(detail.Proposals))
+	}
+	change := detail.Proposals[0]
+	if change.ID != waiting.ID || change.Status != proposals.StatusPending {
+		t.Errorf("the change came back as %+v", change)
+	}
+
+	// The comparison, computed by the service. Without it the renderer would
+	// have to work out what changed for itself, and what somebody agreed to
+	// would stop being what gets written.
+	if len(change.Diff) != 2 ||
+		change.Diff[0].Op != "remove" || change.Diff[0].Text != "Listens on 8080." ||
+		change.Diff[1].Op != "add" || change.Diff[1].Text != "Listens on 7743." {
+		t.Errorf("the comparison came back as %+v", change.Diff)
+	}
+
+	// The join: the card is drawn under the turn holding the call it answers.
+	last := detail.Messages[len(detail.Messages)-1]
+	if len(last.ToolCalls) != 1 || last.ToolCalls[0].ID != change.ToolCallID {
+		t.Fatalf("nothing in the transcript holds call %q: %+v", change.ToolCallID, last.ToolCalls)
+	}
+
+	// And a turn nobody started says so, rather than sending an empty one.
+	answered := decide(t, handler, conversation.ID, change.ID, DecisionApply)
+	start := answered.Body.String()
+	start = start[strings.Index(start, "event: start"):]
+	start = start[:strings.Index(start, "\n\n")]
+	if strings.Contains(start, "userMessage") {
+		t.Errorf("the continuation claims somebody said something: %s", start)
+	}
+}

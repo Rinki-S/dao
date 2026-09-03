@@ -279,7 +279,7 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	writeEvent(w, flusher, EventStart, StartEvent{
-		UserMessage:        user,
+		UserMessage:        &user,
 		AssistantMessageID: assistant.ID,
 	})
 
