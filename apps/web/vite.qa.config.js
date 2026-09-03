@@ -132,6 +132,13 @@ const conversations = [
     createdAt: '2026-08-26T15:00:00Z',
     updatedAt: '2026-08-26T15:01:00Z',
   },
+  {
+    id: '01QA0000000000000000000015',
+    workspaceId: workspace.id,
+    title: 'A change waiting on you',
+    createdAt: '2026-09-02T11:00:00Z',
+    updatedAt: '2026-09-02T11:02:00Z',
+  },
 ];
 
 // The second conversation ends on a failed turn on purpose: a reply that stops
@@ -184,6 +191,77 @@ const chatMessages = {
       status: 'failed',
       errorMessage: 'read stream: unexpected EOF',
       createdAt: '2026-08-26T15:01:00Z',
+    },
+  ],
+  '01QA0000000000000000000015': [
+    {
+      id: '01QA0000000000000000000016',
+      conversationId: '01QA0000000000000000000015',
+      role: 'user',
+      content: 'Add the EOF flush to the parser recovery note.',
+      position: 0,
+      status: 'ok',
+      createdAt: '2026-09-02T11:00:00Z',
+    },
+    {
+      id: '01QA0000000000000000000017',
+      conversationId: '01QA0000000000000000000015',
+      role: 'assistant',
+      content: 'Here is what I would add. Nothing is written until you say so.',
+      position: 1,
+      model: 'qa-model',
+      wire: 'anthropic',
+      status: 'ok',
+      createdAt: '2026-09-02T11:02:00Z',
+      // Pending, which is what says this turn is stopped on a person rather
+      // than still running.
+      toolCalls: [
+        {
+          id: 'qa-call-1',
+          name: 'edit_note',
+          input: JSON.stringify({ id: notes[1].id }),
+          status: 'pending',
+        },
+      ],
+    },
+  ],
+};
+
+// A conversation stopped on a change nobody has answered, and one that has been
+// answered, so both states of the card can be looked at without having to get a
+// model to propose something on demand.
+//
+// The note here is the QA fixture's own parser note, and the change is a real
+// one against its text: what is drawn has to be a comparison of two things that
+// could actually be written, not a shape that only looks like one.
+const proposedBefore = notes[1].content;
+const proposedAfter = notes[1].content.replace(
+  'Keep parsing after recoverable syntax errors.',
+  'Keep parsing after recoverable syntax errors.\n\nFlush the buffered token when the reader returns EOF.',
+);
+
+const chatProposals = {
+  '01QA0000000000000000000015': [
+    {
+      id: 'qa-proposal-1',
+      conversationId: '01QA0000000000000000000015',
+      toolCallId: 'qa-call-1',
+      kind: 'edit_note',
+      targetId: notes[1].id,
+      title: notes[1].title,
+      before: proposedBefore,
+      after: proposedAfter,
+      // The service computes this from the two texts above. Written out here
+      // because the QA server stands in for the service, not for the diff.
+      diff: [
+        { op: 'keep', text: '# Parser recovery strategy' },
+        { op: 'keep', text: '' },
+        { op: 'keep', text: 'Keep parsing after recoverable syntax errors.' },
+        { op: 'add', text: '' },
+        { op: 'add', text: 'Flush the buffered token when the reader returns EOF.' },
+      ],
+      status: 'pending',
+      createdAt: '2026-09-02T11:02:00Z',
     },
   ],
 };
@@ -264,6 +342,15 @@ function streamChatReply(request, response, conversationId) {
       `event: start\ndata: ${JSON.stringify({ userMessage, assistantMessageId: assistantId })}\n\n`,
     );
 
+    // Asking for a change gets one prepared rather than made, which is the
+    // whole shape of the thing: a short reply, then the card, then a turn that
+    // is finished but stopped. Keyed off the word so this state can be reached
+    // on demand — a model that proposes only when it feels like it is not
+    // something a surface can be inspected against.
+    if (/\bchange\b/i.test(content)) {
+      return streamProposedChange(response, conversationId, assistantId, stored);
+    }
+
     // A tool runs before the reply starts, the way one does when the model
     // looks something up first.
     const toolCalls = [
@@ -320,6 +407,121 @@ function streamChatReply(request, response, conversationId) {
       response.write(`event: done\ndata: ${JSON.stringify(assistant)}\n\n`);
       response.end();
     }, 40);
+  });
+}
+
+/**
+ * A turn that prepares a change and stops.
+ *
+ * The proposal goes out before done, so that by the time the pane holds the
+ * finished turn it also holds the change that turn is waiting on — there is
+ * never a render showing a stopped conversation with nothing to answer.
+ */
+function streamProposedChange(response, conversationId, assistantId, stored) {
+  const text = 'Here is what I would add. Nothing is written until you say so.';
+  const call = {
+    id: `qa-call-${stored.length}`,
+    name: 'edit_note',
+    input: JSON.stringify({ id: notes[1].id }),
+    status: 'pending',
+  };
+
+  response.write(
+    `event: tool\ndata: ${JSON.stringify({ name: call.name, input: call.input })}\n\n`,
+  );
+  response.write(`event: delta\ndata: ${JSON.stringify({ text })}\n\n`);
+
+  const waiting = {
+    id: `qa-proposal-${stored.length}`,
+    conversationId,
+    toolCallId: call.id,
+    kind: 'edit_note',
+    targetId: notes[1].id,
+    title: notes[1].title,
+    before: proposedBefore,
+    after: proposedAfter,
+    diff: [
+      { op: 'keep', text: '# Parser recovery strategy' },
+      { op: 'keep', text: '' },
+      { op: 'keep', text: 'Keep parsing after recoverable syntax errors.' },
+      { op: 'add', text: '' },
+      { op: 'add', text: 'Flush the buffered token when the reader returns EOF.' },
+    ],
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+  (chatProposals[conversationId] ??= []).push(waiting);
+
+  const assistant = {
+    id: assistantId,
+    conversationId,
+    role: 'assistant',
+    content: text,
+    position: stored.length,
+    model: 'qa-model',
+    wire: 'anthropic',
+    status: 'ok',
+    createdAt: new Date().toISOString(),
+    toolCalls: [call],
+  };
+  stored.push(assistant);
+
+  response.write(`event: proposal\ndata: ${JSON.stringify(waiting)}\n\n`);
+  response.write(`event: done\ndata: ${JSON.stringify(assistant)}\n\n`);
+  response.end();
+}
+
+/**
+ * Answer a change and carry the conversation on, the way the service does.
+ *
+ * The decision is recorded before the stream opens, which is what lets the pane
+ * move the card the moment the first event arrives — so the QA server has to do
+ * it in that order too, or this surface is inspected in a state production
+ * never reaches.
+ *
+ * There is no user message in the start event, because nobody said anything.
+ */
+function resolveChatProposal(request, response, conversationId, proposalId) {
+  const waiting = (chatProposals[conversationId] ?? []).find((item) => item.id === proposalId);
+  if (!waiting || waiting.status !== 'pending') {
+    return sendJson(response, { error: 'that change was already answered' }, 409);
+  }
+
+  readBody(request, (body) => {
+    const { decision } = JSON.parse(body || '{}');
+    waiting.status = decision === 'apply' ? 'applied' : 'discarded';
+
+    const stored = chatMessages[conversationId] ?? (chatMessages[conversationId] = []);
+    const assistantId = `qa-assistant-${stored.length}`;
+
+    response.statusCode = 200;
+    response.setHeader('Content-Type', 'text/event-stream');
+    response.setHeader('Cache-Control', 'no-cache');
+    response.write(
+      `event: start\ndata: ${JSON.stringify({ assistantMessageId: assistantId })}\n\n`,
+    );
+
+    const text =
+      decision === 'apply'
+        ? 'Done — the note now says to flush the buffered token at EOF.'
+        : 'Understood. Nothing was written.';
+
+    const assistant = {
+      id: assistantId,
+      conversationId,
+      role: 'assistant',
+      content: text,
+      position: stored.length,
+      model: 'qa-model',
+      wire: 'anthropic',
+      status: 'ok',
+      createdAt: new Date().toISOString(),
+    };
+    stored.push(assistant);
+
+    response.write(`event: delta\ndata: ${JSON.stringify({ text })}\n\n`);
+    response.write(`event: done\ndata: ${JSON.stringify(assistant)}\n\n`);
+    response.end();
   });
 }
 
@@ -396,6 +598,10 @@ function qaApiPlugin() {
           const id = url.pathname.split('/').at(-2);
           return streamChatReply(request, response, id);
         }
+        if (url.pathname.includes('/proposals/')) {
+          const [id, proposalId] = url.pathname.slice('/api/chats/'.length).split('/proposals/');
+          return resolveChatProposal(request, response, id, proposalId);
+        }
         if (url.pathname.startsWith('/api/chats/')) {
           const id = url.pathname.slice('/api/chats/'.length);
           const conversation = conversations.find((item) => item.id === id);
@@ -407,7 +613,11 @@ function qaApiPlugin() {
             return response.end();
           }
 
-          return sendJson(response, { ...conversation, messages: chatMessages[id] ?? [] });
+          return sendJson(response, {
+            ...conversation,
+            messages: chatMessages[id] ?? [],
+            proposals: chatProposals[id] ?? [],
+          });
         }
         if (url.pathname === '/api/activities') return sendJson(response, activities);
         if (url.pathname === '/api/search') return sendJson(response, []);
