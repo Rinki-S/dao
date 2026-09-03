@@ -859,3 +859,37 @@ The interface:
 ### After that
 
 `create_note`, `edit_tasks` and `rename`/`move`/`delete` — the same machinery pointed at different targets, each needing its own confirmation because there is no diff to draw for a note being created and no content to compare for one being renamed.
+
+## Milestone: The Other Four Tools
+
+Status: complete, apart from the same two gaps the last one left.
+
+`create_note`, `edit_tasks`, `rename_note` and `delete_note`. The machinery from the last milestone pointed at four more targets — which is the whole claim being tested here, and it mostly held.
+
+### Decisions
+
+**One shape for a proposal, whatever kind of change it is.** What a tool recorded used to be edit-shaped: a note id and two texts, with nothing saying what sort of change it was, because there was only one sort. Every one of the five is still the same two things — something to show, and enough to perform it with — so it became one struct with a kind, and one `Propose` on the workspace instead of one function per tool. What a caller has to have thought about is confirmation, and that is a single question. Five nilable fields would have been five chances to leave one out.
+
+**A creation has no before and a deletion has no after, and both are the empty string rather than a flag.** This is where the previous milestone's premise turned out to be wrong. It had recorded that "there is no diff to draw for a note being created" — but `split("")` is nil, so the comparison drawn from an empty before is every line marked as arriving, and from an empty after every line marked as going. Both are exactly the right picture, and neither needed a special case. The generalisation cost nothing because the two texts were already the honest representation.
+
+**A rename compares the titles, not the note.** The two texts are the thing being changed, and a rename changes a name. Putting the body in them would draw a picture of something the tool does not touch.
+
+**A deletion is checked against the text that was shown, not against a timestamp.** The one change with nothing to undo it. What the person agreed to losing is what was on the card, so a note edited in between holds something they were never shown and never said yes to — and that is a refusal, not a stale-write conflict to be resolved.
+
+**A created note lands at the workspace root.** Which folder something belongs in is a judgement about how a person keeps their own work. The model cannot see the folders, and a note in the wrong place is one drag from the right one.
+
+**The button says what it is about to do.** "Apply" is a fair word for a change to some text and a poor one for losing a note, and a person scanning a transcript reads the button before the heading. So the confirm label, the icon, and the line that says what has not happened yet are all per kind — "Nothing has been written yet" is no comfort to somebody looking at a deletion. Delete is the only one that gets the destructive colour, and it is still the second button rather than the first.
+
+### What this milestone is worth remembering for
+
+- **A generalisation that costs nothing is evidence the first shape was right.** Four tools were added and the proposal row, the diff, the card, the stream, the resolve path and the status rules all took them without modification. The only new code on the interface side is vocabulary — labels, icons, one sentence per kind. That is the return on having made the first one carry its comparison and its two texts rather than an edit-shaped payload.
+- **A premise recorded in a log is still a premise.** "There is no diff to draw for a note being created" was written down as settled and was simply false; the code that would have proved it wrong already existed. Worth checking the claims a milestone inherits before designing around them.
+- **The irreversible one deserves different words, not just a different colour.** Everything else about a deletion card is shared with the other four. What is not shared is what it is safe to promise, and that is a sentence, not a style.
+
+### Validation
+
+- Go `test ./...`, `vet ./...` and `gofmt` clean; renderer lint, formatting, 288 tests and production build pass
+- each tool refuses what it cannot honestly propose: an empty note, a title that spans lines or runs past 120 characters, a rename to the name it already has, a deletion of a note that is not there
+- the title rule is enforced in `create_note` and `rename_note` from one function, because a rule applied in one of two places is a rule with a way around it
+- `vite.qa.config.js` reaches all five kinds on a word in the message — rename, delete, create, tasks, change — each verified over HTTP to produce its own kind
+- not done, and carried over: the browser visual pass, and a run against a real provider in the Electron shell. Both are now worth more than they were, since there are five cards to look at instead of one

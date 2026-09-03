@@ -367,8 +367,9 @@ function streamChatReply(request, response, conversationId) {
     // is finished but stopped. Keyed off the word so this state can be reached
     // on demand — a model that proposes only when it feels like it is not
     // something a surface can be inspected against.
-    if (/\bchange\b/i.test(content)) {
-      return streamProposedChange(response, conversationId, assistantId, stored);
+    const asked = PROPOSABLE.find((kind) => kind.match.test(content));
+    if (asked) {
+      return streamProposedChange(response, conversationId, assistantId, stored, asked);
     }
 
     // A tool runs before the reply starts, the way one does when the model
@@ -430,6 +431,98 @@ function streamChatReply(request, response, conversationId) {
   });
 }
 
+// Every line of a text as one kind of change.
+//
+// Only for the two kinds where that is the whole answer: a note being created
+// is all additions and one being deleted is all removals. The others are
+// written out, because a QA server standing in for the service must not stand
+// in for the diff as well — a fixture that computed the comparison could agree
+// with itself about a picture the real thing would never draw.
+function everyLine(text, op) {
+  return text.split('\n').map((line) => ({ op, text: line }));
+}
+
+// The five changes a model can ask for, and how to reach each one.
+//
+// Keyed off a word in the message so any of them can be got to on demand. A
+// surface that can only be looked at when a real model happens to propose
+// something is a surface nobody checks.
+const PROPOSABLE = [
+  {
+    match: /\brename\b/i,
+    tool: 'rename_note',
+    kind: 'rename_note',
+    text: 'I would call it something shorter. Nothing is renamed until you say so.',
+    targetId: notes[1].id,
+    title: notes[1].title,
+    before: notes[1].title,
+    after: 'Parser recovery',
+    diff: [
+      { op: 'remove', text: 'Parser recovery strategy' },
+      { op: 'add', text: 'Parser recovery' },
+    ],
+  },
+  {
+    match: /\bdelete\b/i,
+    tool: 'delete_note',
+    kind: 'delete_note',
+    text: 'This one looks finished with. Nothing is deleted until you say so.',
+    targetId: notes[2].id,
+    title: notes[2].title,
+    before: notes[2].content,
+    after: '',
+    diff: everyLine(notes[2].content, 'remove'),
+  },
+  {
+    match: /\b(new note|create)\b/i,
+    tool: 'create_note',
+    kind: 'create_note',
+    text: 'Here is the note I would write. It does not exist until you say so.',
+    // No target: there is nothing yet to point at.
+    targetId: '',
+    title: 'Lexer flush path',
+    before: '',
+    after: '# Lexer flush path\n\nFlush the buffered token when the reader returns EOF.',
+    diff: everyLine(
+      '# Lexer flush path\n\nFlush the buffered token when the reader returns EOF.',
+      'add',
+    ),
+  },
+  {
+    match: /\btasks?\b/i,
+    tool: 'edit_tasks',
+    kind: 'edit_tasks',
+    text: 'I would tick that one off. Nothing is written until you say so.',
+    targetId: '',
+    title: 'Task list',
+    before: '- [ ] Ship it\n- [ ] Write the release notes\n',
+    after: '- [x] Ship it\n- [ ] Write the release notes\n',
+    diff: [
+      { op: 'remove', text: '- [ ] Ship it' },
+      { op: 'add', text: '- [x] Ship it' },
+      { op: 'keep', text: '- [ ] Write the release notes' },
+    ],
+  },
+  {
+    // Last, and the loosest word, so the more specific ones win.
+    match: /\bchange\b/i,
+    tool: 'edit_note',
+    kind: 'edit_note',
+    text: 'Here is what I would add. Nothing is written until you say so.',
+    targetId: notes[1].id,
+    title: notes[1].title,
+    before: proposedBefore,
+    after: proposedAfter,
+    diff: [
+      { op: 'keep', text: '# Parser recovery strategy' },
+      { op: 'keep', text: '' },
+      { op: 'keep', text: 'Keep parsing after recoverable syntax errors.' },
+      { op: 'add', text: '' },
+      { op: 'add', text: 'Flush the buffered token when the reader returns EOF.' },
+    ],
+  },
+];
+
 /**
  * A turn that prepares a change and stops.
  *
@@ -437,12 +530,12 @@ function streamChatReply(request, response, conversationId) {
  * finished turn it also holds the change that turn is waiting on — there is
  * never a render showing a stopped conversation with nothing to answer.
  */
-function streamProposedChange(response, conversationId, assistantId, stored) {
-  const text = 'Here is what I would add. Nothing is written until you say so.';
+function streamProposedChange(response, conversationId, assistantId, stored, asked) {
+  const text = asked.text;
   const call = {
     id: `qa-call-${stored.length}`,
-    name: 'edit_note',
-    input: JSON.stringify({ id: notes[1].id }),
+    name: asked.tool,
+    input: JSON.stringify({ id: asked.targetId }),
     status: 'pending',
   };
 
@@ -455,18 +548,12 @@ function streamProposedChange(response, conversationId, assistantId, stored) {
     id: `qa-proposal-${stored.length}`,
     conversationId,
     toolCallId: call.id,
-    kind: 'edit_note',
-    targetId: notes[1].id,
-    title: notes[1].title,
-    before: proposedBefore,
-    after: proposedAfter,
-    diff: [
-      { op: 'keep', text: '# Parser recovery strategy' },
-      { op: 'keep', text: '' },
-      { op: 'keep', text: 'Keep parsing after recoverable syntax errors.' },
-      { op: 'add', text: '' },
-      { op: 'add', text: 'Flush the buffered token when the reader returns EOF.' },
-    ],
+    kind: asked.kind,
+    targetId: asked.targetId,
+    title: asked.title,
+    before: asked.before,
+    after: asked.after,
+    diff: asked.diff,
     status: 'pending',
     createdAt: new Date().toISOString(),
   };
