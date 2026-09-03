@@ -8,6 +8,8 @@
 // direction: a confirmation that trusts its own payload confirms nothing.
 package proposals
 
+import "github.com/rinki-s/dao/apps/local-service/internal/diff"
+
 // The writing tools, which is also how a proposal knows what it is showing.
 // There is no diff to draw for a note being created, and no content to compare
 // for one being renamed.
@@ -53,6 +55,16 @@ type Proposal struct {
 	Before string `json:"before"`
 	After  string `json:"after"`
 
+	// Diff is the comparison between those two, by line.
+	//
+	// Derived, not stored: it is a function of Before and After, and a copy of
+	// it in a column would be a second thing that could disagree with the pair
+	// it was computed from. Filled in wherever a proposal comes back out of the
+	// database, so a surface never has to work it out for itself — a second
+	// implementation in another language is the way the picture somebody agreed
+	// to stops being the change that gets written.
+	Diff []diff.Line `json:"diff"`
+
 	// ExpectedUpdatedAt is what the note's updated_at said when this was worked
 	// out. A proposal is a plan made against a file at a moment, and applying it
 	// after the file has moved on would write over whatever happened in between.
@@ -68,6 +80,16 @@ type Proposal struct {
 // Pending reports whether this is still waiting on a person.
 func (p Proposal) Pending() bool {
 	return p.Status == StatusPending
+}
+
+// WithDiff is the proposal with its comparison worked out.
+//
+// Called on the way out of the database rather than on the way in, so that a
+// row written before this existed is drawn the same way as one written after.
+func (p Proposal) WithDiff() Proposal {
+	p.Diff = diff.Lines(p.Before, p.After)
+
+	return p
 }
 
 // CreateRequest is a change a tool worked out but did not make.

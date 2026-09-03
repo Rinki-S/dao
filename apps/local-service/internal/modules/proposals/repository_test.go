@@ -3,9 +3,12 @@ package proposals
 import (
 	"database/sql"
 	"errors"
+	"slices"
 	"testing"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/rinki-s/dao/apps/local-service/internal/diff"
 )
 
 func openTestDB(t *testing.T) *sql.DB {
@@ -227,5 +230,50 @@ func TestOneCallProposesOneChange(t *testing.T) {
 	}
 	if _, err := repo.Create(anEdit("call-1")); err == nil {
 		t.Error("one call proposed two changes")
+	}
+}
+
+// The comparison is worked out here, not by whatever is drawing it.
+//
+// A second implementation in the renderer is how the picture somebody agreed to
+// stops being the change that gets written — so every way a proposal comes back
+// out carries the same lines, computed by the same code.
+func TestAProposalComesBackWithItsComparison(t *testing.T) {
+	repo := NewRepository(openTestDB(t))
+
+	created, err := repo.Create(anEdit("call-1"))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	read, err := repo.Get(created.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+
+	waiting, found, err := repo.Waiting("chat-1")
+	if err != nil || !found {
+		t.Fatalf("Waiting: found=%v err=%v", found, err)
+	}
+
+	all, err := repo.ForConversation("chat-1")
+	if err != nil {
+		t.Fatalf("ForConversation: %v", err)
+	}
+
+	want := []diff.Line{
+		{Op: diff.Remove, Text: "Listens on 8080."},
+		{Op: diff.Add, Text: "Listens on 7743."},
+	}
+
+	for name, got := range map[string][]diff.Line{
+		"Create":          created.Diff,
+		"Get":             read.Diff,
+		"Waiting":         waiting.Diff,
+		"ForConversation": all[0].Diff,
+	} {
+		if !slices.Equal(got, want) {
+			t.Errorf("%s gave %+v, want %+v", name, got, want)
+		}
 	}
 }

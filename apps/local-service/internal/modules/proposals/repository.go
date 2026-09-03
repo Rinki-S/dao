@@ -64,7 +64,10 @@ func (r *Repository) Create(req CreateRequest) (Proposal, error) {
 		return Proposal{}, err
 	}
 
-	return proposal, nil
+	// With its comparison, like every other proposal this package hands out. A
+	// row that came back one way from Create and another way from Get would be
+	// the same trap the derived field exists to avoid.
+	return proposal.WithDiff(), nil
 }
 
 func (r *Repository) Get(id string) (Proposal, error) {
@@ -187,6 +190,9 @@ type scanner interface {
 	Scan(dest ...any) error
 }
 
+// scan reads one row, and is the only way a proposal leaves this package. The
+// comparison is worked out here for that reason: every caller gets it, and no
+// caller has to remember to ask.
 func scan(row scanner) (Proposal, error) {
 	var proposal Proposal
 
@@ -209,5 +215,5 @@ func scan(row scanner) (Proposal, error) {
 		return Proposal{}, err
 	}
 
-	return proposal, nil
+	return proposal.WithDiff(), nil
 }
