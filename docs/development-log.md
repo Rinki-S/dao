@@ -792,9 +792,9 @@ Validation:
 - Go `test ./...` and `vet ./...` pass; renderer formatting, lint, 257 tests and production build pass; 92 desktop tests pass
 - each part verified against the running app and the real workspace folder, including the failure paths: a save refused with the text on disk while the file was left as the other program wrote it, a folder delete refused by the name of a stray PDF with nothing moved on either side, and a note whose file could not be removed left intact along with its file
 
-## Milestone in progress: Tools That Write
+## Milestone: Tools That Write
 
-Status: the service is complete and tested; the interface is not built.
+Status: complete
 
 Branch:
 
@@ -816,7 +816,9 @@ The model can propose a change to a note or the task list, and a human agrees to
 - **Saying something else abandons a waiting change.** Not a convenience: an unanswered tool call cannot be replayed, so without it the next message fails on the wire.
 - **A turn has a step ceiling of its own** (`maxTurnSteps`, 16), because a continuation handed the loop's full bound again makes propose-apply-propose-apply endless.
 
-### Done
+### Completed scope
+
+The service:
 
 - a stored tool call carries the model's id, the tool's output, and `ok` / `failed` / `pending`, and `BuildContext` replays calls with the results that answer them — a call with no id or no result is dropped rather than sent half-formed
 - `proposals`: a change worked out and not made, keyed to the conversation and to the model's own call id, holding both texts and the `updated_at` it was worked out against
@@ -824,24 +826,31 @@ The model can propose a change to a note or the task list, and a human agrees to
 - `internal/diff`: line-level LCS, common ends trimmed first
 - `edit_note`: exactly-one-match, and a miss is answered with the line the model was reaching for, found by flattening whitespace on both sides — the failure it cannot see by re-reading its own attempt
 - `POST /api/chats/{id}/proposals/{proposalId}` applies or discards from the stored row, answers the waiting call, and runs the loop again over the mended transcript
+- every proposal that leaves the repository carries its comparison, computed by `internal/diff` on the way out — the loose end that had `internal/diff` written, tested and called by nothing
 
-### Next: the interface
+The interface:
 
-What the renderer is given:
+- a card in the transcript under the turn that asked for it, joined on the model's own call id: the note's title, the comparison, Discard and Apply
+- the comparison is drawn from what the service sent, never recomputed here, and long stretches of untouched text are folded into a count rather than dropped
+- read back with the conversation, so a change nobody answered is still waiting after a reload and one somebody answered still says so
+- a decision streams the continuation into the same conversation, through the same reader a message uses — the two ways a turn can start now share everything after the request is opened
+- sending something else instead of answering sets the waiting change aside on this side too, at the moment the service says it did
 
-- `GET /api/chats/{id}` now returns `proposals` beside `messages`. A proposal is
-  `{id, conversationId, toolCallId, kind, targetId, title, before, after, status, createdAt}`.
-- the stream gained a `proposal` event, sent before `done` when a turn stopped.
-- a waiting turn is one whose `toolCalls[].status === 'pending'`; join it to its proposal on `toolCallId`.
-- `POST /api/chats/{id}/proposals/{proposalId}` with `{"decision":"apply"|"discard"}` returns the same event stream a message does, and `readEvents` already reads it. Its `start` event carries no `userMessage`, because nobody said anything.
+### What this milestone is worth remembering for
 
-To build:
+- **The picture and the change are one thing, or the confirmation is theatre.** The comparison is computed once, by the code that owns the two texts, and travels with the row that applying will write. A second implementation in the renderer would agree with it almost always, and the times it did not would be exactly the times somebody agreed to something else.
+- **Say what the person did, not what became of their file.** Applying can still be refused by a note that moved on in between. The card says "You applied this change" because that is the part this surface witnessed; what happened to the file comes from the code that touched it, in the model's next turn.
+- **A field that is absent says absent.** The continuation's `start` event used to carry a zero-valued user turn, which the client would have had to recognise as meaning nobody spoke. A pointer and `omitempty` say it on the wire instead.
+- **Optimism has to be timed to the other side's commit point.** The service records a decision before it opens the stream, so the card can move on the first event and not before — moving it when the button is pressed would report a decision that a refused request never made.
+- **Eliding is the interface's job, and only the interface's.** The service sends every line because it cannot know how wide the pane is; a diff that had already dropped its context could not be asked for it back.
 
-- a card in the transcript: the note's title, the diff, Discard and Apply
-- rehydrate from `proposals` on load, so a decision survives a reload
-- send the decision, then stream the continuation into the same conversation
+### Validation
 
-One loose end to close first: `internal/diff` is written and tested but nothing calls it. Serialise the diff onto the proposal when it is read, so that what is drawn is computed by the same code that would compute it anywhere else, rather than a second implementation in JavaScript.
+- Go `test ./...` and `vet ./...` pass; renderer formatting, lint, 282 tests and production build pass; 92 desktop tests pass
+- the wire the two halves meet on is tested from the service side: the change goes out before the turn it belongs to, the conversation comes back carrying it with its comparison, the transcript holds the call the card joins on, and a continuation nobody started carries no user turn
+- the paths that must not move the card were checked by breaking them: a decision the service refused leaves the change waiting, and a message sent instead of an answer sets it aside
+- `vite.qa.config.js` grew a conversation stopped on a change, a live turn that proposes one, and a resolve route that answers in the service's order — exercised over HTTP, including answering the same change twice
+- not done: the browser visual pass, and a run against a real provider in the Electron shell
 
 ### After that
 
