@@ -5,6 +5,7 @@ import {
   ConversationSchema,
   DeltaEventSchema,
   DoneEventSchema,
+  ProposalEventSchema,
   StartEventSchema,
   ToolEventSchema,
 } from './schemas.js';
@@ -81,6 +82,13 @@ export const CHAT_OUTCOMES = {
   keyRejected: 'keyRejected',
   rateLimited: 'rateLimited',
   missing: 'missing',
+
+  // A change that was already answered — by another window, or by the same
+  // person pressing twice. Its own outcome because there is nothing to fix and
+  // nothing to retry: the decision was made, and the conversation just has to
+  // be read again to see what it was.
+  answered: 'answered',
+
   failed: 'failed',
 };
 
@@ -103,34 +111,22 @@ function outcomeFor(status) {
       return CHAT_OUTCOMES.rateLimited;
     case 404:
       return CHAT_OUTCOMES.missing;
+    case 409:
+      return CHAT_OUTCOMES.answered;
     default:
       return CHAT_OUTCOMES.failed;
   }
 }
 
 /**
- * Send a turn and read the reply as it is written.
+ * Read one turn's stream to its end.
  *
- * A plain fetch rather than EventSource: this is a POST with a body, and
- * EventSource can only issue a GET. What it gives up — reconnection — is not
- * wanted anyway, since a reconnect would ask the model the same question a
- * second time and be billed for it.
- *
- * The callbacks report progress; the promise resolves with the assistant row
- * the stream ended on, which is the one the transcript now holds.
+ * Shared by the two ways a turn starts — somebody said something, or somebody
+ * answered a change the model prepared. What comes back is identical: the same
+ * events in the same order, ending on the same stored row. A second copy of
+ * this walk would be a second set of decisions about what a missing done means.
  */
-export async function sendMessage(
-  conversationId,
-  content,
-  { onStart, onDelta, onTool, signal } = {},
-) {
-  const response = await apiFetch(`/api/chats/${encodeURIComponent(conversationId)}/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content }),
-    signal,
-  });
-
+async function readTurn(response, { onStart, onDelta, onTool, onProposal } = {}) {
   // Everything the service can refuse, it refuses before the first event, so a
   // failure here is still an ordinary response with a status worth reading.
   if (!response.ok) {
@@ -151,6 +147,9 @@ export async function sendMessage(
       case 'tool':
         onTool?.(ToolEventSchema.parse(event.data));
         break;
+      case 'proposal':
+        onProposal?.(ProposalEventSchema.parse(event.data));
+        break;
       case 'done':
         done = DoneEventSchema.parse(event.data);
         break;
@@ -170,4 +169,63 @@ export async function sendMessage(
   }
 
   return done;
+}
+
+/**
+ * Send a turn and read the reply as it is written.
+ *
+ * A plain fetch rather than EventSource: this is a POST with a body, and
+ * EventSource can only issue a GET. What it gives up — reconnection — is not
+ * wanted anyway, since a reconnect would ask the model the same question a
+ * second time and be billed for it.
+ *
+ * The callbacks report progress; the promise resolves with the assistant row
+ * the stream ended on, which is the one the transcript now holds.
+ */
+export async function sendMessage(conversationId, content, { signal, ...callbacks } = {}) {
+  const response = await apiFetch(`/api/chats/${encodeURIComponent(conversationId)}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+    signal,
+  });
+
+  return readTurn(response, callbacks);
+}
+
+/** The two things somebody can say about a change the model prepared. */
+export const DECISIONS = {
+  apply: 'apply',
+  discard: 'discard',
+};
+
+/**
+ * Answer a proposed change, and carry the conversation on.
+ *
+ * The decision is the whole of the request. What gets written is read by the
+ * service from the row that was shown, so there is nothing here to substitute —
+ * a confirmation that carried its own payload would be confirming whatever this
+ * call last said rather than what the person read.
+ *
+ * It streams, and for the same reason sending a message does: what happens next
+ * is the model being asked again. There is no user message in the start event,
+ * because nobody said anything.
+ */
+export async function resolveProposal(
+  conversationId,
+  proposalId,
+  decision,
+  { signal, ...callbacks } = {},
+) {
+  const response = await apiFetch(
+    `/api/chats/${encodeURIComponent(conversationId)}/proposals/${encodeURIComponent(proposalId)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision }),
+      signal,
+    },
+  );
+
+  return readTurn(response, callbacks);
 }

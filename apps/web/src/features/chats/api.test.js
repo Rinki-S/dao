@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { CHAT_OUTCOMES, sendMessage } from './api.js';
+import { CHAT_OUTCOMES, resolveProposal, sendMessage } from './api.js';
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/api-client.js', () => ({ apiFetch }));
@@ -173,5 +173,92 @@ describe('sendMessage', () => {
     const stored = await sendMessage('chat-1', 'hi');
 
     expect(stored).toMatchObject({ status: 'failed', content: 'Half an answer' });
+  });
+});
+
+function proposal(overrides = {}) {
+  return {
+    id: 'proposal-1',
+    conversationId: 'chat-1',
+    toolCallId: 'call-1',
+    kind: 'edit_note',
+    targetId: 'note-1',
+    title: 'Ports',
+    before: 'Listens on 8080.',
+    after: 'Listens on 7743.',
+    diff: [
+      { op: 'remove', text: 'Listens on 8080.' },
+      { op: 'add', text: 'Listens on 7743.' },
+    ],
+    status: 'pending',
+    createdAt: '2026-09-02T10:00:00Z',
+    ...overrides,
+  };
+}
+
+describe('a turn that stops to ask', () => {
+  it('hands over the change before the turn it belongs to', async () => {
+    // The order is the point: by the time the caller holds the finished turn it
+    // already holds the change that turn is waiting on, so there is never a
+    // render with a stopped conversation and nothing to answer.
+    streamOf([
+      frame('delta', { text: 'I can change that.' }),
+      frame('proposal', proposal()),
+      frame('done', message({ content: 'I can change that.' })),
+    ]);
+
+    const seen = [];
+
+    await sendMessage('chat-1', 'fix the port', {
+      onProposal: (change) => seen.push(change),
+    });
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({
+      id: 'proposal-1',
+      toolCallId: 'call-1',
+      diff: [
+        { op: 'remove', text: 'Listens on 8080.' },
+        { op: 'add', text: 'Listens on 7743.' },
+      ],
+    });
+  });
+});
+
+describe('resolveProposal', () => {
+  it('sends the decision and nothing else, and reads the turn that follows', async () => {
+    // What gets written is read by the service from the row that was shown. A
+    // confirmation carrying its own payload would be confirming whatever this
+    // call last said rather than what the person read.
+    streamOf([
+      frame('start', { assistantMessageId: 'message-3' }),
+      frame('delta', { text: 'Done.' }),
+      frame('done', message({ id: 'message-3', content: 'Done.' })),
+    ]);
+
+    const onStart = vi.fn();
+    const stored = await resolveProposal('chat-1', 'proposal-1', 'apply', { onStart });
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/api/chats/chat-1/proposals/proposal-1',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ decision: 'apply' }) }),
+    );
+    // Nobody said anything, so the start event carries no user turn.
+    expect(onStart).toHaveBeenCalledWith({ assistantMessageId: 'message-3' });
+    expect(stored).toMatchObject({ id: 'message-3', content: 'Done.' });
+  });
+
+  it('reports a change somebody already answered as its own outcome', async () => {
+    // There is nothing to fix and nothing to retry: the decision was made, and
+    // the conversation only has to be read again to see what it was.
+    apiFetch.mockResolvedValue({
+      ok: false,
+      status: 409,
+      text: async () => 'that change was already answered',
+    });
+
+    await expect(resolveProposal('chat-1', 'proposal-1', 'apply')).rejects.toMatchObject({
+      outcome: CHAT_OUTCOMES.answered,
+    });
   });
 });
