@@ -827,6 +827,8 @@ The service:
 - `edit_note`: exactly-one-match, and a miss is answered with the line the model was reaching for, found by flattening whitespace on both sides — the failure it cannot see by re-reading its own attempt
 - `POST /api/chats/{id}/proposals/{proposalId}` applies or discards from the stored row, answers the waiting call, and runs the loop again over the mended transcript
 - every proposal that leaves the repository carries its comparison, computed by `internal/diff` on the way out — the loose end that had `internal/diff` written, tested and called by nothing
+- a proposal's status records what happened rather than what was asked for: an apply the note refused lands as `failed`, which is neither `applied` nor `discarded`
+- both streams say where a change now stands — the one that follows a decision, and the one that follows somebody talking past it — through the `proposal` event that already existed
 
 The interface:
 
@@ -834,22 +836,24 @@ The interface:
 - the comparison is drawn from what the service sent, never recomputed here, and long stretches of untouched text are folded into a count rather than dropped
 - read back with the conversation, so a change nobody answered is still waiting after a reload and one somebody answered still says so
 - a decision streams the continuation into the same conversation, through the same reader a message uses — the two ways a turn can start now share everything after the request is opened
-- sending something else instead of answering sets the waiting change aside on this side too, at the moment the service says it did
+- sending something else instead of answering sets the waiting change aside on this side too, because the service sends the row it set aside
+- an answered card says what was recorded, including a write that was refused; a status this build does not recognise is still answered, and does not come back offering the buttons a second time
 
 ### What this milestone is worth remembering for
 
 - **The picture and the change are one thing, or the confirmation is theatre.** The comparison is computed once, by the code that owns the two texts, and travels with the row that applying will write. A second implementation in the renderer would agree with it almost always, and the times it did not would be exactly the times somebody agreed to something else.
-- **Say what the person did, not what became of their file.** Applying can still be refused by a note that moved on in between. The card says "You applied this change" because that is the part this surface witnessed; what happened to the file comes from the code that touched it, in the model's next turn.
+- **Say what the person did, not what became of their file — unless somebody wrote down what became of the file.** The card says "You applied this change" because that is the part it witnessed. It took a second pass to notice that the row was not saying even that much: it recorded the decision, so a change the note refused sat there marked `applied`. With a `failed` status the write's own answer outlives the turn, and the card can state it without guessing. The rule is not that a surface should be vague; it is that it must not assert what nobody told it.
 - **A field that is absent says absent.** The continuation's `start` event used to carry a zero-valued user turn, which the client would have had to recognise as meaning nobody spoke. A pointer and `omitempty` say it on the wire instead.
-- **Optimism has to be timed to the other side's commit point.** The service records a decision before it opens the stream, so the card can move on the first event and not before — moving it when the button is pressed would report a decision that a refused request never made.
+- **Optimism that can be replaced by a sentence from the other side should be.** The card was settled locally on the `start` event, timed to the moment the service commits — which was the right timing for the wrong idea. The pane knows which decision it sent and never knows what came of it, so the guess was wrong in precisely the case that mattered. The stream now carries the row the service wrote, through the event the card was already listening to, and both guesses went away rather than being corrected. Timing a guess well is worth much less than not having to guess.
 - **Eliding is the interface's job, and only the interface's.** The service sends every line because it cannot know how wide the pane is; a diff that had already dropped its context could not be asked for it back.
 
 ### Validation
 
-- Go `test ./...` and `vet ./...` pass; renderer formatting, lint, 282 tests and production build pass; 92 desktop tests pass
+- Go `test ./...` and `vet ./...` pass; renderer formatting, lint, 285 tests and production build pass; 92 desktop tests pass
 - the wire the two halves meet on is tested from the service side: the change goes out before the turn it belongs to, the conversation comes back carrying it with its comparison, the transcript holds the call the card joins on, and a continuation nobody started carries no user turn
 - the paths that must not move the card were checked by breaking them: a decision the service refused leaves the change waiting, and a message sent instead of an answer sets it aside
-- `vite.qa.config.js` grew a conversation stopped on a change, a live turn that proposes one, and a resolve route that answers in the service's order — exercised over HTTP, including answering the same change twice
+- the status fix was checked the same way: with the write's answer ignored again, a refused apply is recorded as `applied`, and with each stream's `proposal` event removed the card is never told what became of the change
+- `vite.qa.config.js` grew a conversation stopped on a change, a live turn that proposes one, and a resolve route that answers in the service's order — exercised over HTTP, including answering the same change twice, and refusing to apply the seeded change so the third state can be looked at at all
 - not done: the browser visual pass, and a run against a real provider in the Electron shell
 
 ### After that
