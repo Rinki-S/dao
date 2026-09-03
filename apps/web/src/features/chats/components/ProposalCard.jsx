@@ -1,4 +1,13 @@
-import { IconAlertTriangle, IconCheck, IconFilePencil, IconX } from '@tabler/icons-react';
+import {
+  IconAlertTriangle,
+  IconCheck,
+  IconCursorText,
+  IconFilePencil,
+  IconFilePlus,
+  IconListCheck,
+  IconTrash,
+  IconX,
+} from '@tabler/icons-react';
 import { Button } from '@/components/ui/button.jsx';
 import { cn } from '@/lib/utils';
 import { DECISIONS } from '../api.js';
@@ -74,6 +83,40 @@ function describe({ kind, title }) {
   }
 }
 
+// What the button says, and what is true until it is pressed.
+//
+// Per kind, because "Apply" is a fair word for a change to some text and a poor
+// one for losing a note: a button says what it is about to do, and a person
+// scanning a transcript reads the button before they read the heading. The line
+// beside it is the same promise stated for the change in hand — "nothing has
+// been written" is no comfort to somebody looking at a deletion.
+const ACTIONS = {
+  edit_note: { icon: IconFilePencil, confirm: 'Apply', pending: 'Nothing has been written yet.' },
+  edit_tasks: { icon: IconListCheck, confirm: 'Apply', pending: 'Nothing has been written yet.' },
+  create_note: { icon: IconFilePlus, confirm: 'Create', pending: 'This note does not exist yet.' },
+  rename_note: {
+    icon: IconCursorText,
+    confirm: 'Rename',
+    pending: 'The note still has its old name.',
+  },
+  // The only one with nothing to undo it. It gets the colour that means so,
+  // and it is still the second button rather than the first.
+  delete_note: {
+    icon: IconTrash,
+    confirm: 'Delete',
+    pending: 'Nothing has been deleted yet.',
+    destroys: true,
+  },
+};
+
+// A kind this build does not know still gets a usable pair of buttons, in the
+// vaguest words that are certainly true of it.
+const UNKNOWN_ACTION = {
+  icon: IconFilePencil,
+  confirm: 'Apply',
+  pending: 'Nothing has been written yet.',
+};
+
 // What an answered change is called afterwards.
 //
 // Mostly in terms of what the person did rather than what became of the file,
@@ -110,6 +153,8 @@ export function ProposalCard({ proposal, busy = false, onDecide }) {
   const answered =
     proposal.status === 'pending' ? null : (ANSWERED[proposal.status] ?? UNRECOGNISED);
   const AnsweredIcon = answered?.icon;
+  const action = ACTIONS[proposal.kind] ?? UNKNOWN_ACTION;
+  const KindIcon = action.icon;
 
   return (
     <section
@@ -122,7 +167,15 @@ export function ProposalCard({ proposal, busy = false, onDecide }) {
       )}
     >
       <header className="flex items-center gap-2 px-3 py-2">
-        <IconFilePencil aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+        <KindIcon
+          aria-hidden="true"
+          className={cn(
+            'size-4 shrink-0',
+            // The one card whose icon is not the colour of every other icon on
+            // the page, because it is the one change that cannot be taken back.
+            action.destroys && !answered ? 'text-destructive' : 'text-muted-foreground',
+          )}
+        />
         <h3 className="min-w-0 flex-1 truncate font-medium text-sm">{describe(proposal)}</h3>
       </header>
 
@@ -141,7 +194,7 @@ export function ProposalCard({ proposal, busy = false, onDecide }) {
         </p>
       ) : (
         <div className="flex items-center justify-between gap-2 px-3 py-2">
-          <p className="text-muted-foreground text-xs">Nothing has been written yet.</p>
+          <p className="text-muted-foreground text-xs">{action.pending}</p>
           <div className="flex gap-2">
             {/* Discard first, and it is the plain one. The button that writes to
                 somebody's file should not be the one a hand lands on. */}
@@ -153,8 +206,13 @@ export function ProposalCard({ proposal, busy = false, onDecide }) {
             >
               Discard
             </Button>
-            <Button disabled={busy} size="sm" onClick={() => onDecide?.(proposal, DECISIONS.apply)}>
-              Apply
+            <Button
+              disabled={busy}
+              size="sm"
+              variant={action.destroys ? 'destructive' : 'default'}
+              onClick={() => onDecide?.(proposal, DECISIONS.apply)}
+            >
+              {action.confirm}
             </Button>
           </div>
         </div>

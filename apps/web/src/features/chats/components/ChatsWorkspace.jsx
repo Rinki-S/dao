@@ -99,10 +99,20 @@ function describeTool({ name, input }) {
       return 'Read a note';
     case 'read_tasks':
       return 'Read your task list';
+    // Worked out, not made. The card below the turn is what says what each
+    // change is; these lines only have to avoid implying it already happened.
+    // Every one of them is in the past tense about the preparing and silent
+    // about the file, which is the distinction the whole feature rests on.
     case 'edit_note':
-      // Worked out, not made. The card below the turn is what says what the
-      // change is; this line only has to avoid implying the note was written.
       return 'Prepared a change to a note';
+    case 'create_note':
+      return args.title ? `Drafted a note called “${args.title}”` : 'Drafted a new note';
+    case 'edit_tasks':
+      return 'Prepared a change to your task list';
+    case 'rename_note':
+      return args.title ? `Suggested renaming a note to “${args.title}”` : 'Suggested a new name';
+    case 'delete_note':
+      return 'Asked about deleting a note';
     default:
       // A tool this build has not heard of still gets a line. Saying nothing
       // would hide that the model did something.

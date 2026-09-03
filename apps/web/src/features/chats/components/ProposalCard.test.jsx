@@ -118,11 +118,47 @@ describe('ProposalCard', () => {
   });
 
   it('renders a change with nothing to compare', () => {
-    // Renaming a note has no content to compare, and a card that threw would
-    // take the conversation down with it.
+    // Not a shape the service sends, but a card that threw on one would take
+    // the whole conversation down rather than one row of it.
     render(<ProposalCard proposal={proposal({ kind: 'rename_note', diff: [] })} />);
 
     expect(screen.getByText('There is nothing to show for this change.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
+  });
+
+  it('names the act rather than calling everything Apply', () => {
+    // A button says what it is about to do, and it is read before the heading
+    // is. "Apply" is fair for a change to some text and poor for losing a note.
+    const labels = {
+      edit_note: 'Apply',
+      edit_tasks: 'Apply',
+      create_note: 'Create',
+      rename_note: 'Rename',
+      delete_note: 'Delete',
+    };
+
+    for (const [kind, label] of Object.entries(labels)) {
+      const { unmount } = render(<ProposalCard proposal={proposal({ kind })} />);
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('does not promise nothing was written when the change is a deletion', () => {
+    // The reassurance has to be about the change in hand. "Nothing has been
+    // written yet" is no comfort to somebody looking at a note about to go.
+    render(<ProposalCard proposal={proposal({ kind: 'delete_note' })} />);
+
+    expect(screen.getByText('Nothing has been deleted yet.')).toBeInTheDocument();
+    expect(screen.queryByText('Nothing has been written yet.')).toBeNull();
+  });
+
+  it('still offers Discard first on a deletion', () => {
+    // The colour marks it as the one change that cannot be undone; it must not
+    // also become the button a hand lands on by default.
+    render(<ProposalCard proposal={proposal({ kind: 'delete_note' })} />);
+
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.map((button) => button.textContent)).toEqual(['Discard', 'Delete']);
   });
 });
