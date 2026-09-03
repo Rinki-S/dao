@@ -219,6 +219,94 @@ func TestATaskChangeThatChangesNothingIsRefused(t *testing.T) {
 	}
 }
 
+func TestARenameComparesTheTitlesAndNotTheNote(t *testing.T) {
+	// What this change does is change a name, so the two texts are the two
+	// names. Putting the body in them would draw a picture of something the
+	// tool does not touch.
+	var into recorder
+	renamer := noteToolFor(t, "rename_note", kestrel, &into)
+
+	_, err := edit(t, renamer, `{"id":"note-1","title":"Kestrel ports"}`)
+
+	if !errors.Is(err, agent.ErrAwaitingApproval) {
+		t.Fatalf("err = %v, want ErrAwaitingApproval", err)
+	}
+
+	proposed := into.edits[0]
+	if proposed.Kind != KindRenameNote {
+		t.Errorf("kind = %q", proposed.Kind)
+	}
+	if proposed.Before != "Kestrel service notes" || proposed.After != "Kestrel ports" {
+		t.Errorf("before = %q, after = %q", proposed.Before, proposed.After)
+	}
+	if strings.Contains(proposed.Before, "Listens on") {
+		t.Error("the note's text was put in a change that does not touch it")
+	}
+}
+
+func TestRenamingToTheSameTitleIsRefused(t *testing.T) {
+	var into recorder
+	renamer := noteToolFor(t, "rename_note", kestrel, &into)
+
+	if _, err := edit(
+		t, renamer, `{"id":"note-1","title":"Kestrel service notes"}`,
+	); err == nil {
+		t.Fatal("a rename that renames nothing was proposed")
+	}
+}
+
+func TestARenameIsHeldToTheSameTitleRuleAsACreation(t *testing.T) {
+	// A title is a filename in both, and a rule enforced in one of the two
+	// places is a rule with a way around it.
+	var into recorder
+	renamer := noteToolFor(t, "rename_note", kestrel, &into)
+
+	if _, err := edit(t, renamer, `{"id":"note-1","title":"Kestrel\nports"}`); err == nil {
+		t.Fatal("a title spanning two lines was proposed")
+	}
+	if len(into.edits) != 0 {
+		t.Error("it was recorded anyway")
+	}
+}
+
+func TestADeletionCarriesWhatWouldBeLost(t *testing.T) {
+	// The comparison drawn from these two is every line marked as going, which
+	// is what somebody about to agree to this needs to see. A card saying only
+	// "delete Kestrel" would be asking them to remember what was in it.
+	var into recorder
+	deleter := noteToolFor(t, "delete_note", kestrel, &into)
+
+	_, err := edit(t, deleter, `{"id":"note-1"}`)
+
+	if !errors.Is(err, agent.ErrAwaitingApproval) {
+		t.Fatalf("err = %v, want ErrAwaitingApproval", err)
+	}
+
+	proposed := into.edits[0]
+	if proposed.Kind != KindDeleteNote {
+		t.Errorf("kind = %q", proposed.Kind)
+	}
+	if proposed.Before != kestrel || proposed.After != "" {
+		t.Errorf("before = %q, after = %q", proposed.Before, proposed.After)
+	}
+	// What the deletion will be checked against when somebody says yes.
+	if proposed.ExpectedUpdatedAt == "" {
+		t.Error("a deletion was recorded against no moment at all")
+	}
+}
+
+func TestDeletingANoteThatIsNotThereIsRefused(t *testing.T) {
+	var into recorder
+	deleter := noteToolFor(t, "delete_note", kestrel, &into)
+
+	if _, err := edit(t, deleter, `{"id":"note-9"}`); err == nil {
+		t.Fatal("a deletion was proposed for a note that does not exist")
+	}
+	if len(into.edits) != 0 {
+		t.Error("it was recorded anyway")
+	}
+}
+
 // The rule the whole package is built on, checked for the tools that were just
 // added: no way to record a change means no way to ask for one.
 func TestAWorkspaceWithNowhereToPutAChangeOffersNoWritingTools(t *testing.T) {
@@ -228,7 +316,7 @@ func TestAWorkspaceWithNowhereToPutAChangeOffersNoWritingTools(t *testing.T) {
 
 	for _, tool := range built {
 		switch tool.Definition().Name {
-		case "create_note", "edit_tasks", "edit_note":
+		case "create_note", "edit_tasks", "edit_note", "rename_note", "delete_note":
 			t.Errorf("%s was offered without anywhere to record a proposal", tool.Definition().Name)
 		}
 	}

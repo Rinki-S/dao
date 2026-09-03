@@ -29,6 +29,13 @@ func (r *recorder) propose(edit Proposed) error {
 func editorFor(t *testing.T, content string, into *recorder) agent.Tool {
 	t.Helper()
 
+	return noteToolFor(t, "edit_note", content, into)
+}
+
+// noteToolFor returns one tool over a workspace holding a single note.
+func noteToolFor(t *testing.T, name string, content string, into *recorder) agent.Tool {
+	t.Helper()
+
 	tools := New(Workspace{
 		ReadNote: func(id string) (NoteContent, error) {
 			if id != "note-1" {
@@ -45,12 +52,12 @@ func editorFor(t *testing.T, content string, into *recorder) agent.Tool {
 	})
 
 	for _, tool := range tools {
-		if tool.Definition().Name == "edit_note" {
+		if tool.Definition().Name == name {
 			return tool
 		}
 	}
 
-	t.Fatal("no edit_note tool was offered")
+	t.Fatalf("no %s tool was offered", name)
 
 	return nil
 }

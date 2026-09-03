@@ -66,26 +66,11 @@ func (t *createNote) Run(_ context.Context, call agent.Call) (string, error) {
 		return "", fmt.Errorf("could not read the arguments: %v", err)
 	}
 
-	title := strings.TrimSpace(arguments.Title)
-	if title == "" {
-		return "", fmt.Errorf("title is required: a note with no title cannot be found again")
+	title, err := checkTitle(arguments.Title)
+	if err != nil {
+		return "", err
 	}
-	if len([]rune(title)) > maxProposedTitleRunes {
-		return "", fmt.Errorf(
-			"that title is %d characters, and a title is also this note's filename. "+
-				"Give it a short one and put the rest in the content",
-			len([]rune(title)),
-		)
-	}
-	// A title with a line break in it is a title that would be a filename with a
-	// line break in it. Said plainly rather than quietly flattened, because a
-	// model that meant two lines meant a heading and a first paragraph.
-	if strings.ContainsAny(title, "\r\n") {
-		return "", fmt.Errorf(
-			"a title cannot span lines. Use the first line as the title and put the rest " +
-				"in the content",
-		)
-	}
+
 	if strings.TrimSpace(arguments.Content) == "" {
 		return "", fmt.Errorf(
 			"content is required: proposing an empty note asks somebody to agree to a file " +
@@ -106,6 +91,171 @@ func (t *createNote) Run(_ context.Context, call agent.Call) (string, error) {
 	}
 
 	return "", agent.ErrAwaitingApproval
+}
+
+type renameNote struct{ workspace Workspace }
+
+func (t *renameNote) Definition() llm.ToolDefinition {
+	return llm.ToolDefinition{
+		Name: "rename_note",
+		Description: "Propose a new title for one note. This changes what the note is called " +
+			"and nothing inside it — to change its text, use edit_note." + doesNotWrite,
+		Schema: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"id": {
+					"type": "string",
+					"description": "The note's id, exactly as search_notes or read_note gave it."
+				},
+				"title": {
+					"type": "string",
+					"description": "What to call it instead. Short, and specific enough to find again."
+				}
+			},
+			"required": ["id", "title"]
+		}`),
+	}
+}
+
+// Run records a new title for a note.
+//
+// The two texts are the titles, not the note. That is the honest reading of
+// what Before and After are for — the thing being changed — and it means the
+// comparison shown to a person is of the two names, which is the whole of what
+// this change does. Putting the note's body in there would draw a picture of
+// something this tool does not touch.
+func (t *renameNote) Run(_ context.Context, call agent.Call) (string, error) {
+	var arguments struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	}
+	if err := json.Unmarshal(call.Input, &arguments); err != nil {
+		return "", fmt.Errorf("could not read the arguments: %v", err)
+	}
+
+	id := strings.TrimSpace(arguments.ID)
+	if id == "" {
+		return "", fmt.Errorf("id is required and cannot be empty")
+	}
+
+	title, err := checkTitle(arguments.Title)
+	if err != nil {
+		return "", err
+	}
+
+	note, err := t.workspace.ReadNote(id)
+	if err != nil {
+		return "", fmt.Errorf(
+			"no note with id %q in this workspace. Use search_notes to find the right id", id,
+		)
+	}
+
+	if title == note.Title {
+		return "", fmt.Errorf("%q is already called that, so there is nothing to change", note.Title)
+	}
+
+	if err := t.workspace.Propose(Proposed{
+		ToolCallID:        call.ID,
+		Kind:              KindRenameNote,
+		TargetID:          id,
+		Before:            note.Title,
+		After:             title,
+		ExpectedUpdatedAt: note.UpdatedAt,
+	}); err != nil {
+		return "", fmt.Errorf("the rename could not be prepared: %v", err)
+	}
+
+	return "", agent.ErrAwaitingApproval
+}
+
+type deleteNote struct{ workspace Workspace }
+
+func (t *deleteNote) Definition() llm.ToolDefinition {
+	return llm.ToolDefinition{
+		Name: "delete_note",
+		Description: "Propose deleting one note. Read it first: the person will be shown what " +
+			"is in it, and asking to delete a note you have not read is asking them to check " +
+			"your work for you." + doesNotWrite,
+		Schema: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"id": {
+					"type": "string",
+					"description": "The note's id, exactly as search_notes or read_note gave it."
+				}
+			},
+			"required": ["id"]
+		}`),
+	}
+}
+
+// Run records a note the model thinks should go.
+//
+// The note's whole text becomes Before, with nothing after it. Not bookkeeping:
+// the comparison drawn from that pair is every line marked as going, which is
+// exactly what somebody about to agree to this needs to see. A card that said
+// only "delete Ports" would be asking them to remember what was in it.
+func (t *deleteNote) Run(_ context.Context, call agent.Call) (string, error) {
+	var arguments struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(call.Input, &arguments); err != nil {
+		return "", fmt.Errorf("could not read the arguments: %v", err)
+	}
+
+	id := strings.TrimSpace(arguments.ID)
+	if id == "" {
+		return "", fmt.Errorf("id is required and cannot be empty")
+	}
+
+	note, err := t.workspace.ReadNote(id)
+	if err != nil {
+		return "", fmt.Errorf(
+			"no note with id %q in this workspace. Use search_notes to find the right id", id,
+		)
+	}
+
+	if err := t.workspace.Propose(Proposed{
+		ToolCallID:        call.ID,
+		Kind:              KindDeleteNote,
+		TargetID:          id,
+		Before:            note.Content,
+		ExpectedUpdatedAt: note.UpdatedAt,
+	}); err != nil {
+		return "", fmt.Errorf("the deletion could not be prepared: %v", err)
+	}
+
+	return "", agent.ErrAwaitingApproval
+}
+
+// checkTitle is the rule for a title the model made up, wherever one arrives.
+//
+// Shared by creating and renaming because a title is a filename in both, and a
+// rule enforced in one of the two places is a rule with a way around it.
+func checkTitle(proposed string) (string, error) {
+	title := strings.TrimSpace(proposed)
+
+	if title == "" {
+		return "", fmt.Errorf("title is required: a note with no title cannot be found again")
+	}
+	if len([]rune(title)) > maxProposedTitleRunes {
+		return "", fmt.Errorf(
+			"that title is %d characters, and a title is also this note's filename. "+
+				"Give it a short one and put the rest in the content",
+			len([]rune(title)),
+		)
+	}
+	// A title with a line break in it is a title that would be a filename with a
+	// line break in it. Said plainly rather than quietly flattened, because a
+	// model that meant two lines meant a heading and a first paragraph.
+	if strings.ContainsAny(title, "\r\n") {
+		return "", fmt.Errorf(
+			"a title cannot span lines. Use the first line as the title and put the rest " +
+				"in the content",
+		)
+	}
+
+	return title, nil
 }
 
 type editTasks struct{ workspace Workspace }

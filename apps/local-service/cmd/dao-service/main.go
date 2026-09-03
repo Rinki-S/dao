@@ -360,6 +360,10 @@ func applyChange(
 			return applyNoteCreate(noteRepo, proposal)
 		case proposals.KindEditTasks:
 			return applyTaskEdit(taskRepo, proposal)
+		case proposals.KindRenameNote:
+			return applyNoteRename(noteRepo, proposal)
+		case proposals.KindDeleteNote:
+			return applyNoteDelete(noteRepo, proposal)
 		default:
 			// A row written by a build that knew more kinds than this one. Said
 			// as a refusal rather than attempted, because the one thing worse
@@ -415,6 +419,63 @@ func applyNoteCreate(noteRepo *notes.Repository, proposal proposals.Proposal) (s
 	// The id goes back because the model may well want to read or extend what it
 	// just made, and it has no other way to learn it.
 	return fmt.Sprintf("The note %q was created, with id %s.", created.Title, created.ID), nil
+}
+
+// applyNoteRename gives a note the title that was agreed to.
+//
+// Update takes no expectation, so the check is made here: the title somebody was
+// shown as the current one has to still be the current one. Renaming a note that
+// was renamed in between would undo whatever the person did, using a title they
+// last saw before it happened.
+func applyNoteRename(noteRepo *notes.Repository, proposal proposals.Proposal) (string, error) {
+	current, err := noteRepo.Get(proposal.TargetID)
+	if err != nil {
+		return "", fmt.Errorf("that note is no longer here, so nothing was renamed")
+	}
+	if current.Title != proposal.Before {
+		return "", fmt.Errorf(
+			"that note is called %q now, not %q, so nothing was renamed. "+
+				"Look at it again before proposing anything else",
+			current.Title, proposal.Before,
+		)
+	}
+
+	title := proposal.After
+	if _, err := noteRepo.Update(proposal.TargetID, notes.UpdateNoteRequest{
+		Title: &title,
+	}); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%q was renamed to %q.", proposal.Before, title), nil
+}
+
+// applyNoteDelete removes a note somebody agreed to lose.
+//
+// Checked against the text that was shown rather than against a timestamp, and
+// deliberately: this is the one change with nothing to undo it with, and the
+// person agreed to losing what was on the card. A note edited in between holds
+// something they were never shown and never said yes to.
+func applyNoteDelete(noteRepo *notes.Repository, proposal proposals.Proposal) (string, error) {
+	current, err := noteRepo.Get(proposal.TargetID)
+	if err != nil {
+		// Already gone. Not a failure — what was asked for is the case — but
+		// said as what it is, because "deleted" would have the model report
+		// doing something it did not do.
+		return fmt.Sprintf("%q was already gone, so nothing was deleted.", proposal.Title), nil
+	}
+	if current.Content != proposal.Before {
+		return "", fmt.Errorf(
+			"the note changed after this was prepared, so nothing was deleted. " +
+				"Read it again before proposing anything else",
+		)
+	}
+
+	if err := noteRepo.Delete(proposal.TargetID); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%q was deleted.", proposal.Title), nil
 }
 
 // applyTaskEdit writes the task list, if it is still the one that was shown.

@@ -115,6 +115,8 @@ func New(workspace Workspace) []agent.Tool {
 			&editNote{workspace: workspace},
 			&createNote{workspace: workspace},
 			&editTasks{workspace: workspace},
+			&renameNote{workspace: workspace},
+			&deleteNote{workspace: workspace},
 		)
 	}
 
