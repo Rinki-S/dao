@@ -50,6 +50,43 @@ describe('fold', () => {
     expect(fold(keep('a', 'b'), 3)).toEqual([{ op: 'folded', count: 2 }]);
   });
 
+  it('caps a comparison that folding cannot help', () => {
+    // A deletion is every line at once, so there is no untouched stretch to
+    // fold and nothing stops the card growing to the length of the note.
+    const whole = Array.from({ length: 500 }, (_, at) => ({ op: 'remove', text: `line ${at}` }));
+
+    const folded = fold(whole, 3, 200);
+
+    expect(folded).toHaveLength(201);
+    expect(folded.at(-1)).toEqual({ op: 'more', count: 300 });
+    // From the end, because a note is read from the top.
+    expect(folded[0]).toEqual({ op: 'remove', text: 'line 0' });
+  });
+
+  it('counts what it cut in lines of the note, not in rows', () => {
+    // A row standing for a folded stretch is worth every line it folded away.
+    // Counting rows would tell somebody a 400-line note has 3 lines left.
+    const lines = [
+      { op: 'add', text: 'first' },
+      ...keep(...Array(300).fill('x')),
+      { op: 'add', text: 'second' },
+    ];
+
+    // Cut at two, so the row standing for 298 folded lines is itself cut.
+    const folded = fold(lines, 1, 2);
+
+    expect(folded).toHaveLength(3);
+    expect(folded.at(-1).op).toBe('more');
+    // 298 folded away, plus the last kept line and the second change.
+    expect(folded.at(-1).count).toBe(300);
+  });
+
+  it('leaves a comparison that fits alone', () => {
+    const lines = [{ op: 'remove', text: 'a' }, { op: 'add', text: 'b' }, ...keep('c')];
+
+    expect(fold(lines, 3, 200)).toEqual(lines);
+  });
+
   it('folds each stretch on its own', () => {
     // Two edits far apart are two places to look, not one long one.
     const folded = fold(

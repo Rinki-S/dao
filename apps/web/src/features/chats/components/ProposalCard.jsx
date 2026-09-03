@@ -24,6 +24,20 @@ const OPS = {
   keep: { gutter: ' ', label: '', className: 'text-muted-foreground' },
 };
 
+// What a row standing for several lines says.
+//
+// The two are different facts and are worded as such: a folded stretch is text
+// this change does not touch, and a cut one is text the card ran out of room
+// for. Reading "unchanged" under a deletion would say the opposite of what is
+// about to happen to it.
+function summarise({ op, count }) {
+  if (op === 'more') {
+    return count === 1 ? '1 more line' : `${count} more lines`;
+  }
+
+  return count === 1 ? '1 unchanged line' : `${count} unchanged lines`;
+}
+
 /**
  * What the change would do to the text, line by line.
  *
@@ -37,9 +51,9 @@ function Diff({ lines }) {
   return (
     <div className="overflow-x-auto border-y font-mono text-xs">
       {folded.map((line, index) =>
-        line.op === 'folded' ? (
+        line.op === 'folded' || line.op === 'more' ? (
           <p className="bg-muted/40 px-3 py-1 text-[0.6875rem] text-muted-foreground" key={index}>
-            {line.count === 1 ? '1 unchanged line' : `${line.count} unchanged lines`}
+            {summarise(line)}
           </p>
         ) : (
           <p className={cn('flex gap-2 whitespace-pre px-3', OPS[line.op].className)} key={index}>

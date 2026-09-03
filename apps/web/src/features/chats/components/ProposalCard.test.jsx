@@ -108,6 +108,21 @@ describe('ProposalCard', () => {
     expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
   });
 
+  it('does not grow to the length of the note it is deleting', () => {
+    // Folding keeps context around changes, and in a deletion every line is a
+    // change — so nothing folds, and without a cap the card is as tall as the
+    // file. The remainder is counted, not dropped: agreeing to lose something
+    // means being able to see that it goes on past the bottom of the card.
+    const whole = Array.from({ length: 500 }, (_, at) => ({ op: 'remove', text: `line ${at}` }));
+    render(<ProposalCard proposal={proposal({ kind: 'delete_note', diff: whole })} />);
+
+    expect(screen.getByText('line 0')).toBeInTheDocument();
+    expect(screen.queryByText('line 400')).toBeNull();
+    expect(screen.getByText('300 more lines')).toBeInTheDocument();
+    // "unchanged" would say the opposite of what is about to happen to them.
+    expect(screen.queryByText(/unchanged/)).toBeNull();
+  });
+
   it('still asks about a kind it has never heard of', () => {
     // A newer service proposing something new should leave the reader able to
     // say yes or no, not looking at a card that declines to name itself.
