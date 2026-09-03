@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   getConversation: vi.fn(),
   listConversations: vi.fn(),
   renameConversation: vi.fn(),
+  resolveProposal: vi.fn(),
   sendMessage: vi.fn(),
 }));
 
@@ -185,6 +186,7 @@ describe('ChatsWorkspace', () => {
       },
     ]);
     api.getConversation.mockResolvedValue({
+      proposals: [],
       id: 'chat-1',
       workspaceId: 'workspace-1',
       title: 'Yesterday',
@@ -234,6 +236,7 @@ describe('what the model looked up', () => {
       },
     ]);
     api.getConversation.mockResolvedValue({
+      proposals: [],
       id: 'chat-1',
       workspaceId: 'workspace-1',
       title: 'Yesterday',
@@ -261,6 +264,7 @@ describe('what the model looked up', () => {
     // A newer service adding a tool should not make the model appear to have
     // done nothing.
     api.getConversation.mockResolvedValue({
+      proposals: [],
       id: 'chat-1',
       workspaceId: 'workspace-1',
       title: 'Yesterday',
@@ -288,6 +292,7 @@ describe('what the model looked up', () => {
     // A model writes the arguments, so they arrive however it wrote them. The
     // tool refused these; the line still has to render.
     api.getConversation.mockResolvedValue({
+      proposals: [],
       id: 'chat-1',
       workspaceId: 'workspace-1',
       title: 'Yesterday',
@@ -377,6 +382,7 @@ it('opens the conversation a search hit asked for', async () => {
     { id: 'chat-9', workspaceId: 'workspace-1', title: 'Found', createdAt: '', updatedAt: '' },
   ]);
   api.getConversation.mockResolvedValue({
+    proposals: [],
     id: 'chat-9',
     workspaceId: 'workspace-1',
     title: 'Found',
@@ -406,6 +412,7 @@ describe('the sidebar and the pane, on the same conversation', () => {
   beforeEach(() => {
     api.listConversations.mockResolvedValue([yesterday]);
     api.getConversation.mockResolvedValue({
+      proposals: [],
       ...yesterday,
       messages: [message({ content: 'an older question' })],
     });
@@ -450,5 +457,187 @@ describe('the sidebar and the pane, on the same conversation', () => {
     await waitFor(() => expect(screen.queryByText('an older question')).toBeNull());
     // Gone from the list as well as from the pane.
     expect(screen.queryByRole('button', { name: 'Yesterday' })).toBeNull();
+  });
+});
+
+// The point of the whole milestone: the model can ask to change a note, and
+// nothing is written until somebody says so in the place they were asked.
+describe('a change the model proposed', () => {
+  const chat = {
+    id: 'chat-1',
+    workspaceId: 'workspace-1',
+    title: 'Ports',
+    createdAt: '',
+    updatedAt: '',
+  };
+
+  function change(overrides = {}) {
+    return {
+      id: 'proposal-1',
+      conversationId: 'chat-1',
+      toolCallId: 'call-1',
+      kind: 'edit_note',
+      targetId: 'note-1',
+      title: 'Ports',
+      before: 'Listens on 8080.',
+      after: 'Listens on 7743.',
+      diff: [
+        { op: 'remove', text: 'Listens on 8080.' },
+        { op: 'add', text: 'Listens on 7743.' },
+      ],
+      status: 'pending',
+      createdAt: '2026-09-02T10:00:00Z',
+      ...overrides,
+    };
+  }
+
+  /** A turn that prepares a change and stops. */
+  function proposes() {
+    api.sendMessage.mockImplementation(
+      async (_id, content, { onStart, onTool, onDelta, onProposal }) => {
+        onStart?.({ userMessage: message({ content }), assistantMessageId: 'message-2' });
+        onTool?.({ name: 'edit_note', input: '{"id":"note-1"}' });
+        onDelta?.('Here is what I would change.');
+        onProposal?.(change());
+
+        return assistant({
+          content: 'Here is what I would change.',
+          toolCalls: [
+            { id: 'call-1', name: 'edit_note', input: '{"id":"note-1"}', status: 'pending' },
+          ],
+        });
+      },
+    );
+  }
+
+  it('shows the change under the turn that asked for it', async () => {
+    proposes();
+
+    await ask('fix the port');
+
+    expect(await screen.findByRole('heading', { name: 'Change to “Ports”' })).toBeInTheDocument();
+    expect(screen.getByText('Listens on 8080.')).toBeInTheDocument();
+    expect(screen.getByText('Listens on 7743.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
+  });
+
+  it('does not say the note was changed', async () => {
+    // The tool prepared a change; it did not make one. A line claiming
+    // otherwise would be the transcript's own claim, not the model's.
+    proposes();
+
+    await ask('fix the port');
+
+    expect(await screen.findByText('Prepared a change to a note')).toBeInTheDocument();
+  });
+
+  it('sends the decision and carries the conversation on', async () => {
+    proposes();
+    api.resolveProposal.mockImplementation(async (_chat, _proposal, _decision, { onStart }) => {
+      // Nobody said anything, so there is no user turn to add.
+      onStart?.({ assistantMessageId: 'message-3' });
+
+      return assistant({ id: 'message-3', content: 'The note now says 7743.', position: 2 });
+    });
+
+    await ask('fix the port');
+    await userEvent.click(await screen.findByRole('button', { name: 'Apply' }));
+
+    expect(api.resolveProposal).toHaveBeenCalledWith(
+      'chat-1',
+      'proposal-1',
+      'apply',
+      expect.anything(),
+    );
+    expect(await screen.findByText('The note now says 7743.')).toBeInTheDocument();
+  });
+
+  it('says what was decided once it has been', async () => {
+    proposes();
+    api.resolveProposal.mockImplementation(async (_chat, _proposal, _decision, { onStart }) => {
+      onStart?.({ assistantMessageId: 'message-3' });
+
+      return assistant({ id: 'message-3', content: 'Nothing was written.', position: 2 });
+    });
+
+    await ask('fix the port');
+    await userEvent.click(await screen.findByRole('button', { name: 'Discard' }));
+
+    expect(await screen.findByText('You discarded this change')).toBeInTheDocument();
+    // The question is answered, so it stops being asked.
+    expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+  });
+
+  it('leaves the change waiting when the decision was refused', async () => {
+    // The service records the decision before it opens the stream, so a refusal
+    // means nothing was recorded — and a card that had already moved on would
+    // be reporting something that did not happen.
+    proposes();
+    api.resolveProposal.mockRejectedValue(
+      new ChatError(CHAT_OUTCOMES.answered, 'that change was already answered'),
+    );
+
+    await ask('fix the port');
+    await userEvent.click(await screen.findByRole('button', { name: 'Apply' }));
+
+    expect(await screen.findByText('That change was already answered')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+  });
+
+  it('is still waiting after a reload', async () => {
+    // A decision nobody made should not be lost by closing the window, and one
+    // somebody made should not be asked for twice.
+    api.listConversations.mockResolvedValue([chat]);
+    api.getConversation.mockResolvedValue({
+      ...chat,
+      messages: [
+        message({ content: 'fix the port' }),
+        assistant({
+          content: 'Here is what I would change.',
+          toolCalls: [
+            { id: 'call-1', name: 'edit_note', input: '{"id":"note-1"}', status: 'pending' },
+          ],
+        }),
+      ],
+      proposals: [change()],
+    });
+
+    renderChats();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ports' }));
+
+    expect(await screen.findByRole('heading', { name: 'Change to “Ports”' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+  });
+
+  it('keeps an answered change in the transcript after a reload', async () => {
+    api.listConversations.mockResolvedValue([chat]);
+    api.getConversation.mockResolvedValue({
+      ...chat,
+      messages: [assistant({ toolCalls: [{ id: 'call-1', name: 'edit_note', input: '{}' }] })],
+      proposals: [change({ status: 'applied' })],
+    });
+
+    renderChats();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ports' }));
+
+    expect(await screen.findByText('You applied this change')).toBeInTheDocument();
+  });
+
+  it('sets the change aside when the reader says something else instead', async () => {
+    // Not a convenience. A tool call left unanswered cannot be replayed, so the
+    // service abandons it before storing the next message — and a pane still
+    // offering the buttons would be offering a decision that is no longer open.
+    proposes();
+
+    await ask('fix the port');
+    await screen.findByRole('button', { name: 'Apply' });
+
+    replies(['Something else entirely.'], assistant({ id: 'message-3', position: 2 }));
+    await userEvent.type(screen.getByLabelText('Message'), 'never mind');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(await screen.findByText('You discarded this change')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
   });
 });

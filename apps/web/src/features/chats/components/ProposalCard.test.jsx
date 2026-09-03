@@ -1,0 +1,108 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+
+import { ProposalCard } from './ProposalCard.jsx';
+
+function proposal(overrides = {}) {
+  return {
+    id: 'proposal-1',
+    conversationId: 'chat-1',
+    toolCallId: 'call-1',
+    kind: 'edit_note',
+    targetId: 'note-1',
+    title: 'Ports',
+    before: 'Listens on 8080.',
+    after: 'Listens on 7743.',
+    diff: [
+      { op: 'remove', text: 'Listens on 8080.' },
+      { op: 'add', text: 'Listens on 7743.' },
+    ],
+    status: 'pending',
+    createdAt: '2026-09-02T10:00:00Z',
+    ...overrides,
+  };
+}
+
+describe('ProposalCard', () => {
+  it('names the note and shows both sides of the change', async () => {
+    render(<ProposalCard proposal={proposal()} />);
+
+    expect(screen.getByRole('heading', { name: 'Change to “Ports”' })).toBeInTheDocument();
+    expect(screen.getByText('Listens on 8080.')).toBeInTheDocument();
+    expect(screen.getByText('Listens on 7743.')).toBeInTheDocument();
+  });
+
+  it('says which line is going and which is arriving, in words', () => {
+    // A diff read out one line at a time is a list of sentences with no sign of
+    // which are being taken away, and colour is not something a screen reader
+    // can pass on.
+    render(<ProposalCard proposal={proposal()} />);
+
+    expect(screen.getByText('Removed:')).toBeInTheDocument();
+    expect(screen.getByText('Added:')).toBeInTheDocument();
+  });
+
+  it('is plain that nothing has happened yet', async () => {
+    render(<ProposalCard proposal={proposal()} />);
+
+    expect(screen.getByText('Nothing has been written yet.')).toBeInTheDocument();
+  });
+
+  it('reports which decision was pressed', async () => {
+    const onDecide = vi.fn();
+    render(<ProposalCard proposal={proposal()} onDecide={onDecide} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onDecide).toHaveBeenCalledWith(expect.objectContaining({ id: 'proposal-1' }), 'apply');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(onDecide).toHaveBeenCalledWith(expect.objectContaining({ id: 'proposal-1' }), 'discard');
+  });
+
+  it('offers nothing to press while a turn is running', async () => {
+    render(<ProposalCard busy proposal={proposal()} />);
+
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Discard' })).toBeDisabled();
+  });
+
+  it('says what the person did, not what became of the file', () => {
+    // Applying can still be refused by a note that moved on in between. The
+    // account of that comes from the model's next turn, which is the only side
+    // that knows — a card claiming the change was written would be guessing,
+    // and contradicting the reply printed under it.
+    render(<ProposalCard proposal={proposal({ status: 'applied' })} />);
+
+    expect(screen.getByText('You applied this change')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
+  });
+
+  it('keeps a discarded change in the transcript', () => {
+    // A transcript shows what happened, and a change somebody said no to is as
+    // much a part of that as one they agreed to.
+    render(<ProposalCard proposal={proposal({ status: 'discarded' })} />);
+
+    expect(screen.getByText('You discarded this change')).toBeInTheDocument();
+    expect(screen.getByText('Listens on 8080.')).toBeInTheDocument();
+  });
+
+  it('still asks about a kind it has never heard of', () => {
+    // A newer service proposing something new should leave the reader able to
+    // say yes or no, not looking at a card that declines to name itself.
+    render(<ProposalCard proposal={proposal({ kind: 'edit_calendar', title: '' })} />);
+
+    expect(screen.getByRole('heading', { name: 'A change to your workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+  });
+
+  it('renders a change with nothing to compare', () => {
+    // Renaming a note has no content to compare, and a card that threw would
+    // take the conversation down with it.
+    render(<ProposalCard proposal={proposal({ kind: 'rename_note', diff: [] })} />);
+
+    expect(screen.getByText('There is nothing to show for this change.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+  });
+});

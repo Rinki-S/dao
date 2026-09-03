@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   IconAlertTriangle,
   IconInfoCircle,
@@ -22,8 +22,15 @@ import { Textarea } from '@/components/ui/textarea.jsx';
 import { useTitlebarInset } from '@/components/shell/use-titlebar-inset.js';
 import { cn } from '@/lib/utils';
 import { Markdown } from './Markdown.jsx';
+import { ProposalCard } from './ProposalCard.jsx';
 import { useConversations } from '../use-conversations.js';
-import { CHAT_OUTCOMES, createConversation, getConversation, sendMessage } from '../api.js';
+import {
+  CHAT_OUTCOMES,
+  createConversation,
+  getConversation,
+  resolveProposal,
+  sendMessage,
+} from '../api.js';
 
 // Each refusal, with the variant that says what kind of thing it is. No model
 // connected is not a breakage, so it does not get an error's colour.
@@ -53,6 +60,14 @@ const OUTCOMES = {
     icon: IconAlertTriangle,
     title: 'That conversation is gone',
     description: 'It was deleted somewhere else. Start a new one.',
+  },
+  // Not a breakage either. The decision was made — in another window, or by a
+  // second press — and what this one is holding is out of date.
+  [CHAT_OUTCOMES.answered]: {
+    variant: 'info',
+    icon: IconInfoCircle,
+    title: 'That change was already answered',
+    description: 'Open the conversation again to see what happened to it.',
   },
 };
 
@@ -84,6 +99,10 @@ function describeTool({ name, input }) {
       return 'Read a note';
     case 'read_tasks':
       return 'Read your task list';
+    case 'edit_note':
+      // Worked out, not made. The card below the turn is what says what the
+      // change is; this line only has to avoid implying the note was written.
+      return 'Prepared a change to a note';
     default:
       // A tool this build has not heard of still gets a line. Saying nothing
       // would hide that the model did something.
@@ -193,6 +212,15 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   const [transcript, setTranscript] = useState({ id: null, messages: [] });
   const [problem, setProblem] = useState({ id: null, outcome: null, failure: '' });
 
+  // The changes this conversation has proposed, answered or not, tagged the
+  // same way and for the same reason.
+  //
+  // Beside the transcript rather than inside it: a change is recorded while the
+  // tool runs, before the turn that asked for it has been stored, so for the
+  // moment between the two there is no message to hang it on. They are joined
+  // where they are drawn, by the id of the call that proposed it.
+  const [changes, setChanges] = useState({ id: null, items: [] });
+
   // Memoised only so its identity is stable: the effect that follows the answer
   // down the page depends on it, and a fresh [] every render would scroll on
   // every render.
@@ -202,6 +230,10 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   );
   const outcome = problem.id === selectedId ? problem.outcome : null;
   const failure = problem.id === selectedId ? problem.failure : '';
+  const proposed = useMemo(
+    () => (changes.id === selectedId ? changes.items : []),
+    [changes, selectedId],
+  );
 
   const [draft, setDraft] = useState('');
   // The turn in flight: what the user just said, what is being looked up, and
@@ -240,10 +272,18 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
 
     getConversation(selectedId)
       .then((detail) => {
-        if (!cancelled) setTranscript({ id: selectedId, messages: detail.messages });
+        if (cancelled) return;
+
+        setTranscript({ id: selectedId, messages: detail.messages });
+        // Read back with the turns, so a change nobody answered is still
+        // waiting after a reload and one somebody answered still says so.
+        setChanges({ id: selectedId, items: detail.proposals });
       })
       .catch(() => {
-        if (!cancelled) setTranscript({ id: selectedId, messages: [] });
+        if (cancelled) return;
+
+        setTranscript({ id: selectedId, messages: [] });
+        setChanges({ id: selectedId, items: [] });
       });
 
     return () => {
@@ -261,55 +301,71 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
     }));
   }
 
+  // One change onto the conversation it belongs to, replacing it if it is
+  // already held: the same row arrives from the stream and from a reload, and
+  // two copies of one change would be two sets of buttons for one decision.
+  function keepChange(conversationId, proposal) {
+    setChanges((current) => {
+      const held = current.id === conversationId ? current.items : [];
+
+      return {
+        id: conversationId,
+        items: held.some((change) => change.id === proposal.id)
+          ? held.map((change) => (change.id === proposal.id ? proposal : change))
+          : [...held, proposal],
+      };
+    });
+  }
+
+  // What a change becomes once it has been answered.
+  //
+  // Only ever called where the service has already recorded the same thing, so
+  // this is not the interface guessing — it is the interface not having to go
+  // and read back what it was just told.
+  function settle(conversationId, decide) {
+    setChanges((current) => {
+      if (current.id !== conversationId) return current;
+
+      return { id: conversationId, items: current.items.map(decide) };
+    });
+  }
+
   // Following the answer as it is written is the whole point of streaming it.
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: 'end' });
-  }, [messages, streaming, pending, activity]);
+  }, [messages, streaming, pending, activity, proposed]);
 
-  async function submit(event) {
-    event.preventDefault();
-
-    const content = draft.trim();
-    if (!content || sending || !workspaceId) return;
-
-    setDraft('');
-    setPending(content);
+  /**
+   * Everything that happens after a turn's request is opened.
+   *
+   * Shared by the two ways a turn can start — somebody said something, or
+   * somebody answered a change the model prepared. The difference between them
+   * is entirely in what comes before; after that it is the same events in the
+   * same order, and this is the part with all the ways to get it wrong: what to
+   * keep when a stream dies, what to call a reader who pressed stop, what to
+   * store so the pane and a reload agree.
+   */
+  async function carry(conversationId, begin, { restore = '' } = {}) {
     setActivity([]);
     setStreaming('');
     setSending(true);
-    setProblem({ id: selectedId, outcome: null, failure: '' });
+    setProblem({ id: conversationId, outcome: null, failure: '' });
 
     running.current = new AbortController();
     streamed.current = '';
     streamedTools.current = [];
     assistantId.current = '';
 
-    // Hoisted out of the try so the catch can file what it builds against the
-    // conversation the turn was actually sent to, which may have been created
-    // by this send rather than selected before it.
-    let conversationId = selectedId;
-
     try {
-      // Lazily, so the list only ever holds conversations with something in
-      // them. The id is needed before the turn can be sent either way.
-      if (!conversationId) {
-        const conversation = await createConversation(workspaceId);
-        conversationId = conversation.id;
-        // Marked loaded before it is selected: this pane already holds the
-        // conversation, which is empty, and reading it back would race the
-        // turn about to be streamed into it.
-        loaded.current = conversation.id;
-        setTranscript({ id: conversation.id, messages: [] });
-        select(conversation.id);
-      }
-
-      const reply = await sendMessage(conversationId, content, {
+      const reply = await begin({
         // The stored user turn replaces the local one: it carries the id,
-        // position and timestamp only the service could assign.
+        // position and timestamp only the service could assign. It is absent
+        // when nobody said anything, which is how a turn picked up after a
+        // change was answered begins.
         onStart: (start) => {
           assistantId.current = start.assistantMessageId;
           setPending('');
-          addTurn(conversationId, start.userMessage);
+          if (start.userMessage) addTurn(conversationId, start.userMessage);
         },
         onDelta: (text) => {
           streamed.current += text;
@@ -319,6 +375,9 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
           streamedTools.current = [...streamedTools.current, call];
           setActivity((current) => [...current, call]);
         },
+        // The turn stopped to ask something. The card is drawn from this row
+        // exactly as stored, so what is agreed to is what would be written.
+        onProposal: (proposal) => keepChange(conversationId, proposal),
         signal: running.current.signal,
       });
 
@@ -376,12 +435,116 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
       setActivity([]);
       setStreaming('');
       // Nothing was sent, so the words are handed back rather than lost to a
-      // failure the user is about to be asked to do something about.
-      setDraft((current) => current || content);
+      // failure the user is about to be asked to do something about. There are
+      // none to hand back when the turn was started by a decision.
+      if (restore) setDraft((current) => current || restore);
     } finally {
       running.current = null;
       setSending(false);
     }
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+
+    const content = draft.trim();
+    if (!content || sending || !workspaceId) return;
+
+    setDraft('');
+    setPending(content);
+    // Before the conversation is created, not after: creating one is a request
+    // of its own, and a second press while it is in flight would create a
+    // second conversation to send the same question to.
+    setSending(true);
+
+    // Hoisted out of the try so the catch can file what it builds against the
+    // conversation the turn was actually sent to, which may have been created
+    // by this send rather than selected before it.
+    let conversationId = selectedId;
+
+    try {
+      // Lazily, so the list only ever holds conversations with something in
+      // them. The id is needed before the turn can be sent either way.
+      if (!conversationId) {
+        const conversation = await createConversation(workspaceId);
+        conversationId = conversation.id;
+        // Marked loaded before it is selected: this pane already holds the
+        // conversation, which is empty, and reading it back would race the
+        // turn about to be streamed into it.
+        loaded.current = conversation.id;
+        setTranscript({ id: conversation.id, messages: [] });
+        setChanges({ id: conversation.id, items: [] });
+        select(conversation.id);
+      }
+    } catch (error) {
+      setProblem({
+        id: selectedId,
+        outcome: error.outcome ?? CHAT_OUTCOMES.failed,
+        failure: error.message,
+      });
+      setPending('');
+      setSending(false);
+      setDraft((current) => current || content);
+
+      return;
+    }
+
+    await carry(
+      conversationId,
+      (events) =>
+        sendMessage(conversationId, content, {
+          ...events,
+          onStart: (start) => {
+            // Saying something else instead of answering is an answer: no. The
+            // service sets aside whatever was waiting before it stores this
+            // turn, and the pane says the same thing rather than going on
+            // offering buttons for a decision that is no longer open.
+            //
+            // Here rather than before the request, because a turn the service
+            // refuses outright — no provider configured — never gets that far,
+            // and the change is still waiting when the reader tries again.
+            settle(conversationId, (change) =>
+              change.status === 'pending' ? { ...change, status: 'discarded' } : change,
+            );
+            events.onStart(start);
+          },
+        }),
+      { restore: content },
+    );
+  }
+
+  /**
+   * Answer a change the model prepared, and let the turn carry on.
+   *
+   * The decision is all that is sent. What gets written is read by the service
+   * from the row that was shown, so there is nothing here that could confirm
+   * something other than what the person read.
+   */
+  async function decide(proposal, decision) {
+    if (sending) return;
+
+    const conversationId = proposal.conversationId || selectedId;
+    if (!conversationId) return;
+
+    await carry(conversationId, (events) =>
+      resolveProposal(conversationId, proposal.id, decision, {
+        ...events,
+        onStart: (start) => {
+          // The service records the decision before it opens the stream, so by
+          // the time this event arrives the answer is already kept. Said in
+          // terms of what the person did rather than what became of the file:
+          // applying can still be refused by a note that moved on, and the
+          // account of that comes from the model's next turn, which is the only
+          // side that knows.
+          settle(conversationId, (change) =>
+            change.id === proposal.id
+              ? { ...change, status: decision === 'apply' ? 'applied' : 'discarded' }
+              : change,
+          );
+          events.onStart(start);
+        },
+      }),
+    );
   }
 
   // Aborting the request is the whole mechanism. The connection closing is what
@@ -395,6 +558,25 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   const refusal = outcome ? OUTCOMES[outcome] : null;
   const RefusalIcon = refusal?.icon ?? IconAlertTriangle;
   const empty = messages.length === 0 && !pending && !streaming && activity.length === 0;
+
+  // A change is drawn under the turn that asked for it, found through the call
+  // it was recorded against — which is why the transcript keeps call ids it
+  // never shows anybody.
+  const under = (message) => {
+    const calls = new Set((message.toolCalls ?? []).map((call) => call.id).filter(Boolean));
+
+    return proposed.filter((change) => calls.has(change.toolCallId));
+  };
+
+  // A change whose turn is not in hand yet, which is the state between the
+  // proposal event and the done event that carries the row holding its call.
+  // Drawn at the end rather than held back: it is the thing the conversation is
+  // stopped on, and a card that appeared a second later would be a card that
+  // was missing when somebody looked.
+  const placed = new Set(
+    messages.flatMap((message) => (message.toolCalls ?? []).map((call) => call.id)),
+  );
+  const loose = proposed.filter((change) => !placed.has(change.toolCallId));
 
   return (
     <section aria-label="Chats" className="flex h-full min-h-0 flex-col">
@@ -439,7 +621,12 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
           ) : null}
 
           {messages.map((message) => (
-            <Turn key={message.id} message={message} />
+            <Fragment key={message.id}>
+              <Turn message={message} />
+              {under(message).map((change) => (
+                <ProposalCard busy={sending} key={change.id} proposal={change} onDecide={decide} />
+              ))}
+            </Fragment>
           ))}
 
           {pending ? (
@@ -458,6 +645,10 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
                 fence is a fence still being written rather than a stray
                 backtick. */}
           {streaming ? <Markdown final={false} text={streaming} /> : null}
+
+          {loose.map((change) => (
+            <ProposalCard busy={sending} key={change.id} proposal={change} onDecide={decide} />
+          ))}
 
           {sending && !streaming && activity.length === 0 ? <Spinner aria-hidden="true" /> : null}
 
