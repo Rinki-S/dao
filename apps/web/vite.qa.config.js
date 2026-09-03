@@ -266,6 +266,15 @@ const chatProposals = {
   ],
 };
 
+// What the model says after each kind of change was written.
+const APPLIED_REPLY = {
+  edit_note: 'Done — the note now says to flush the buffered token at EOF.',
+  create_note: 'Written. The note is in your workspace now.',
+  edit_tasks: 'Done — that one is ticked off.',
+  rename_note: 'Renamed.',
+  delete_note: 'Deleted. It is gone from the workspace.',
+};
+
 // Changes this server will refuse to apply, by id.
 //
 // Kept beside the fixtures rather than on them: the real service decides this
@@ -616,10 +625,13 @@ function resolveChatProposal(request, response, conversationId, proposalId) {
     // the order the service writes them.
     response.write(`event: proposal\ndata: ${JSON.stringify(waiting)}\n\n`);
 
+    // In the words of the change that was actually answered. A reply that talks
+    // about a note after somebody ticked off a task is the fixture undermining
+    // the thing it exists to let somebody look at.
     const text = refused
       ? 'I could not write it — the note changed after I prepared this.'
       : decision === 'apply'
-        ? 'Done — the note now says to flush the buffered token at EOF.'
+        ? (APPLIED_REPLY[waiting.kind] ?? 'Done.')
         : 'Understood. Nothing was written.';
 
     const assistant = {
