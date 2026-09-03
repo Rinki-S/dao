@@ -297,27 +297,37 @@ func workspaceTools(
 			},
 			// The one thing that lets the model ask to change anything, and it
 			// only records the asking. Nothing here writes.
-			ProposeEdit: func(edit tools.ProposedEdit) error {
-				// Checked here as well as when the tool read the note, because
-				// this is the call that ends in somebody's file being written.
-				// The read that came before it proves nothing about the id in
-				// front of us now.
-				note, err := noteRepo.Get(edit.NoteID)
-				if err != nil || note.WorkspaceID != workspaceID {
-					return fmt.Errorf("no note %q in this workspace", edit.NoteID)
-				}
-
-				_, err = proposalRepo.Create(proposals.CreateRequest{
+			Propose: func(change tools.Proposed) error {
+				request := proposals.CreateRequest{
 					WorkspaceID:       workspaceID,
 					ConversationID:    conversationID,
-					ToolCallID:        edit.ToolCallID,
-					Kind:              proposals.KindEditNote,
-					TargetID:          edit.NoteID,
-					Title:             note.Title,
-					Before:            edit.Before,
-					After:             edit.After,
-					ExpectedUpdatedAt: edit.ExpectedUpdatedAt,
-				})
+					ToolCallID:        change.ToolCallID,
+					Kind:              change.Kind,
+					TargetID:          change.TargetID,
+					Title:             change.Title,
+					Before:            change.Before,
+					After:             change.After,
+					ExpectedUpdatedAt: change.ExpectedUpdatedAt,
+				}
+
+				// A change against a note that exists is checked here as well as
+				// when the tool read it, because this is the call that ends in
+				// somebody's file being written. The read that came before it
+				// proves nothing about the id in front of us now.
+				//
+				// And the title comes from the note rather than from the model,
+				// so the question somebody is asked names the note the way their
+				// own workspace does.
+				if change.TargetID != "" {
+					note, err := noteRepo.Get(change.TargetID)
+					if err != nil || note.WorkspaceID != workspaceID {
+						return fmt.Errorf("no note %q in this workspace", change.TargetID)
+					}
+
+					request.Title = note.Title
+				}
+
+				_, err := proposalRepo.Create(request)
 
 				return err
 			},

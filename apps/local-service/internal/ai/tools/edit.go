@@ -10,17 +10,52 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm"
 )
 
-// ProposedEdit is a change worked out but not made.
+// The changes a tool can ask for.
+//
+// The same strings the tools are called by, because a proposal is the record of
+// one call and a second vocabulary for the same five things would be a second
+// thing to keep in step.
+const (
+	KindEditNote   = "edit_note"
+	KindCreateNote = "create_note"
+	KindEditTasks  = "edit_tasks"
+	KindRenameNote = "rename_note"
+	KindDeleteNote = "delete_note"
+)
+
+// Proposed is a change worked out but not made.
 //
 // Carries both texts because whoever records it has to be able to show the
 // change and then perform it from the same thing. Carries the call's id because
 // the model is about to be left waiting on that call, and whatever answers it
 // later has to answer that one.
-type ProposedEdit struct {
-	ToolCallID        string
-	NoteID            string
-	Before            string
-	After             string
+//
+// One shape for all five kinds, because what a proposal is for does not vary:
+// something to show, and enough to perform it with. What varies is which fields
+// are filled, and each tool's own code is the honest place to say that — a
+// struct per kind would put five nearly identical things in front of every
+// reader of the confirmation path, which is the path that most needs to be read
+// in one piece.
+type Proposed struct {
+	ToolCallID string
+	Kind       string
+
+	// TargetID is what the change is against. Empty for a note that does not
+	// exist yet, which is the only kind of change with nothing to point at.
+	TargetID string
+
+	// Title is what to call this when somebody is asked about it. For a note
+	// that exists it is filled in by whoever records the proposal, from the note
+	// it re-reads — a title the model supplied would be a title nobody checked.
+	Title string
+
+	// Before and After are what to show. A creation has no before and a deletion
+	// has no after, and both of those are the empty string rather than a flag:
+	// the comparison drawn from them is then right without a special case, all
+	// additions in the first and all removals in the second.
+	Before string
+	After  string
+
 	ExpectedUpdatedAt string
 }
 
@@ -117,9 +152,10 @@ func (t *editNote) Run(_ context.Context, call agent.Call) (string, error) {
 
 	after := strings.Replace(note.Content, arguments.OldText, arguments.NewText, 1)
 
-	if err := t.workspace.ProposeEdit(ProposedEdit{
+	if err := t.workspace.Propose(Proposed{
 		ToolCallID:        call.ID,
-		NoteID:            id,
+		Kind:              KindEditNote,
+		TargetID:          id,
 		Before:            note.Content,
 		After:             after,
 		ExpectedUpdatedAt: note.UpdatedAt,

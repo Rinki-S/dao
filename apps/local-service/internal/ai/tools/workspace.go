@@ -55,15 +55,20 @@ type Workspace struct {
 	// ReadTasks returns the workspace's task list as it stands.
 	ReadTasks func() (string, error)
 
-	// ProposeEdit records a change to a note for somebody to agree to, and does
-	// not make it.
+	// Propose records a change for somebody to agree to, and does not make it.
 	//
 	// Nil is not an oversight and not a degraded mode: a workspace built without
 	// it gets no writing tools at all, so a surface that has not thought about
 	// confirmation cannot offer one by forgetting to. The read tools are always
 	// there; this is the only thing that decides whether the model can ask to
 	// change anything.
-	ProposeEdit func(ProposedEdit) error
+	//
+	// One function for every kind of change rather than one per tool. What a
+	// caller has to have thought about is confirmation, and that is a single
+	// question — a workspace that could be handed the ability to create notes
+	// and not the ability to edit them would be a shape with no reason to exist,
+	// and five nilable fields would be five chances to leave one out.
+	Propose func(Proposed) error
 }
 
 // maxMatches bounds a search result.
@@ -95,7 +100,7 @@ func New(workspace Workspace) []agent.Tool {
 		&readTasks{workspace: workspace},
 	}
 
-	if workspace.ProposeEdit != nil {
+	if workspace.Propose != nil {
 		tools = append(tools, &editNote{workspace: workspace})
 	}
 

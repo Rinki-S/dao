@@ -12,11 +12,11 @@ import (
 
 // what a run against a one-note workspace recorded, if anything.
 type recorder struct {
-	edits []ProposedEdit
+	edits []Proposed
 	err   error
 }
 
-func (r *recorder) propose(edit ProposedEdit) error {
+func (r *recorder) propose(edit Proposed) error {
 	if r.err != nil {
 		return r.err
 	}
@@ -41,7 +41,7 @@ func editorFor(t *testing.T, content string, into *recorder) agent.Tool {
 				UpdatedAt: "2026-09-02T09:00:00Z",
 			}, nil
 		},
-		ProposeEdit: into.propose,
+		Propose: into.propose,
 	})
 
 	for _, tool := range tools {
