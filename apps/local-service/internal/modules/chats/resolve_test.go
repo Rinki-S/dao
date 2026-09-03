@@ -345,6 +345,61 @@ func TestAFailedApplyIsToldToTheModelAsAFailure(t *testing.T) {
 	}
 }
 
+// The model is told by the code that tried, and forgets at the end of the turn.
+// The row is what is left, and what somebody coming back tomorrow reads. A
+// change that was refused must not sit in it claiming to have been made.
+func TestAFailedApplyIsNotRecordedAsApplied(t *testing.T) {
+	model := llmtest.Sequence(
+		llmtest.Turn{Calls: llmtest.ToolCall("call-1", "edit_note", `{}`).Calls},
+		llmtest.Turn{Text: "I could not change it.", Stop: llm.StopEnd},
+	)
+
+	handler, repo, proposalRepo, world, _ := proposingHandler(t, model)
+	world.err = errNoteMoved
+	conversation := newConversation(t, repo)
+	send(t, handler, conversation.ID, "fix the port")
+
+	waiting, _, _ := proposalRepo.Waiting(conversation.ID)
+	decide(t, handler, conversation.ID, waiting.ID, DecisionApply)
+
+	answered, err := proposalRepo.Get(waiting.ID)
+	if err != nil {
+		t.Fatalf("reading the change back: %v", err)
+	}
+	if answered.Status != proposals.StatusFailed {
+		t.Errorf("a change the note refused is recorded as %q", answered.Status)
+	}
+
+	// And it is still answered, so the buttons do not come back for a decision
+	// that has already been spent on a tool call the model has seen.
+	if answered.Pending() {
+		t.Error("a change that failed to apply is still waiting for an answer")
+	}
+}
+
+// The other half of the same claim: an apply that worked says so.
+func TestAnAppliedChangeIsRecordedAsApplied(t *testing.T) {
+	model := llmtest.Sequence(
+		llmtest.Turn{Calls: llmtest.ToolCall("call-1", "edit_note", `{}`).Calls},
+		llmtest.Turn{Text: "Done.", Stop: llm.StopEnd},
+	)
+
+	handler, repo, proposalRepo, _, _ := proposingHandler(t, model)
+	conversation := newConversation(t, repo)
+	send(t, handler, conversation.ID, "fix the port")
+
+	waiting, _, _ := proposalRepo.Waiting(conversation.ID)
+	decide(t, handler, conversation.ID, waiting.ID, DecisionApply)
+
+	answered, err := proposalRepo.Get(waiting.ID)
+	if err != nil {
+		t.Fatalf("reading the change back: %v", err)
+	}
+	if answered.Status != proposals.StatusApplied {
+		t.Errorf("a change that was written is recorded as %q", answered.Status)
+	}
+}
+
 var errNoteMoved = &staticError{"the note changed after this was prepared"}
 
 type staticError struct{ text string }
@@ -437,10 +492,43 @@ func TestTheWireCarriesWhatTheInterfaceDrawsFrom(t *testing.T) {
 
 	// And a turn nobody started says so, rather than sending an empty one.
 	answered := decide(t, handler, conversation.ID, change.ID, DecisionApply)
-	start := answered.Body.String()
-	start = start[strings.Index(start, "event: start"):]
+	continued := answered.Body.String()
+	start := continued[strings.Index(continued, "event: start"):]
 	start = start[:strings.Index(start, "\n\n")]
 	if strings.Contains(start, "userMessage") {
 		t.Errorf("the continuation claims somebody said something: %s", start)
+	}
+
+	// The answered change comes back down the same stream. What the person
+	// pressed does not settle what the row says — an apply a note refused is
+	// recorded as failed — so the surface is told rather than left to infer it.
+	if !strings.Contains(continued, "event: proposal") {
+		t.Fatalf("the continuation never says what became of the change:\n%s", continued)
+	}
+	if !strings.Contains(continued, `"status":"applied"`) {
+		t.Errorf("the continuation does not carry the recorded status:\n%s", continued)
+	}
+}
+
+// A change abandoned by somebody talking past it is on screen with its buttons
+// live at the moment it is set aside, and this stream is the only thing that
+// will reach the surface holding it.
+func TestSettingAChangeAsideIsSaidOnTheWire(t *testing.T) {
+	model := llmtest.Sequence(
+		llmtest.Turn{Calls: llmtest.ToolCall("call-1", "edit_note", `{}`).Calls},
+		llmtest.Turn{Text: "Fine.", Stop: llm.StopEnd},
+	)
+
+	handler, repo, _, _, _ := proposingHandler(t, model)
+	conversation := newConversation(t, repo)
+	send(t, handler, conversation.ID, "fix the port")
+
+	stream := send(t, handler, conversation.ID, "never mind").Body.String()
+
+	if !strings.Contains(stream, "event: proposal") {
+		t.Fatalf("walking away never says so:\n%s", stream)
+	}
+	if !strings.Contains(stream, `"status":"discarded"`) {
+		t.Errorf("the abandoned change is not sent as answered:\n%s", stream)
 	}
 }

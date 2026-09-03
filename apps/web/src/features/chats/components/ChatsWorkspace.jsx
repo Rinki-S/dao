@@ -317,19 +317,6 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
     });
   }
 
-  // What a change becomes once it has been answered.
-  //
-  // Only ever called where the service has already recorded the same thing, so
-  // this is not the interface guessing — it is the interface not having to go
-  // and read back what it was just told.
-  function settle(conversationId, decide) {
-    setChanges((current) => {
-      if (current.id !== conversationId) return current;
-
-      return { id: conversationId, items: current.items.map(decide) };
-    });
-  }
-
   // Following the answer as it is written is the whole point of streaming it.
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: 'end' });
@@ -375,8 +362,11 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
           streamedTools.current = [...streamedTools.current, call];
           setActivity((current) => [...current, call]);
         },
-        // The turn stopped to ask something. The card is drawn from this row
-        // exactly as stored, so what is agreed to is what would be written.
+        // Where a change stands, said by the side that knows. It arrives when a
+        // turn stops to ask, and again at the top of the stream that follows an
+        // answer — the card is drawn from this row exactly as stored, so what is
+        // agreed to is what would be written, and what is shown afterwards is
+        // what was actually recorded rather than what this pane sent.
         onProposal: (proposal) => keepChange(conversationId, proposal),
         signal: running.current.signal,
       });
@@ -489,28 +479,12 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
       return;
     }
 
-    await carry(
-      conversationId,
-      (events) =>
-        sendMessage(conversationId, content, {
-          ...events,
-          onStart: (start) => {
-            // Saying something else instead of answering is an answer: no. The
-            // service sets aside whatever was waiting before it stores this
-            // turn, and the pane says the same thing rather than going on
-            // offering buttons for a decision that is no longer open.
-            //
-            // Here rather than before the request, because a turn the service
-            // refuses outright — no provider configured — never gets that far,
-            // and the change is still waiting when the reader tries again.
-            settle(conversationId, (change) =>
-              change.status === 'pending' ? { ...change, status: 'discarded' } : change,
-            );
-            events.onStart(start);
-          },
-        }),
-      { restore: content },
-    );
+    // Saying something else instead of answering is an answer: no. Nothing here
+    // has to arrange for the card to say so — the service sets aside whatever
+    // was waiting before it stores this turn, and sends the row it set aside.
+    await carry(conversationId, (events) => sendMessage(conversationId, content, events), {
+      restore: content,
+    });
   }
 
   /**
@@ -519,6 +493,11 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
    * The decision is all that is sent. What gets written is read by the service
    * from the row that was shown, so there is nothing here that could confirm
    * something other than what the person read.
+   *
+   * And what the card says afterwards comes back down the stream. Guessing it
+   * from the decision would be wrong in exactly the case that matters: an apply
+   * a note refused is not an apply, and only the code that tried to write knows
+   * which happened.
    */
   async function decide(proposal, decision) {
     if (sending) return;
@@ -527,23 +506,7 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
     if (!conversationId) return;
 
     await carry(conversationId, (events) =>
-      resolveProposal(conversationId, proposal.id, decision, {
-        ...events,
-        onStart: (start) => {
-          // The service records the decision before it opens the stream, so by
-          // the time this event arrives the answer is already kept. Said in
-          // terms of what the person did rather than what became of the file:
-          // applying can still be refused by a note that moved on, and the
-          // account of that comes from the model's next turn, which is the only
-          // side that knows.
-          settle(conversationId, (change) =>
-            change.id === proposal.id
-              ? { ...change, status: decision === 'apply' ? 'applied' : 'discarded' }
-              : change,
-          );
-          events.onStart(start);
-        },
-      }),
+      resolveProposal(conversationId, proposal.id, decision, events),
     );
   }
 

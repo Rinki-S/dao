@@ -1,4 +1,4 @@
-import { IconCheck, IconFilePencil, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCheck, IconFilePencil, IconX } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button.jsx';
 import { cn } from '@/lib/utils';
 import { DECISIONS } from '../api.js';
@@ -76,15 +76,23 @@ function describe({ kind, title }) {
 
 // What an answered change is called afterwards.
 //
-// In terms of what the person did, not of what became of the file. Applying can
-// still fail — the note may have been edited in between — and the account of
-// that comes from the model's next turn, which is the only side that knows. A
-// line here claiming the change was written would be this surface guessing, and
-// contradicting the reply printed underneath it.
+// Mostly in terms of what the person did rather than what became of the file,
+// because those are different claims and this surface can only make the first
+// one. The exception is a change that failed, and it is only sayable because the
+// service records it: the code that tried to write is the one that knows, and
+// now that its answer survives in the row, the card can repeat it instead of
+// guessing something that would contradict the reply printed underneath.
 const ANSWERED = {
   applied: { icon: IconCheck, text: 'You applied this change' },
   discarded: { icon: IconX, text: 'You discarded this change' },
+  failed: { icon: IconAlertTriangle, text: 'This change could not be applied' },
 };
+
+// Anything that is not pending has been answered, whether or not this build
+// knows the word for it. A status from a newer service falling through to a
+// fresh pair of buttons would offer a decision that has already been made and
+// spent on a call the model has seen the result of.
+const UNRECOGNISED = { icon: IconCheck, text: 'This change was answered' };
 
 /**
  * A change the model prepared, waiting for an answer.
@@ -99,7 +107,8 @@ const ANSWERED = {
  * that happens.
  */
 export function ProposalCard({ proposal, busy = false, onDecide }) {
-  const answered = ANSWERED[proposal.status];
+  const answered =
+    proposal.status === 'pending' ? null : (ANSWERED[proposal.status] ?? UNRECOGNISED);
   const AnsweredIcon = answered?.icon;
 
   return (

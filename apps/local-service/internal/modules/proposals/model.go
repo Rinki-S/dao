@@ -27,10 +27,17 @@ const (
 // person walking away. Sending another message abandons whatever was waiting,
 // because a tool call left unanswered makes the whole transcript unreadable to
 // the model — so there is no third state where a proposal is merely forgotten.
+//
+// Failed is separate from both, and from applied. Somebody agreed and the write
+// did not happen — because the note moved on in between, most often. Recording
+// that as applied would leave a row asserting a change to a file that does not
+// contain it, and everything downstream reads the row: the model is told the
+// truth by the code that tried, but a person coming back tomorrow has only this.
 const (
 	StatusPending   = "pending"
 	StatusApplied   = "applied"
 	StatusDiscarded = "discarded"
+	StatusFailed    = "failed"
 )
 
 // Proposal is one change, waiting.

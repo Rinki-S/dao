@@ -555,11 +555,16 @@ describe('a change the model proposed', () => {
 
   it('says what was decided once it has been', async () => {
     proposes();
-    api.resolveProposal.mockImplementation(async (_chat, _proposal, _decision, { onStart }) => {
-      onStart?.({ assistantMessageId: 'message-3' });
+    api.resolveProposal.mockImplementation(
+      async (_chat, _proposal, _decision, { onStart, onProposal }) => {
+        onStart?.({ assistantMessageId: 'message-3' });
+        // How the card finds out. The service resolves the row before it opens
+        // the stream and sends what it wrote.
+        onProposal?.(change({ status: 'discarded' }));
 
-      return assistant({ id: 'message-3', content: 'Nothing was written.', position: 2 });
-    });
+        return assistant({ id: 'message-3', content: 'Nothing was written.', position: 2 });
+      },
+    );
 
     await ask('fix the port');
     await userEvent.click(await screen.findByRole('button', { name: 'Discard' }));
@@ -567,6 +572,32 @@ describe('a change the model proposed', () => {
     expect(await screen.findByText('You discarded this change')).toBeInTheDocument();
     // The question is answered, so it stops being asked.
     expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+  });
+
+  it('does not call an apply the note refused an apply', async () => {
+    // The decision the person made and what came of acting on it are two
+    // different things, and this pane only ever knows the first. Reading the
+    // status off the decision it sent would show the change as made, over a
+    // reply explaining that it was not.
+    proposes();
+    api.resolveProposal.mockImplementation(
+      async (_chat, _proposal, _decision, { onStart, onProposal }) => {
+        onStart?.({ assistantMessageId: 'message-3' });
+        onProposal?.(change({ status: 'failed' }));
+
+        return assistant({
+          id: 'message-3',
+          content: 'The note changed while you were reading.',
+          position: 2,
+        });
+      },
+    );
+
+    await ask('fix the port');
+    await userEvent.click(await screen.findByRole('button', { name: 'Apply' }));
+
+    expect(await screen.findByText('This change could not be applied')).toBeInTheDocument();
+    expect(screen.queryByText('You applied this change')).toBeNull();
   });
 
   it('leaves the change waiting when the decision was refused', async () => {
@@ -633,7 +664,15 @@ describe('a change the model proposed', () => {
     await ask('fix the port');
     await screen.findByRole('button', { name: 'Apply' });
 
-    replies(['Something else entirely.'], assistant({ id: 'message-3', position: 2 }));
+    // The service sets the change aside before it stores this turn, and sends
+    // the row it set aside — which is the only way this pane could know.
+    api.sendMessage.mockImplementation(async (_id, content, { onStart, onProposal }) => {
+      onStart?.({ userMessage: message({ content }), assistantMessageId: 'message-3' });
+      onProposal?.(change({ status: 'discarded' }));
+
+      return assistant({ id: 'message-3', content: 'Something else entirely.', position: 2 });
+    });
+
     await userEvent.type(screen.getByLabelText('Message'), 'never mind');
     await userEvent.click(screen.getByRole('button', { name: 'Send' }));
 

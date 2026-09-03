@@ -236,7 +236,8 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 	// lets them just carry on talking, which is the thing they were trying to
 	// do — and the model is told plainly that nothing was written, so it does
 	// not go on believing the change happened.
-	if err := h.abandonWaitingChange(conversationID); err != nil {
+	abandoned, setAside, err := h.abandonWaitingChange(conversationID)
+	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "failed to set aside the proposed change")
 		return
 	}
@@ -282,6 +283,13 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 		UserMessage:        &user,
 		AssistantMessageID: assistant.ID,
 	})
+
+	// A change this message walked away from, said as the row it now is. It was
+	// on screen with its buttons live when the request went out, and the surface
+	// showing it has no other way to find out that it is over.
+	if setAside {
+		writeEvent(w, flusher, EventProposal, abandoned)
+	}
 
 	h.runTurn(w, r, flusher, turnRun{
 		client:       client,

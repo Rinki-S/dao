@@ -88,6 +88,26 @@ describe('ProposalCard', () => {
     expect(screen.getByText('Listens on 8080.')).toBeInTheDocument();
   });
 
+  it('says so when the write was refused', () => {
+    // The one thing about the file this surface can state, because the service
+    // recorded what the code that tried to write reported. Without it the card
+    // would say the change was applied over a reply explaining that it was not.
+    render(<ProposalCard proposal={proposal({ status: 'failed' })} />);
+
+    expect(screen.getByText('This change could not be applied')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+  });
+
+  it('offers no second answer to a status it has never heard of', () => {
+    // A newer service's word for answered is still answered. Fresh buttons here
+    // would offer a decision already spent on a call the model has replied to.
+    render(<ProposalCard proposal={proposal({ status: 'superseded' })} />);
+
+    expect(screen.getByText('This change was answered')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
+  });
+
   it('still asks about a kind it has never heard of', () => {
     // A newer service proposing something new should leave the reader able to
     // say yes or no, not looking at a card that declines to name itself.

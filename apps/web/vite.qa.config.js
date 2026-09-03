@@ -266,6 +266,15 @@ const chatProposals = {
   ],
 };
 
+// Changes this server will refuse to apply, by id.
+//
+// Kept beside the fixtures rather than on them: the real service decides this
+// when it tries to write, so a flag travelling in the payload would be a field
+// the interface could come to read. Applying qa-proposal-1 fails, which is how
+// the third state — somebody said yes and the note had moved on — can be looked
+// at at all. Discarding it still works.
+const refusesToApply = new Set(['qa-proposal-1']);
+
 // Written to exercise what a reply is actually made of — prose, a list, a
 // fenced block, a table, a link — so the rendered shapes can be looked at
 // rather than assumed. It streams in pieces, so the pane can be watched filling
@@ -341,6 +350,17 @@ function streamChatReply(request, response, conversationId) {
     response.write(
       `event: start\ndata: ${JSON.stringify({ userMessage, assistantMessageId: assistantId })}\n\n`,
     );
+
+    // Talking past a change answers it: no. The service sets it aside before it
+    // stores this turn and sends the row it set aside, which is the only thing
+    // that will reach a pane already showing the card with its buttons live.
+    const abandoned = (chatProposals[conversationId] ?? []).find(
+      (item) => item.status === 'pending',
+    );
+    if (abandoned) {
+      abandoned.status = 'discarded';
+      response.write(`event: proposal\ndata: ${JSON.stringify(abandoned)}\n\n`);
+    }
 
     // Asking for a change gets one prepared rather than made, which is the
     // whole shape of the thing: a short reply, then the card, then a turn that
@@ -489,7 +509,11 @@ function resolveChatProposal(request, response, conversationId, proposalId) {
 
   readBody(request, (body) => {
     const { decision } = JSON.parse(body || '{}');
-    waiting.status = decision === 'apply' ? 'applied' : 'discarded';
+    // What came of acting on it, not what was asked for. An apply the note
+    // refused is recorded as failed, which is the whole reason the surface is
+    // told the status rather than working it out from the decision it sent.
+    const refused = decision === 'apply' && refusesToApply.has(waiting.id);
+    waiting.status = decision !== 'apply' ? 'discarded' : refused ? 'failed' : 'applied';
 
     const stored = chatMessages[conversationId] ?? (chatMessages[conversationId] = []);
     const assistantId = `qa-assistant-${stored.length}`;
@@ -501,8 +525,13 @@ function resolveChatProposal(request, response, conversationId, proposalId) {
       `event: start\ndata: ${JSON.stringify({ assistantMessageId: assistantId })}\n\n`,
     );
 
-    const text =
-      decision === 'apply'
+    // Where the card finds out. Written after start and before the reply, in
+    // the order the service writes them.
+    response.write(`event: proposal\ndata: ${JSON.stringify(waiting)}\n\n`);
+
+    const text = refused
+      ? 'I could not write it — the note changed after I prepared this.'
+      : decision === 'apply'
         ? 'Done — the note now says to flush the buffered token at EOF.'
         : 'Understood. Nothing was written.';
 

@@ -103,7 +103,8 @@ func (h *Handler) resolve(w http.ResponseWriter, r *http.Request) {
 	// inside a stream that has already promised to end with a reply.
 	outcome, failed := h.perform(proposal, request.Decision)
 
-	if _, err := h.proposals.Resolve(proposalID, statusAfter(request.Decision), outcome); err != nil {
+	recorded, err := h.proposals.Resolve(proposalID, statusAfter(request.Decision, failed), outcome)
+	if err != nil {
 		if errors.Is(err, proposals.ErrAlreadyResolved) {
 			httpx.Error(w, http.StatusConflict, "that change was already answered")
 			return
@@ -164,6 +165,12 @@ func (h *Handler) resolve(w http.ResponseWriter, r *http.Request) {
 	// deltas that follow.
 	writeEvent(w, flusher, EventStart, StartEvent{AssistantMessageID: assistant.ID})
 
+	// What the change is now, from the row that was just written. The caller
+	// knows which decision it sent, but not what came of acting on it — an apply
+	// the note refused is recorded as failed, and a surface left to infer the
+	// status from the decision it sent would show the change as made.
+	writeEvent(w, flusher, EventProposal, recorded)
+
 	// The turn has spent its allowance. Recorded as the turn ending rather than
 	// asking the model again, which is the whole point of having a ceiling.
 	if spent >= maxTurnSteps {
@@ -220,20 +227,36 @@ func (h *Handler) perform(proposal proposals.Proposal, decision string) (string,
 	return outcome, false
 }
 
-// statusAfter turns a decision into the status it leaves behind.
-func statusAfter(decision string) string {
-	if decision == DecisionApply {
-		return proposals.StatusApplied
+// statusAfter turns a decision, and what came of acting on it, into the status
+// it leaves behind.
+//
+// Both arguments, because the decision alone is what the person said and the
+// row is meant to record what happened. An apply the note refused is not an
+// apply: perform already knows, because it is the code that tried, and taking
+// the status from the decision would throw that away and leave the row claiming
+// a change the file does not contain.
+func statusAfter(decision string, failed bool) string {
+	if decision != DecisionApply {
+		return proposals.StatusDiscarded
 	}
 
-	return proposals.StatusDiscarded
+	if failed {
+		return proposals.StatusFailed
+	}
+
+	return proposals.StatusApplied
 }
 
 // abandonWaitingChange is what happens when somebody says something else
 // instead of answering.
-func (h *Handler) abandonWaitingChange(conversationID string) error {
+//
+// Returns what it set aside, so the stream that follows can say so. The change
+// is on screen with its buttons live at the moment this runs, and a card left
+// offering a decision that has already been spent is one press away from an
+// answer the service will refuse.
+func (h *Handler) abandonWaitingChange(conversationID string) (proposals.Proposal, bool, error) {
 	if h.proposals == nil {
-		return nil
+		return proposals.Proposal{}, false, nil
 	}
 
 	const outcome = "The person moved on without answering this change. " +
@@ -241,12 +264,16 @@ func (h *Handler) abandonWaitingChange(conversationID string) error {
 
 	abandoned, found, err := h.proposals.DiscardWaiting(conversationID, outcome)
 	if err != nil || !found {
-		return err
+		return proposals.Proposal{}, false, err
 	}
 
 	// The waiting call is answered too, or the transcript stays unreadable and
 	// the message they are about to send fails on the wire.
-	_, err = h.repo.AnswerToolCall(conversationID, abandoned.ToolCallID, outcome, false)
+	if _, err := h.repo.AnswerToolCall(
+		conversationID, abandoned.ToolCallID, outcome, false,
+	); err != nil {
+		return proposals.Proposal{}, false, err
+	}
 
-	return err
+	return abandoned, true, nil
 }
