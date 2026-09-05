@@ -6,6 +6,7 @@ import {
     nativeTheme,
     powerMonitor,
     screen,
+    session,
     shell,
 } from 'electron'
 import path from 'node:path'
@@ -95,6 +96,33 @@ function createWindow() {
         mainWindow = null
     })
 }
+
+// The file types the chat will accept, kept in step with the service's own
+// allowlist in internal/ai/attach. Duplicated deliberately rather than fetched:
+// this only decides what the dialog offers, and the service checks again before
+// anything is stored — a dialog that offered more than the service takes would
+// be a refusal after the choosing rather than before it.
+const ATTACHABLE = [
+    { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] },
+    { name: 'Documents', extensions: ['pdf', 'md', 'txt', 'csv', 'json', 'log', 'yaml', 'yml'] },
+]
+
+// Paths, not bytes. The renderer never reads an attachment — it names one, and
+// the service reads the file itself. Anything else would copy a file through
+// two processes to reach a service running on the same disk.
+ipcMain.handle('dao:choose-attachments', async () => {
+    const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+        title: 'Attach files',
+        properties: ['openFile', 'multiSelections'],
+        filters: ATTACHABLE,
+    })
+
+    if (result.canceled || result.filePaths.length === 0) {
+        return { canceled: true, paths: [] }
+    }
+
+    return { canceled: false, paths: result.filePaths }
+})
 
 ipcMain.handle('dao:select-working-directory', async () => {
     const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
@@ -231,10 +259,34 @@ ipcMain.handle('dao:restart-local-service', async () => {
     return restartLocalServicePromise
 })
 
+// The permissions this window may ask Chromium for, and the only ones.
+//
+// `local-fonts` is what backs the font pickers in Settings: listing the
+// families installed on the machine goes through the Local Font Access API,
+// which is permissioned because the set of fonts somebody has installed is a
+// good fingerprint of who they are. Dao asks for it only when a picker is
+// opened, and the answer never leaves the renderer.
+//
+// Everything else is refused. The default handler grants a good deal by
+// simply not being set, and a local-first app that never records audio should
+// not be one dependency away from being able to.
+const ALLOWED_PERMISSIONS = new Set(['local-fonts'])
+
 app.whenReady().then(async () => {
     if (process.platform === 'darwin') {
         app.dock.setIcon(appIconPath)
     }
+
+    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+        callback(ALLOWED_PERMISSIONS.has(permission))
+    })
+
+    // Asked instead of the handler above for permissions Chromium checks
+    // synchronously, which the font query is one of. Both have to agree or the
+    // query is refused without a prompt ever being shown.
+    session.defaultSession.setPermissionCheckHandler((_webContents, permission) =>
+        ALLOWED_PERMISSIONS.has(permission),
+    )
 
     const startupCredential = readServiceSecret()
     serviceConfig = createServiceConfig(startupCredential.secret, startupCredential.kind)

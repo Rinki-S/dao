@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('dao', {
         sessionToken: readArg('dao-session-token'),
     },
     selectWorkingDirectory: () => ipcRenderer.invoke('dao:select-working-directory'),
+    chooseAttachments: () => ipcRenderer.invoke('dao:choose-attachments'),
     setAppearance: (source) => ipcRenderer.invoke('dao:set-appearance', source),
     restartLocalService: () => ipcRenderer.invoke('dao:restart-local-service'),
     // Write-only by design. There is no getter: the renderer can learn that a
