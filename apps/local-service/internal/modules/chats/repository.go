@@ -329,6 +329,13 @@ func scanMessage(row scanner) (Message, error) {
 	if err != nil {
 		return Message{}, err
 	}
+	// Checked on the way out, every time. Whether a file is still the one that
+	// was attached is a fact about the disk now, not about the turn, so it is
+	// asked rather than remembered — a column holding it would be wrong the
+	// moment somebody tidied their folder.
+	for index, file := range files {
+		files[index] = file.Check()
+	}
 	message.Attachments = files
 
 	return message, nil

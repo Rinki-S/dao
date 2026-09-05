@@ -6,6 +6,7 @@ import {
   DeltaEventSchema,
   DoneEventSchema,
   ProposalEventSchema,
+  AttachmentSchema,
   ReasoningEventSchema,
   StartEventSchema,
   ToolEventSchema,
@@ -203,6 +204,30 @@ export async function sendMessage(
   });
 
   return readTurn(response, callbacks);
+}
+
+/**
+ * What some paths would be attached as.
+ *
+ * Asked as soon as files are chosen, so a file too large or of a kind that
+ * cannot be sent is refused while the dialog is still what somebody is
+ * thinking about — rather than after they have written a message to go with
+ * it. The service answers, because the service owns the rule; a copy of the
+ * limit here would be a second limit to keep in step.
+ */
+export async function describeAttachments(paths) {
+  const response = await apiFetch('/api/chats/attachments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths }),
+  });
+
+  if (!response.ok) {
+    const message = (await response.text()) || 'Those files could not be attached';
+    throw new ChatError(outcomeFor(response.status), message);
+  }
+
+  return AttachmentSchema.array().parse(await response.json());
 }
 
 /** The two things somebody can say about a change the model prepared. */

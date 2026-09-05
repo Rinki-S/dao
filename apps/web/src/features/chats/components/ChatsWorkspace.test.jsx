@@ -14,6 +14,7 @@ import { CHAT_OUTCOMES, ChatError } from '../api.js';
 const api = vi.hoisted(() => ({
   createConversation: vi.fn(),
   deleteConversation: vi.fn(),
+  describeAttachments: vi.fn(),
   getConversation: vi.fn(),
   listConversations: vi.fn(),
   renameConversation: vi.fn(),
@@ -774,6 +775,19 @@ describe('attachments', () => {
         paths: ['/Users/me/diagram.png'],
       }),
     };
+    // The service answers what a path would be attached as. It owns the rule,
+    // so the size and the media type come from there rather than from
+    // anything the renderer worked out for itself.
+    api.describeAttachments.mockImplementation(async (paths) =>
+      paths.map((path) => ({
+        path,
+        filename: path.split('/').pop(),
+        mediaType: 'image/png',
+        size: 2048,
+        modifiedAt: '2026-09-05T10:00:00Z',
+        unreadable: false,
+      })),
+    );
   });
 
   afterEach(() => {
@@ -795,7 +809,7 @@ describe('attachments', () => {
     // already see it.
     const [, , options] = api.sendMessage.mock.calls[0];
     expect(options.attachments).toEqual([
-      { path: '/Users/me/diagram.png', filename: 'diagram.png' },
+      expect.objectContaining({ path: '/Users/me/diagram.png', filename: 'diagram.png' }),
     ]);
   });
 
@@ -822,6 +836,72 @@ describe('attachments', () => {
 
     // The service would read it twice and the model would be shown it twice.
     expect(await screen.findAllByText('diagram.png')).toHaveLength(1);
+  });
+
+  it('refuses a file the service will not take, before anything is staged', async () => {
+    // While the dialog is still what somebody is thinking about, rather than
+    // after they have written a message to go with it.
+    api.describeAttachments.mockRejectedValue(
+      new ChatError(
+        CHAT_OUTCOMES.failed,
+        'that file is too large to attach: holiday.png is over 5 MB',
+      ),
+    );
+    renderChats();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Attach files' }));
+
+    // Named, because somebody who has just chosen four things needs to know
+    // which one. And nothing staged: taking the rest would leave them working
+    // out which file is missing from a row of chips.
+    expect(await screen.findByText(/holiday\.png is over 5 MB/)).toBeInTheDocument();
+    expect(screen.queryByText('diagram.png')).toBeNull();
+  });
+
+  it('shows how big a staged file is', async () => {
+    renderChats();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Attach files' }));
+
+    // The number somebody wants before they send rather than after.
+    expect(await screen.findByText('2 KB')).toBeInTheDocument();
+  });
+
+  it('marks a file that can no longer be read as the one that was sent', async () => {
+    api.listConversations.mockResolvedValue([
+      { id: 'chat-1', workspaceId: 'workspace-1', title: 'Ports', createdAt: '', updatedAt: '' },
+    ]);
+    api.getConversation.mockResolvedValue({
+      id: 'chat-1',
+      workspaceId: 'workspace-1',
+      title: 'Ports',
+      createdAt: '',
+      updatedAt: '',
+      messages: [
+        message({
+          content: 'what is this?',
+          attachments: [
+            {
+              path: '/Users/me/gone.png',
+              filename: 'gone.png',
+              mediaType: 'image/png',
+              size: 2048,
+              modifiedAt: '2026-09-05T10:00:00Z',
+              unreadable: true,
+            },
+          ],
+        }),
+      ],
+      proposals: [],
+    });
+
+    renderChats();
+    await userEvent.click(await screen.findByRole('button', { name: /Ports/ }));
+
+    // A transcript that showed the name as though the file went would be
+    // claiming something it cannot check.
+    const chip = await screen.findByTitle(/moved, changed or deleted since it was sent/);
+    expect(chip).toHaveTextContent('gone.png');
   });
 
   it('says so when the file chooser cannot be opened', async () => {
@@ -1094,5 +1174,27 @@ describe('typing with an input method', () => {
     fireEvent.keyDown(box, { key: 'Enter' });
 
     await waitFor(() => expect(api.sendMessage).toHaveBeenCalled());
+  });
+});
+
+describe('what a conversation has cost', () => {
+  it('totals the tokens across its turns', async () => {
+    replies(['An answer.'], assistant({ inputTokens: 1200, outputTokens: 340 }));
+
+    await ask();
+    await screen.findByText('An answer.');
+
+    // Tokens rather than money: Dao lets somebody point at any endpoint with
+    // any model name, so a figure in dollars would be a rate card this app
+    // invented for a provider it was told nothing about.
+    expect(await screen.findByText(/1\.2k in/)).toBeInTheDocument();
+    expect(screen.getByText(/340 out/)).toBeInTheDocument();
+  });
+
+  it('says nothing at all when nothing has been spent', async () => {
+    renderChats();
+
+    // A new chat should not be wearing a zero.
+    expect(screen.queryByText(/in ·/)).toBeNull();
   });
 });

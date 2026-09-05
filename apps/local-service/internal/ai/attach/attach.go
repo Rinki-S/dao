@@ -29,6 +29,11 @@ import (
 // for anything larger should be a sentence rather than a stalled request.
 const maxBytes = 5 << 20
 
+// How a modification time is written down. One constant because the stamping
+// and the comparing have to agree exactly — a difference of format is a file
+// that always looks changed.
+const stampFormat = "2006-01-02T15:04:05Z07:00"
+
 var (
 	ErrTooLarge     = errors.New("that file is too large to attach")
 	ErrUnsupported  = errors.New("that kind of file cannot be attached")
@@ -51,6 +56,30 @@ type Attachment struct {
 	MediaType  string `json:"mediaType"`
 	Size       int64  `json:"size"`
 	ModifiedAt string `json:"modifiedAt"`
+
+	// Unreadable says the file cannot be replayed as the one that was sent —
+	// it has been moved, deleted, or edited since.
+	//
+	// Derived, never stored, and filled in wherever an attachment comes back
+	// out of the database. It is a fact about the disk right now rather than
+	// about the turn, so a column holding it would be a column that is wrong
+	// as soon as somebody tidies their folder. Same reason a proposal's
+	// comparison is computed on the way out rather than written down.
+	//
+	// It is sent because a transcript that shows a filename as though the file
+	// went is a transcript claiming something it cannot check. The model is
+	// already told; this is how the person reading is.
+	Unreadable bool `json:"unreadable,omitempty"`
+}
+
+// Check reports whether the file is still the one that was attached, without
+// reading it. Cheap enough to run over a whole conversation on the way out.
+func (a Attachment) Check() Attachment {
+	info, err := os.Stat(a.Path)
+	a.Unreadable = err != nil || info.Size() != a.Size ||
+		info.ModTime().UTC().Format(stampFormat) != a.ModifiedAt
+
+	return a
 }
 
 // byExtension is what this app will attach, and nothing else.
@@ -116,7 +145,7 @@ func Describe(path string) (Attachment, error) {
 		Filename:   filepath.Base(path),
 		MediaType:  mediaType,
 		Size:       info.Size(),
-		ModifiedAt: info.ModTime().UTC().Format("2006-01-02T15:04:05Z07:00"),
+		ModifiedAt: info.ModTime().UTC().Format(stampFormat),
 	}, nil
 }
 
@@ -133,7 +162,7 @@ func Block(attachment Attachment) (llm.ContentBlock, error) {
 		return llm.ContentBlock{}, err
 	}
 
-	stamp := info.ModTime().UTC().Format("2006-01-02T15:04:05Z07:00")
+	stamp := info.ModTime().UTC().Format(stampFormat)
 	if info.Size() != attachment.Size || stamp != attachment.ModifiedAt {
 		return llm.ContentBlock{}, fmt.Errorf("%w: %s", ErrChangedSince, attachment.Filename)
 	}

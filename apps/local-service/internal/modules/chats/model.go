@@ -208,6 +208,12 @@ type RenameConversationRequest struct {
 // file dialog — and the service reads each one when it needs it. Uploading the
 // bytes to a local service that is about to read the same file off the same
 // disk would be a copy made for no reason.
+// DescribeAttachmentsRequest asks what some paths would be attached as, before
+// there is a message to attach them to.
+type DescribeAttachmentsRequest struct {
+	Paths []string `json:"paths"`
+}
+
 type SendMessageRequest struct {
 	Content     string              `json:"content"`
 	Attachments []attach.Attachment `json:"attachments,omitempty"`

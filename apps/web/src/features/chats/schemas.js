@@ -57,6 +57,11 @@ export const AttachmentSchema = z.object({
   mediaType: z.string().default(''),
   size: z.number().default(0),
   modifiedAt: z.string().default(''),
+
+  // Whether the file can still be read as the one that was sent. Derived by
+  // the service on the way out, never stored: it is a fact about the disk now
+  // rather than about the turn.
+  unreadable: z.boolean().default(false),
 });
 
 export const MessageSchema = z.object({

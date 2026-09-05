@@ -636,7 +636,7 @@ Planned scope:
 - keep failed-save behavior intact so unsaved editor state is not lost
 - add a focused formatting toolbar, keyboard-friendly editing, and Dao theme integration
 - expose Paragraph and H1-H6 through one block-type selector; keep low-frequency dividers, remote image references, and GFM tables in a compact Insert menu
-- keep local image attachments deferred until the Go file layer owns asset copying and note-relative path resolution
+- keep local image attachments deferred until the Go file layer owns asset copying and note-relative path resolution — _superseded_: chat attachments landed under "The Real Provider" below, and copy nothing at all, so the asset layer this waited on turned out not to be a prerequisite for them. A note's own inline images are still deferred.
 - support the initial Markdown subset with explicit round-trip tests, including headings, emphasis, links, lists, task lists, blockquotes, code, tables, dividers, and images
 - require real Tiptap-to-Markdown autosave coverage and a second-round-trip idempotence check before merge
 - treat Tiptap Markdown support as a compatibility boundary because `@tiptap/markdown` is currently beta and semantic round trips may normalize source formatting
@@ -893,4 +893,177 @@ Status: complete, apart from the same two gaps the last one left.
 - the title rule is enforced in `create_note` and `rename_note` from one function, because a rule applied in one of two places is a rule with a way around it
 - `vite.qa.config.js` reaches all five kinds on a word in the message — rename, delete, create, tasks, change — each verified over HTTP to produce its own kind
 - the browser pass was finally done, and covers what no test asserts: all five cards drawn, the deletion in destructive red with Discard still first, a refused apply showing "This change could not be applied" directly above the model's reply saying the same thing, a change set aside by talking past it, and an answered card coming back intact through a full page reload
-- still not done: a run against a real model provider in the Electron shell. Everything above was driven by fixtures, so what remains untested is whether a real model reaches for these five tools sensibly — which is a question about the descriptions, not the machinery
+- still not done at the time: a run against a real model provider in the Electron shell. Everything above was driven by fixtures, so what remained untested was whether a real model reaches for these five tools sensibly — which is a question about the descriptions, not the machinery. That run happened, and is the milestone below
+
+## Milestone: The Real Provider
+
+Status: complete.
+
+Branch:
+
+```txt
+feat/ai-write
+```
+
+Goal:
+
+```txt
+Point the harness at a real model and fix what that turns up.
+```
+
+The last two milestones were built against fixtures and a fake provider, and
+closed on the same open item both times: nobody had run this against an actual
+endpoint. Doing so answered the question that had been recorded — a real model
+does reach for the five tools sensibly, and the descriptions needed no work —
+and immediately raised one nobody had asked.
+
+### What the real provider turned up
+
+**A reasoning model's working has to go back with the call it produced.**
+DeepSeek's `deepseek-reasoner` answered the first turn and then refused the
+next one outright: a 400 saying `reasoning_content` must be passed back. The
+service had never captured it. Neither wire needed it before, because nothing
+in this build asks Anthropic for extended thinking, so nothing had ever
+returned any — the field existed in the type system and was dead.
+
+It matters most in exactly the flow this app is built around. Propose-then-apply
+reloads a turn from the database days later and replays it, so the fix is not
+"send it back on the next request" but "keep it, in a column, for as long as
+the transcript lives". The Anthropic wire still drops it, which stays correct
+there.
+
+That is worth writing down as a general point: **a fixture cannot refuse you.**
+Every wire-level test in this repo passes a request to a server that was told
+what to say. None of them could have produced this, because the fake had no
+opinion about what a well-formed second request looks like. The bug was one
+real conversation deep.
+
+### Decisions taken
+
+**Attachments copy nothing.** A path, plus the size and modification time the
+file had when it was attached. The pair is the whole of the mechanism: on a
+later turn the file is read again, and those two say whether what comes back is
+what was actually sent. A file that has moved or changed cannot be replayed,
+and the turn says so in the model's place for it.
+
+This was chosen over copying into the workspace folder and over a content-
+addressed store outside it, knowing the cost. The cost is real and is paid in
+words: a transcript can end up describing a file it can no longer show. What it
+buys is that attaching something does not put a copy of it anywhere, which for
+a local-first app holding somebody's own files is the more honest default.
+
+Saying so is the part that took thought. A model asked a follow-up about a
+picture it can no longer see, and told nothing, answers from the conversation
+around it and sounds exactly as confident as it did when it could see. So an
+unreadable attachment is replayed as a sentence in the place the file would
+have been, which is the same rule the tools already follow: a failure the model
+has to act on goes to the model as content, not up as an error.
+
+**An image and a document are different kinds, not one kind with a media
+type.** The wires disagree about documents more than they disagree about
+anything else. Anthropic reads a PDF itself; the OpenAI wire has no such
+concept at all. A single "attachment" kind would have hidden that behind a
+string and left each wire to rediscover it. So a document carries both
+readings of itself — the file, and the words got out of it beforehand — and
+which one is usable is a property of the endpoint that happens to be
+configured rather than of the attachment.
+
+**Where a tool ran is a number on the call, not a new shape for a turn.** A
+turn was stored as one run of prose and one list of calls, which loses the
+thing a reader most wants: the model said something, went and looked, and
+carried on. Recording how much of the reply had been written at the moment of
+each call puts that back for the price of one integer, and every call stored
+before it reads as zero — which puts them all at the front, exactly where they
+used to be drawn. Backward compatibility fell out of the representation
+instead of being a branch.
+
+Counted in UTF-16 code units. Not bytes, not runes: the only thing that has to
+cut the text at that point is a renderer, where a string index is a UTF-16
+offset. A byte offset lands several characters late in any reply with an accent
+in it; a rune count lands early in one with an emoji, splitting a surrogate
+pair.
+
+**A correction fitted to one typeface is not a correction.** Public Sans and
+JetBrains Mono replaced Iosevka, and the global -2% letter spacing went with
+them — it had been measured against Iosevka Aile, which is drawn narrow and
+spaced loose. Public Sans reads cramped at the same setting, and the interface
+font is now whatever somebody chose, so there is no face left to tune against.
+Both new faces are variable, which took the bundled fonts from about eight
+megabytes to about two hundred kilobytes.
+
+### What this milestone is worth remembering for
+
+- **A fixture cannot refuse you.** The provider bug that stopped this working
+  was invisible to every test in the repo, and would have stayed invisible for
+  as long as the fake provider was the only thing being asked. Wire-level tests
+  prove the request is shaped the way this code believes; only a real endpoint
+  has an opinion about whether that belief is right.
+- **Preload is not hot-reloaded.** A paperclip that did nothing was not a bug in
+  the paperclip. The renderer reloads on save and the Electron process does not,
+  so the bridge had moved on from the running app — and the click failed
+  silently because `ipcRenderer.invoke` rejects, and nothing was catching it.
+  A call across a process boundary is the one that can fail with nothing to
+  look at, and so is the last one that should be left without a catch.
+- **A test that cannot fail is worse than no test.** The first pass at the IME
+  guard had two tests and only one of them could ever have gone red; the other
+  asserted on a mock that had not been called _yet_, because sending awaits a
+  request first. Deleting the guard and re-running is cheap, and is the only
+  thing that tells you which of your tests are load-bearing.
+- **Following a reply is a thing the reader asks for, not a thing the pane
+  does.** Scrolling to the bottom on every token makes it impossible to read
+  back through a conversation while one is arriving. The question is not "has
+  new text arrived" but "was this person at the end when it did".
+
+### What the run left to tidy
+
+Four things, done after the first pass and worth naming because each is the
+same kind of mistake: the app knowing something and not saying it.
+
+**A refusal belongs where the choosing happens.** An attachment over the limit
+was refused by the send, which is after somebody has written a message to go
+with it. Picking a file now asks the service what it would be attached as, and
+the answer names the file it will not take. The service is asked rather than
+the rule copied, because a limit enforced in two places is two limits that can
+drift — and the size it reports is shown on the chip, which is the number
+somebody wants before they send rather than after.
+
+**A file that has gone should not be drawn as though it went.** The model was
+already told; the person reading was not. Whether an attachment can still be
+read is a fact about the disk now, so it is computed wherever a message leaves
+the repository and never stored — the same reasoning as a proposal's
+comparison, and for the same reason: a column holding it is wrong the moment
+somebody tidies their folder.
+
+**What a conversation cost, in tokens.** The counts were stored per turn from
+the first AI milestone and displayed nowhere. In tokens and not in money,
+which is not a shortcut: this app lets somebody point at any endpoint with any
+model name, so a figure in dollars would be a rate card invented for a
+provider it was told nothing about. A running total rather than a per-turn
+number, because the thing worth knowing is that a long thread is expensive
+_because_ every turn re-sends the ones before it — which a total shows and a
+per-turn figure hides.
+
+**And the seam nobody had crossed.** Attachments and proposals both replay a
+whole transcript, so a conversation holding both is where the cost of not
+copying is actually paid: every attached file is read again on every apply.
+That now has a test, because two features that were each correct alone is not
+the same claim as the two of them together.
+
+### Validation
+
+- Go `test ./...`, `vet ./...` and `gofmt` clean; renderer lint, formatting,
+  347 tests and production build pass; 92 desktop tests pass
+- the wire difference is pinned from both sides: an image goes to Anthropic as
+  a base64 source and to the OpenAI wire as a data URL in a parts array, a
+  document goes to one as a file and to the other as its own words, and a turn
+  with no picture in it keeps the string form every compatible endpoint
+  understands
+- the attachment staleness check was verified by breaking it: a file rewritten
+  to the same length with a later timestamp is refused, and a deleted one is
+  reported rather than silently dropped
+- the IME guard was verified by removing it and confirming each test goes red
+- `vite.qa.config.js` streams reasoning, and fires one tool call before a word
+  is said and one part way through, so a browser pass can see a line drawn
+  where the call happened rather than above the answer
+- the real provider run is done, against DeepSeek in the Electron shell, which
+  is what this milestone is named for

@@ -104,6 +104,43 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/chats/{id}", h.delete)
 	mux.HandleFunc("POST /api/chats/{id}/messages", h.send)
 	mux.HandleFunc("POST /api/chats/{id}/proposals/{proposalId}", h.resolve)
+	mux.HandleFunc("POST /api/chats/attachments", h.describeAttachments)
+}
+
+// describeAttachments answers what a set of paths would be attached as.
+//
+// So that picking a file too large to send is refused while the file dialog is
+// still the thing somebody is thinking about, rather than after they have
+// written a message to go with it. It is the same rule the send uses, run by
+// the same function, because a limit enforced in two places is two limits that
+// can drift.
+//
+// Not on a conversation. Describing a file has nothing to do with which
+// conversation it might end up in, and a chat that does not exist yet — the
+// common case, since a conversation is created by its first message — has no
+// id to hang this off.
+func (h *Handler) describeAttachments(w http.ResponseWriter, r *http.Request) {
+	var request DescribeAttachmentsRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	described := make([]attach.Attachment, 0, len(request.Paths))
+	for _, path := range request.Paths {
+		attachment, err := attach.Describe(path)
+		if err != nil {
+			// The first refusal, by name. Somebody who has just chosen four
+			// files and one of them is a 30 MB video needs to know which.
+			httpx.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		described = append(described, attachment)
+	}
+
+	httpx.JSON(w, http.StatusOK, described)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {

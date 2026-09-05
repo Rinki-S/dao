@@ -31,6 +31,7 @@ import { useConversations } from '../use-conversations.js';
 import {
   CHAT_OUTCOMES,
   createConversation,
+  describeAttachments,
   getConversation,
   resolveProposal,
   sendMessage,
@@ -169,6 +170,54 @@ function Reply({ content, calls, final = true }) {
         ),
       )}
     </>
+  );
+}
+
+/** A token count, short enough to sit in a header. */
+function compact(tokens) {
+  if (tokens < 1000) return String(tokens);
+  if (tokens < 1_000_000) return `${(tokens / 1000).toFixed(tokens < 10_000 ? 1 : 0)}k`;
+
+  return `${(tokens / 1_000_000).toFixed(1)}M`;
+}
+
+/**
+ * What this conversation has cost, in tokens.
+ *
+ * Tokens rather than money, and that is not a shortcut. Dao lets somebody
+ * point at any endpoint with any model name, so there is no honest way to
+ * price a call here — a figure in dollars would be this app inventing a rate
+ * card for a provider it was told nothing about. The counts are what the
+ * provider actually reported, which is the part that is true.
+ *
+ * A running total rather than a per-turn figure. What somebody wants to know
+ * is whether this conversation has become expensive, and no single turn
+ * answers that — a long thread is expensive because every turn re-sends the
+ * ones before it, which is exactly the thing a total makes visible and a
+ * per-turn number hides.
+ */
+function Cost({ messages }) {
+  const spent = useMemo(
+    () =>
+      messages.reduce(
+        (total, message) => ({
+          input: total.input + (message.inputTokens ?? 0),
+          output: total.output + (message.outputTokens ?? 0),
+        }),
+        { input: 0, output: 0 },
+      ),
+    [messages],
+  );
+
+  if (spent.input === 0 && spent.output === 0) return null;
+
+  return (
+    <p
+      className="shrink-0 text-muted-foreground text-xs tabular-nums"
+      title={`${spent.input.toLocaleString()} tokens sent, ${spent.output.toLocaleString()} received`}
+    >
+      {compact(spent.input)} in · {compact(spent.output)} out
+    </p>
   );
 }
 
@@ -574,15 +623,35 @@ export function ChatsWorkspace({ model, showThinking = false, onOpenSettings }) 
 
     if (result?.canceled) return;
 
+    // Described before they are staged, so a file too large or of a kind that
+    // cannot be sent is refused now — while the dialog is still what somebody
+    // is thinking about — rather than after they have written a message to go
+    // with it. The service answers, because the service owns the rule.
+    let described;
+    try {
+      described = await describeAttachments(result?.paths ?? []);
+    } catch (error) {
+      // The refusal names the file, which is the whole point of asking now:
+      // somebody who has just chosen four things and one of them is a 30 MB
+      // video needs to know which one.
+      //
+      // Nothing is staged when one is refused. Taking the rest would leave
+      // them to work out which of their files is missing from a row of chips.
+      setProblem({
+        id: selectedId,
+        outcome: error.outcome ?? CHAT_OUTCOMES.failed,
+        failure: error.message,
+      });
+
+      return;
+    }
+
     setStaged((current) => {
       // Keyed on the path, so choosing the same file twice stages it once. The
       // service would read it twice and the model would be shown it twice.
       const held = new Set(current.map((file) => file.path));
-      const added = (result?.paths ?? [])
-        .filter((path) => !held.has(path))
-        .map((path) => ({ path, filename: path.split('/').pop() ?? path }));
 
-      return [...current, ...added];
+      return [...current, ...described.filter((file) => !held.has(file.path))];
     });
   }
 
@@ -721,6 +790,9 @@ export function ChatsWorkspace({ model, showThinking = false, onOpenSettings }) 
             {selected ? selected.title || 'Untitled' : 'New chat'}
           </h1>
         </div>
+        {/* Beside the title rather than under the composer: it is a property
+            of the conversation, and it should not move as one is written. */}
+        <Cost messages={messages} />
       </header>
 
       <ScrollArea className="min-h-0 flex-1" overscrollContain>

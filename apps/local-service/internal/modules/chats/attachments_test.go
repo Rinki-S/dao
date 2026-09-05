@@ -133,3 +133,79 @@ func TestAnAttachmentSurvivesBeingStoredAndReadBack(t *testing.T) {
 		t.Errorf("media type = %q", got.MediaType)
 	}
 }
+
+// The seam between the two features that both replay a transcript. Applying a
+// change reloads the whole conversation and sends it again, which means every
+// attachment in it is read again — so an attachment and a proposal in one
+// conversation is the case where the cost of not copying is actually paid.
+func TestAConversationCarriesItsAttachmentsIntoAResumedTurn(t *testing.T) {
+	picture := attachedFile(t, "shot.png", []byte{0x89, 'P', 'N', 'G'})
+
+	context := BuildContext([]Message{
+		{Role: "user", Content: "what is this?", Attachments: []attach.Attachment{picture}},
+		{
+			Role:    "assistant",
+			Content: "I can rename that note.",
+			ToolCalls: []ToolCall{
+				{ID: "call-1", Name: "rename_note", Input: `{}`, Output: "renamed", Status: ToolCallOK},
+			},
+		},
+	})
+
+	// The picture is still in the first turn, whole, on the request that
+	// carries the answered call. A replay that dropped it would have the model
+	// deciding about a change while no longer able to see what it was for.
+	first := context.Messages[0].Content
+	if len(first) != 2 || first[1].Kind != llm.KindImage || first[1].Data == "" {
+		t.Fatalf("the first turn came back as %+v", first)
+	}
+
+	// And the exchange that follows it is intact: the call, then its result.
+	if got := len(context.Messages); got != 3 {
+		t.Fatalf("got %d messages, want the question, the call and its result", got)
+	}
+	if context.Messages[1].Content[1].Kind != llm.KindToolCall {
+		t.Errorf("the assistant turn is %+v", context.Messages[1])
+	}
+	if context.Messages[2].Content[0].Kind != llm.KindToolResult {
+		t.Errorf("the result turn is %+v", context.Messages[2])
+	}
+}
+
+// Checked on the way out rather than remembered, because whether a file is
+// still there is a fact about the disk now.
+func TestAStoredAttachmentSaysWhetherItCanStillBeRead(t *testing.T) {
+	repo := newRepo(t)
+	conversation := newConversation(t, repo)
+	picture := attachedFile(t, "shot.png", []byte{0x89, 'P', 'N', 'G'})
+
+	if _, err := repo.Append(conversation.ID, Message{
+		Role:        RoleUser,
+		Content:     "what is this?",
+		Attachments: []attach.Attachment{picture},
+	}); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+
+	stored, err := repo.Messages(conversation.ID)
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	if stored[0].Attachments[0].Unreadable {
+		t.Error("a file that is still there was reported as gone")
+	}
+
+	if err := os.Remove(picture.Path); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+
+	stored, err = repo.Messages(conversation.ID)
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	// A transcript that showed the name as though the file went would be
+	// claiming something it cannot check.
+	if !stored[0].Attachments[0].Unreadable {
+		t.Error("a file that is gone was reported as present")
+	}
+}
