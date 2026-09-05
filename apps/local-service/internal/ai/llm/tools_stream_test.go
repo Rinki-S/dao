@@ -16,10 +16,10 @@ func streamWithTools(t *testing.T, wire Wire, lines ...string) (string, Response
 
 	response, err := streamClient(t, wire, server.URL).Stream(
 		context.Background(), request(), Options{MaxTokens: 100},
-		func(chunk string) error {
+		TextSink(func(chunk string) error {
 			prose += chunk
 			return nil
-		},
+		}),
 	)
 	if err != nil {
 		t.Fatalf("Stream: %v", err)

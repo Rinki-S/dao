@@ -50,12 +50,40 @@ type openAIToolFunction struct {
 }
 
 type openAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role string `json:"role"`
+	// A string when the turn is only words, and a list of parts when it
+	// carries an image. Both are valid on this wire and the string form is
+	// what every endpoint claiming compatibility understands, so it stays the
+	// default and the list is used only when there is something in the turn
+	// that cannot be said in text.
+	Content any `json:"content"`
 	// An assistant turn's calls, and — on a message with role "tool" — the one
 	// this message answers.
 	ToolCalls  []openAIToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string           `json:"tool_call_id,omitempty"`
+
+	// ReasoningContent is a reasoning model's working, echoed back on exactly
+	// the assistant turn it belongs to. Unlike the Anthropic wire, where
+	// reasoning is never replayed, a reasoning model on this wire — DeepSeek's
+	// deepseek-reasoner is the case this was found against — refuses the next
+	// request with a 400 if a message carrying tool_calls does not carry the
+	// reasoning that produced them back with it.
+	ReasoningContent string `json:"reasoning_content,omitempty"`
+}
+
+// openAIPart is one piece of a multimodal turn.
+//
+// Only two shapes exist here: text, and an image behind a URL. The URL is a
+// data: URL rather than something to fetch — the bytes are on this machine,
+// and handing a provider a link to localhost would be handing it nothing.
+type openAIPart struct {
+	Type     string          `json:"type"`
+	Text     string          `json:"text,omitempty"`
+	ImageURL *openAIImageURL `json:"image_url,omitempty"`
+}
+
+type openAIImageURL struct {
+	URL string `json:"url"`
 }
 
 // openAIToolCall carries its arguments as a *string* of JSON rather than as
@@ -73,8 +101,9 @@ type openAIToolCall struct {
 type openAIResponse struct {
 	Choices []struct {
 		Message struct {
-			Content   string           `json:"content"`
-			ToolCalls []openAIToolCall `json:"tool_calls"`
+			Content          string           `json:"content"`
+			ReasoningContent string           `json:"reasoning_content"`
+			ToolCalls        []openAIToolCall `json:"tool_calls"`
 		} `json:"message"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
@@ -160,12 +189,16 @@ func (c *openAIClient) newRequest(
 func openAIMessages(message Message) []openAIMessage {
 	var messages []openAIMessage
 	var text strings.Builder
+	var reasoning strings.Builder
 	var calls []openAIToolCall
+	var images []openAIPart
 
 	for _, block := range message.Content {
 		switch block.Kind {
 		case KindText:
 			text.WriteString(block.Text)
+		case KindThinking:
+			reasoning.WriteString(block.Text)
 		case KindToolCall:
 			call := openAIToolCall{ID: block.ID, Type: "function"}
 			call.Function.Name = block.Name
@@ -174,6 +207,29 @@ func openAIMessages(message Message) []openAIMessage {
 			// how 1e300 becomes something else.
 			call.Function.Arguments = string(block.Input)
 			calls = append(calls, call)
+		case KindImage:
+			images = append(images, openAIPart{
+				Type:     "image_url",
+				ImageURL: &openAIImageURL{URL: "data:" + block.MediaType + ";base64," + block.Data},
+			})
+		case KindDocument:
+			// There is no document on this wire, so the file arrives as its own
+			// words or it does not arrive. Said in the turn's text, named, and
+			// fenced so the model can tell the file from the sentence
+			// introducing it.
+			if block.Text != "" {
+				fmt.Fprintf(&text, "\n\nAttached file %q:\n\n```\n%s\n```\n", block.Filename, block.Text)
+				break
+			}
+
+			// Nothing could be got out of it. Saying so is the whole point: a
+			// model told an attachment exists and left to guess at it will
+			// describe what such a file usually contains.
+			fmt.Fprintf(
+				&text,
+				"\n\n[%q was attached. This provider cannot read that kind of file, and no text could be taken from it.]\n",
+				block.Filename,
+			)
 		case KindToolResult:
 			// An error is reported as the result's text. This wire has no flag
 			// for it, and the model needs to be told in words regardless.
@@ -189,11 +245,35 @@ func openAIMessages(message Message) []openAIMessage {
 		}
 	}
 
+	// A turn with a picture in it has to go as a list of parts; one without
+	// goes as a plain string. The string is not a shortcut — it is the shape
+	// every endpoint claiming compatibility understands, and a list sent to
+	// one that only reads strings is a turn it drops on the floor. So the
+	// richer shape is used only when there is something in the turn that
+	// cannot be said any other way.
+	if len(images) > 0 {
+		parts := make([]openAIPart, 0, len(images)+1)
+		if text.Len() > 0 {
+			parts = append(parts, openAIPart{Type: "text", Text: text.String()})
+		}
+		parts = append(parts, images...)
+
+		messages = append(messages, openAIMessage{
+			Role:             string(message.Role),
+			Content:          parts,
+			ToolCalls:        calls,
+			ReasoningContent: reasoning.String(),
+		})
+
+		return messages
+	}
+
 	if text.Len() > 0 || len(calls) > 0 {
 		messages = append(messages, openAIMessage{
-			Role:      string(message.Role),
-			Content:   text.String(),
-			ToolCalls: calls,
+			Role:             string(message.Role),
+			Content:          text.String(),
+			ToolCalls:        calls,
+			ReasoningContent: reasoning.String(),
 		})
 	}
 
@@ -243,8 +323,11 @@ func (c *openAIClient) Complete(ctx context.Context, request Context, opts Optio
 
 	choice := decoded.Choices[0]
 	result.StopReason = openAIStopReason(choice.FinishReason)
+	if choice.Message.ReasoningContent != "" {
+		result.Content = append(result.Content, ContentBlock{Kind: KindThinking, Text: choice.Message.ReasoningContent})
+	}
 	if choice.Message.Content != "" {
-		result.Content = []ContentBlock{TextBlock(choice.Message.Content)}
+		result.Content = append(result.Content, TextBlock(choice.Message.Content))
 	}
 	for _, call := range choice.Message.ToolCalls {
 		// Arguments come as a string of JSON. Empty means the model asked for a
@@ -270,6 +353,9 @@ type openAIChunk struct {
 	Choices []struct {
 		Delta struct {
 			Content string `json:"content"`
+			// A reasoning model streams this ahead of Content, as its own run
+			// of chunks before the answer's chunks begin.
+			ReasoningContent string `json:"reasoning_content"`
 			// A call's id and name arrive with its first fragment and are
 			// absent from every one after it, which is why the accumulator is
 			// keyed on index rather than on id.
@@ -291,7 +377,7 @@ type openAIChunk struct {
 }
 
 func (c *openAIClient) Stream(
-	ctx context.Context, request Context, opts Options, onText func(string) error,
+	ctx context.Context, request Context, opts Options, sink Sink,
 ) (Response, error) {
 	httpRequest, err := c.newRequest(ctx, request, opts, true)
 	if err != nil {
@@ -310,6 +396,7 @@ func (c *openAIClient) Stream(
 	}
 
 	var text strings.Builder
+	var reasoning strings.Builder
 	var calls toolCalls
 	result := Response{StopReason: StopEnd}
 	sawChunk := false
@@ -349,6 +436,16 @@ func (c *openAIClient) Stream(
 				}
 			}
 
+			if choice.Delta.ReasoningContent != "" {
+				// Its own callback, never the text one: this is the model's
+				// working, and a caller that received it as prose would store
+				// it as the answer.
+				reasoning.WriteString(choice.Delta.ReasoningContent)
+				if err := sink.reasoning(choice.Delta.ReasoningContent); err != nil {
+					return false, err
+				}
+			}
+
 			if choice.Delta.Content == "" {
 				continue
 			}
@@ -357,7 +454,7 @@ func (c *openAIClient) Stream(
 			// reader, but the whole answer is still what gets stored, and
 			// making the caller reassemble it invites two versions of it.
 			text.WriteString(choice.Delta.Content)
-			if err := onText(choice.Delta.Content); err != nil {
+			if err := sink.text(choice.Delta.Content); err != nil {
 				return false, err
 			}
 		}
@@ -375,8 +472,11 @@ func (c *openAIClient) Stream(
 		return Response{}, fmt.Errorf("provider streamed no chunks")
 	}
 
+	if reasoning.Len() > 0 {
+		result.Content = append(result.Content, ContentBlock{Kind: KindThinking, Text: reasoning.String()})
+	}
 	if text.Len() > 0 {
-		result.Content = []ContentBlock{TextBlock(text.String())}
+		result.Content = append(result.Content, TextBlock(text.String()))
 	}
 	result.Content = append(result.Content, calls.blocks()...)
 

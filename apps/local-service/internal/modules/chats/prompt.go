@@ -2,7 +2,9 @@ package chats
 
 import (
 	"encoding/json"
+	"fmt"
 
+	"github.com/rinki-s/dao/apps/local-service/internal/ai/attach"
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm"
 )
 
@@ -65,14 +67,26 @@ func BuildContext(messages []Message) llm.Context {
 	for _, message := range messages {
 		answered := answeredCalls(message)
 
-		if message.Content == "" && len(answered) == 0 {
+		// A turn with a picture and nothing said about it is not an empty
+		// turn. Attachments count here or "look at this" with the looking left
+		// off would be dropped before it ever reached the model.
+		if message.Content == "" && len(answered) == 0 && len(message.Attachments) == 0 {
 			continue
 		}
 
 		content := []llm.ContentBlock{}
+		// The reasoning that produced these calls, ahead of them for the same
+		// reason it would have arrived first from the model. Only worth
+		// attaching when there is a call behind it — a wire that wants this
+		// wants it on a turn that carries tool_calls, and one that dropped
+		// them has nothing for the reasoning to be replayed alongside.
+		if message.Reasoning != "" && len(answered) > 0 {
+			content = append(content, llm.ContentBlock{Kind: llm.KindThinking, Text: message.Reasoning})
+		}
 		if message.Content != "" {
 			content = append(content, llm.TextBlock(message.Content))
 		}
+		content = append(content, attached(message)...)
 		for _, call := range answered {
 			content = append(content, llm.ToolCallBlock(call.ID, call.Name, json.RawMessage(call.Input)))
 		}
@@ -101,6 +115,38 @@ func BuildContext(messages []Message) llm.Context {
 	}
 
 	return request
+}
+
+// attached turns a turn's attachments back into content for the model.
+//
+// This is where not copying attachments is paid for. The files are read again,
+// now, from wherever they were when somebody attached them — so a file that has
+// been moved, deleted or edited in the meantime cannot be replayed.
+//
+// When that happens the turn says so, in words, in the place the file would
+// have been. Not dropped: a model asked a follow-up about a picture it can no
+// longer see, and told nothing, answers from the conversation around it and
+// sounds exactly as confident as it did when it could see. Told the picture is
+// gone, it can say so. This is the same rule the tools follow — a failure the
+// model has to act on goes to the model as content, not up as an error.
+func attached(message Message) []llm.ContentBlock {
+	blocks := make([]llm.ContentBlock, 0, len(message.Attachments))
+
+	for _, attachment := range message.Attachments {
+		block, err := attach.Block(attachment)
+		if err != nil {
+			blocks = append(blocks, llm.TextBlock(fmt.Sprintf(
+				"[%q was attached to this message and cannot be read now: %s]",
+				attachment.Filename, err,
+			)))
+
+			continue
+		}
+
+		blocks = append(blocks, block)
+	}
+
+	return blocks
 }
 
 func answeredCalls(message Message) []ToolCall {

@@ -150,6 +150,29 @@ func TestOpenAIWire(t *testing.T) {
 	}
 }
 
+func TestOpenAICapturesReasoning(t *testing.T) {
+	server, _ := serve(t, http.StatusOK, `{
+		"choices": [{"message": {
+			"reasoning_content": "weighing it up",
+			"content": "You shipped the parser fix."
+		}, "finish_reason": "stop"}],
+		"usage": {"prompt_tokens": 120, "completion_tokens": 8}
+	}`)
+
+	response, err := newClient(t, WireOpenAI, server.URL).
+		Complete(context.Background(), request(), Options{MaxTokens: 512})
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+
+	if got := response.Text(); got != "You shipped the parser fix." {
+		t.Errorf("Text() = %q, want reasoning left out", got)
+	}
+	if got := response.Thinking(); got != "weighing it up" {
+		t.Errorf("Thinking() = %q", got)
+	}
+}
+
 func TestBothWiresNormaliseTruncation(t *testing.T) {
 	// A caller parsing JSON needs to tell "the model wrote nonsense" from "the
 	// answer was cut off", and each wire spells the second one differently.

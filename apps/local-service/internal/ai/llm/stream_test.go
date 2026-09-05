@@ -58,15 +58,39 @@ func collect(t *testing.T, streamer Streamer) ([]string, Response) {
 	var pieces []string
 	response, err := streamer.Stream(t.Context(), Context{
 		Messages: []Message{UserText("hi")},
-	}, Options{MaxTokens: 64}, func(text string) error {
+	}, Options{MaxTokens: 64}, TextSink(func(text string) error {
 		pieces = append(pieces, text)
 		return nil
-	})
+	}))
 	if err != nil {
 		t.Fatalf("Stream: %v", err)
 	}
 
 	return pieces, response
+}
+
+// collectBoth records the prose and the working separately, which is the only
+// way to see that a wire kept them apart rather than running them together.
+func collectBoth(t *testing.T, streamer Streamer) (prose []string, working []string, response Response) {
+	t.Helper()
+
+	response, err := streamer.Stream(t.Context(), Context{
+		Messages: []Message{UserText("hi")},
+	}, Options{MaxTokens: 64}, Sink{
+		Text: func(text string) error {
+			prose = append(prose, text)
+			return nil
+		},
+		Reasoning: func(text string) error {
+			working = append(working, text)
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+
+	return prose, working, response
 }
 
 func TestOpenAIStreamsInPieces(t *testing.T) {
@@ -93,6 +117,38 @@ func TestOpenAIStreamsInPieces(t *testing.T) {
 	}
 	if response.Usage.InputTokens != 7 || response.Usage.OutputTokens != 2 {
 		t.Errorf("Usage = %+v, want the final chunk's numbers", response.Usage)
+	}
+}
+
+// A reasoning model streams reasoning_content ahead of content, as its own run
+// of chunks. It must not reach the reader — that is the model's working, not
+// its answer — but it has to survive on the response, because a caller
+// replaying this turn's tool calls later may be talking to the same reasoning
+// model, which will refuse the replay without it.
+func TestOpenAIStreamsReasoningWithoutHandingItToTheReader(t *testing.T) {
+	server := sseServer(t,
+		`data: {"choices":[{"delta":{"reasoning_content":"weighing it "}}]}`,
+		`data: {"choices":[{"delta":{"reasoning_content":"up"}}]}`,
+		`data: {"choices":[{"delta":{"content":"Hello"},"finish_reason":"stop"}]}`,
+		`data: [DONE]`,
+	)
+
+	prose, working, response := collectBoth(t, streamClient(t, WireOpenAI, server.URL))
+
+	if got := strings.Join(prose, "|"); got != "Hello" {
+		t.Errorf("prose = %q, want the reasoning left out of it", got)
+	}
+	// In pieces on its own callback, as it arrived: a surface showing the
+	// thinking while the reader waits needs it while it is still being
+	// written, not once the answer has already started.
+	if got := strings.Join(working, "|"); got != "weighing it |up" {
+		t.Errorf("working = %q, want the reasoning deltas kept separate", got)
+	}
+	if got := response.Text(); got != "Hello" {
+		t.Errorf("Text() = %q", got)
+	}
+	if got := response.Thinking(); got != "weighing it up" {
+		t.Errorf("Thinking() = %q, want the reassembled reasoning", got)
 	}
 }
 
@@ -150,7 +206,7 @@ func TestAnthropicSurfacesAnErrorEvent(t *testing.T) {
 
 	_, err := streamClient(t, WireAnthropic, server.URL).Stream(
 		t.Context(), Context{Messages: []Message{UserText("hi")}}, Options{MaxTokens: 64},
-		func(string) error { return nil },
+		TextSink(func(string) error { return nil }),
 	)
 
 	if err == nil {
@@ -177,10 +233,10 @@ func TestAnErrorFromTheCallbackStopsTheStream(t *testing.T) {
 
 	_, err := streamClient(t, WireOpenAI, server.URL).Stream(
 		t.Context(), Context{Messages: []Message{UserText("hi")}}, Options{MaxTokens: 64},
-		func(string) error {
+		TextSink(func(string) error {
 			seen++
 			return stop
-		},
+		}),
 	)
 
 	if !errors.Is(err, stop) {
@@ -199,7 +255,7 @@ func TestAnEmptyStreamIsAnError(t *testing.T) {
 
 	_, err := streamClient(t, WireOpenAI, server.URL).Stream(
 		t.Context(), Context{Messages: []Message{UserText("hi")}}, Options{MaxTokens: 64},
-		func(string) error { return nil },
+		TextSink(func(string) error { return nil }),
 	)
 
 	if err == nil {
@@ -215,7 +271,7 @@ func TestStreamFailsOnAnErrorStatus(t *testing.T) {
 
 	_, err := streamClient(t, WireOpenAI, server.URL).Stream(
 		t.Context(), Context{Messages: []Message{UserText("hi")}}, Options{MaxTokens: 64},
-		func(string) error { return nil },
+		TextSink(func(string) error { return nil }),
 	)
 
 	var apiError *APIError
@@ -240,10 +296,10 @@ func TestStreamOrCompleteFallsBackToOneWholeAnswer(t *testing.T) {
 
 	response, err := StreamOrComplete(t.Context(), completeOnly{text: "all at once"},
 		Context{Messages: []Message{UserText("hi")}}, Options{MaxTokens: 64},
-		func(text string) error {
+		TextSink(func(text string) error {
 			pieces = append(pieces, text)
 			return nil
-		})
+		}))
 	if err != nil {
 		t.Fatalf("StreamOrComplete: %v", err)
 	}
@@ -273,10 +329,10 @@ func TestStreamOrCompleteUsesTheStreamWhenThereIsOne(t *testing.T) {
 	var pieces []string
 	if _, err := StreamOrComplete(t.Context(), client,
 		Context{Messages: []Message{UserText("hi")}}, Options{MaxTokens: 64},
-		func(text string) error {
+		TextSink(func(text string) error {
 			pieces = append(pieces, text)
 			return nil
-		}); err != nil {
+		})); err != nil {
 		t.Fatalf("StreamOrComplete: %v", err)
 	}
 

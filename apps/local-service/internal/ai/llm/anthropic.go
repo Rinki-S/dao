@@ -50,6 +50,11 @@ type anthropicContent struct {
 	Text     string `json:"text,omitempty"`
 	Thinking string `json:"thinking,omitempty"`
 
+	// image and document. Both wrap their bytes in the same envelope on this
+	// wire, which is the whole reason a PDF is straightforward here and is
+	// not on the other one.
+	Source *anthropicSource `json:"source,omitempty"`
+
 	// tool_use
 	ID    string          `json:"id,omitempty"`
 	Name  string          `json:"name,omitempty"`
@@ -59,6 +64,15 @@ type anthropicContent struct {
 	ToolUseID string `json:"tool_use_id,omitempty"`
 	Content   string `json:"content,omitempty"`
 	IsError   bool   `json:"is_error,omitempty"`
+}
+
+// anthropicSource carries an attachment's bytes. Only base64 is used: a URL
+// source would have the provider fetch something over the network, and this
+// app attaches files from the machine it is running on.
+type anthropicSource struct {
+	Type      string `json:"type"`
+	MediaType string `json:"media_type"`
+	Data      string `json:"data"`
 }
 
 type anthropicResponse struct {
@@ -114,6 +128,27 @@ func (c *anthropicClient) newRequest(
 					ToolUseID: block.ID,
 					Content:   block.Text,
 					IsError:   block.IsError,
+				})
+			case KindImage:
+				content = append(content, anthropicContent{
+					Type: "image",
+					Source: &anthropicSource{
+						Type:      "base64",
+						MediaType: block.MediaType,
+						Data:      block.Data,
+					},
+				})
+			case KindDocument:
+				// A first-class block here, which it is on no other wire. The
+				// model reads the file itself rather than reading somebody
+				// else's extraction of it.
+				content = append(content, anthropicContent{
+					Type: "document",
+					Source: &anthropicSource{
+						Type:      "base64",
+						MediaType: block.MediaType,
+						Data:      block.Data,
+					},
 				})
 			default:
 				// Reasoning is never sent back up: it is the model's own
@@ -220,8 +255,9 @@ type anthropicEvent struct {
 		Name string `json:"name"`
 	} `json:"content_block"`
 	Delta struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
+		Type     string `json:"type"`
+		Text     string `json:"text"`
+		Thinking string `json:"thinking"`
 		// A tool's arguments arrive as fragments of JSON text, which is why
 		// they cannot be decoded until the block is closed.
 		PartialJSON string `json:"partial_json"`
@@ -244,7 +280,7 @@ type anthropicEvent struct {
 }
 
 func (c *anthropicClient) Stream(
-	ctx context.Context, request Context, opts Options, onText func(string) error,
+	ctx context.Context, request Context, opts Options, sink Sink,
 ) (Response, error) {
 	httpRequest, err := c.newRequest(ctx, request, opts, true)
 	if err != nil {
@@ -263,6 +299,7 @@ func (c *anthropicClient) Stream(
 	}
 
 	var text strings.Builder
+	var thinking strings.Builder
 	var calls toolCalls
 	result := Response{StopReason: StopEnd}
 	sawEvent := false
@@ -292,16 +329,26 @@ func (c *anthropicClient) Stream(
 					return true, nil
 				}
 				text.WriteString(event.Delta.Text)
-				if err := onText(event.Delta.Text); err != nil {
+				if err := sink.text(event.Delta.Text); err != nil {
+					return false, err
+				}
+			case "thinking_delta":
+				// The model's working, on its own callback. This build never
+				// asks for extended thinking, so nothing produces one today —
+				// it is handled anyway because the alternative is a wire that
+				// silently drops content the moment somebody turns it on.
+				if event.Delta.Thinking == "" {
+					return true, nil
+				}
+				thinking.WriteString(event.Delta.Thinking)
+				if err := sink.reasoning(event.Delta.Thinking); err != nil {
 					return false, err
 				}
 			case "input_json_delta":
-				// Not passed to onText. These are a tool's arguments, not
-				// something anybody should be reading as an answer.
+				// Not passed to either callback. These are a tool's arguments,
+				// not something anybody should be reading as an answer.
 				calls.argument(event.Index, event.Delta.PartialJSON)
 			}
-			// Any other delta is the model's own working, which this package
-			// already declines to carry back up.
 
 		case "message_delta":
 			if event.Delta.StopReason != "" {
@@ -326,8 +373,11 @@ func (c *anthropicClient) Stream(
 		return Response{}, fmt.Errorf("provider streamed no events")
 	}
 
+	if thinking.Len() > 0 {
+		result.Content = append(result.Content, ContentBlock{Kind: KindThinking, Text: thinking.String()})
+	}
 	if text.Len() > 0 {
-		result.Content = []ContentBlock{TextBlock(text.String())}
+		result.Content = append(result.Content, TextBlock(text.String()))
 	}
 	result.Content = append(result.Content, calls.blocks()...)
 

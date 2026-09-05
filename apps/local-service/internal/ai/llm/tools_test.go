@@ -204,6 +204,42 @@ func TestOpenAISendsToolsAndSplitsTheResultIntoItsOwnMessage(t *testing.T) {
 	}
 }
 
+// DeepSeek's deepseek-reasoner refuses the next request with a 400 unless a
+// message that carries tool_calls also carries the reasoning that produced
+// them. This is that replay: an assistant turn stored with a thinking block
+// ahead of its call has to come back out with reasoning_content set on the
+// same message, not dropped the way the Anthropic wire drops it.
+func TestOpenAIReplaysReasoningAlongsideTheCallItBelongsTo(t *testing.T) {
+	server, recorded := serve(t, http.StatusOK,
+		`{"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}],"usage":{}}`)
+
+	exchange := Context{Messages: []Message{
+		UserText("What did I write about parsers?"),
+		{Role: RoleAssistant, Content: []ContentBlock{
+			{Kind: KindThinking, Text: "let me search first"},
+			ToolCallBlock("call-1", "search_notes", json.RawMessage(`{"query":"parser"}`)),
+		}},
+		{Role: RoleUser, Content: []ContentBlock{
+			ToolResultBlock("call-1", "Parser recovery strategy.md", false),
+		}},
+	}}
+
+	if _, err := newClient(t, WireOpenAI, server.URL).Complete(
+		context.Background(), exchange, Options{MaxTokens: 100},
+	); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+
+	messages, _ := recorded.body["messages"].([]any)
+	assistant, _ := messages[1].(map[string]any)
+	if assistant["role"] != "assistant" {
+		t.Fatalf("message 1 = %v", assistant)
+	}
+	if got := assistant["reasoning_content"]; got != "let me search first" {
+		t.Errorf("reasoning_content = %v, want the thinking block replayed", got)
+	}
+}
+
 // Ordering, on the wire that has to invent it. A tool message answers the calls
 // before it, so prose in the same turn has to follow the results rather than
 // lead them.

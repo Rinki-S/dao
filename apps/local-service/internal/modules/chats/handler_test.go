@@ -110,6 +110,60 @@ func quote(text string) string {
 	return string(encoded)
 }
 
+// A reasoning model's working arrives on events of its own and is stored with
+// the turn, so a reload shows what the stream showed. It must never land in
+// the reply: the whole distinction is that one of them is the answer.
+func TestTheWorkingStreamsApartFromTheAnswerAndIsKept(t *testing.T) {
+	fake := &llmtest.StreamingFake{
+		Fake: llmtest.Fake{Turns: []llmtest.Turn{{
+			Reasoning: "they asked about parsers",
+			Text:      "You wrote about parser recovery.",
+			Stop:      llm.StopEnd,
+		}}},
+		Chunks: 2,
+	}
+	handler, repo := newHandler(t, fake, nil)
+	conversation := newConversation(t, repo)
+
+	events := parseEvents(t, send(t, handler, conversation.ID, "what did I write?").Body.String())
+
+	working, answer := "", ""
+	for _, e := range events {
+		switch e.name {
+		case EventReasoning:
+			var reasoning ReasoningEvent
+			if err := json.Unmarshal([]byte(e.data), &reasoning); err != nil {
+				t.Fatalf("decode reasoning: %v", err)
+			}
+			working += reasoning.Text
+		case EventDelta:
+			var delta DeltaEvent
+			if err := json.Unmarshal([]byte(e.data), &delta); err != nil {
+				t.Fatalf("decode delta: %v", err)
+			}
+			answer += delta.Text
+		}
+	}
+
+	if working != "they asked about parsers" {
+		t.Errorf("the working arrived as %q", working)
+	}
+	if answer != "You wrote about parser recovery." {
+		t.Errorf("the answer arrived as %q", answer)
+	}
+
+	stored, err := repo.Messages(conversation.ID)
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	if stored[1].Reasoning != "they asked about parsers" {
+		t.Errorf("stored reasoning = %q", stored[1].Reasoning)
+	}
+	if stored[1].Content != "You wrote about parser recovery." {
+		t.Errorf("stored content = %q, want the answer without the working", stored[1].Content)
+	}
+}
+
 func TestSendStreamsTheReplyAndStoresBothTurns(t *testing.T) {
 	fake := llmtest.Streamed("The answer, in four pieces.", 4)
 	handler, repo := newHandler(t, fake, nil)
@@ -626,15 +680,15 @@ func (s *stopsPartway) Complete(context.Context, llm.Context, llm.Options) (llm.
 }
 
 func (s *stopsPartway) Stream(
-	_ context.Context, _ llm.Context, _ llm.Options, onText func(string) error,
+	_ context.Context, _ llm.Context, _ llm.Options, sink llm.Sink,
 ) (llm.Response, error) {
-	if err := onText("Half an answer"); err != nil {
+	if err := sink.Text("Half an answer"); err != nil {
 		return llm.Response{}, err
 	}
 
 	s.cancel()
 
-	if err := onText(" and the rest of it"); err != nil {
+	if err := sink.Text(" and the rest of it"); err != nil {
 		return llm.Response{}, err
 	}
 

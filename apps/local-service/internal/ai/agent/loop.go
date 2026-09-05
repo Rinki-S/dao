@@ -54,6 +54,17 @@ type Loop struct {
 	// something worth showing while the tool runs.
 	OnText func(string) error
 
+	// OnReasoning receives a reasoning model's working as it arrives, on its
+	// own channel rather than mixed into OnText.
+	//
+	// Separate because the two are not the same claim. Prose is the model's
+	// answer and belongs in the transcript; this is how it got there, and a
+	// surface may well decline to show it at all. A caller that does not want
+	// it leaves this nil, and nothing else changes — the working is still
+	// collected on Result either way, because the next request may need it
+	// back.
+	OnReasoning func(string) error
+
 	// OnToolStart and OnToolEnd report what is being done, for a surface that
 	// wants to say so while it happens. Neither can refuse: a callback that
 	// could stop a run would make the display part of the control flow.
@@ -96,6 +107,14 @@ type Result struct {
 
 	// Usage is summed across steps, because that is what the exchange cost.
 	Usage llm.Usage
+
+	// Reasoning is the model's working across every step that asked for a
+	// tool, joined in order. Carried separately from Text for the reason
+	// Response.Thinking exists at all: it is not the answer, and a caller
+	// storing this turn has to be able to hand it back on a wire that
+	// requires the exact reasoning that produced a call to travel with the
+	// call when the turn is replayed.
+	Reasoning string
 }
 
 // Run drives the loop to an answer.
@@ -120,7 +139,7 @@ func (l *Loop) Run(ctx context.Context, request llm.Context, opts llm.Options) (
 		request.Messages = messages
 		result.Steps++
 
-		response, err := llm.StreamOrComplete(ctx, l.Client, request, opts, l.text)
+		response, err := llm.StreamOrComplete(ctx, l.Client, request, opts, l.sink())
 
 		// An endpoint that will not take tools at all, asked again without them.
 		//
@@ -135,7 +154,7 @@ func (l *Loop) Run(ctx context.Context, request llm.Context, opts llm.Options) (
 		// never sees the start of an answer twice.
 		if err != nil && len(opts.Tools) > 0 && result.Text == "" && refusedTools(err) {
 			opts.Tools = nil
-			response, err = llm.StreamOrComplete(ctx, l.Client, request, opts, l.text)
+			response, err = llm.StreamOrComplete(ctx, l.Client, request, opts, l.sink())
 		}
 
 		// Usage first: a step that failed part way still spent tokens, and the
@@ -147,6 +166,19 @@ func (l *Loop) Run(ctx context.Context, request llm.Context, opts llm.Options) (
 		}
 
 		result.Text += response.Text()
+
+		// Every step's working, including the last one's. This used to be kept
+		// only for steps that asked for a tool, back when the only thing it was
+		// for was being replayed alongside the call — which left the working of
+		// a turn that simply answered on the floor. It is shown now as well as
+		// replayed, and the step that produces the answer is the one whose
+		// thinking a reader most wants to see.
+		if thinking := response.Thinking(); thinking != "" {
+			if result.Reasoning != "" {
+				result.Reasoning += "\n\n"
+			}
+			result.Reasoning += thinking
+		}
 
 		// Decided by looking for the calls, not by the stop reason. An endpoint
 		// can finish with "stop" and hand back tool calls anyway, and a loop
@@ -184,12 +216,26 @@ func (l *Loop) Run(ctx context.Context, request llm.Context, opts llm.Options) (
 	return result, nil
 }
 
+// sink is where a step's stream is delivered. Built per step rather than held
+// on the Loop because it is a view of the callbacks, not state of its own.
+func (l *Loop) sink() llm.Sink {
+	return llm.Sink{Text: l.text, Reasoning: l.reasoning}
+}
+
 func (l *Loop) text(chunk string) error {
 	if l.OnText == nil {
 		return nil
 	}
 
 	return l.OnText(chunk)
+}
+
+func (l *Loop) reasoning(chunk string) error {
+	if l.OnReasoning == nil {
+		return nil
+	}
+
+	return l.OnReasoning(chunk)
 }
 
 // run executes one step's calls and returns them as results.

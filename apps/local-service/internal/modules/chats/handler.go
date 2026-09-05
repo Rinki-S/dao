@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/agent"
+	"github.com/rinki-s/dao/apps/local-service/internal/ai/attach"
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm"
 	"github.com/rinki-s/dao/apps/local-service/internal/httpx"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/proposals"
@@ -193,9 +194,31 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	content := strings.TrimSpace(request.Content)
-	if content == "" {
+	// A picture on its own is a message. What is required is that the turn say
+	// something, and an attachment says something.
+	if content == "" && len(request.Attachments) == 0 {
 		httpx.Error(w, http.StatusBadRequest, "message content is required")
 		return
+	}
+
+	// Checked here, before anything is stored, and against the same rule that
+	// will be used to read them. An attachment that cannot be read is a
+	// refusal the person can act on now — the file is in front of them — where
+	// the same failure discovered mid-stream would arrive as a broken reply to
+	// a question already in the transcript.
+	for index, attachment := range request.Attachments {
+		checked, err := attach.Describe(attachment.Path)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		// The service's reading of the file wins over the client's. The
+		// renderer sends what it was told by a file dialog, and between that
+		// moment and this one the file can have changed; storing the client's
+		// numbers would record a size and a time that were never checked
+		// against anything.
+		request.Attachments[index] = checked
 	}
 
 	// Server-sent events are useless through a writer that buffers until the
@@ -242,7 +265,11 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.repo.Append(conversationID, Message{Role: RoleUser, Content: content})
+	user, err := h.repo.Append(conversationID, Message{
+		Role:        RoleUser,
+		Content:     content,
+		Attachments: request.Attachments,
+	})
 	if err != nil {
 		httpx.Error(w, statusFor(err), messageFor(err, "failed to store the message"))
 		return

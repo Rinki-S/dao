@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/rinki-s/dao/apps/local-service/internal/ai/attach"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/proposals"
 	"github.com/rinki-s/dao/apps/local-service/internal/modules/search"
 )
@@ -225,7 +226,8 @@ func (r *Repository) Messages(conversationID string) ([]Message, error) {
 // stop agreeing is that someone adds a column to one of them.
 const messageColumns = `id, conversation_id, role, content, position,
 	       model, wire, input_tokens, output_tokens,
-	       status, error_message, created_at, tool_calls, steps`
+	       status, error_message, created_at, tool_calls, steps, reasoning,
+	       attachments`
 
 // reindexTx rewrites a conversation's search entry from what the tables now
 // hold.
@@ -305,13 +307,14 @@ type scanner interface {
 func scanMessage(row scanner) (Message, error) {
 	var message Message
 	var toolCalls string
+	var attachments string
 
 	if err := row.Scan(
 		&message.ID, &message.ConversationID, &message.Role, &message.Content,
 		&message.Position, &message.Model, &message.Wire,
 		&message.InputTokens, &message.OutputTokens,
 		&message.Status, &message.ErrorMessage, &message.CreatedAt, &toolCalls,
-		&message.Steps,
+		&message.Steps, &message.Reasoning, &attachments,
 	); err != nil {
 		return Message{}, err
 	}
@@ -322,7 +325,42 @@ func scanMessage(row scanner) (Message, error) {
 	}
 	message.ToolCalls = calls
 
+	files, err := decodeAttachments(attachments)
+	if err != nil {
+		return Message{}, err
+	}
+	message.Attachments = files
+
 	return message, nil
+}
+
+// The empty string is what every row written before the column existed holds,
+// and what a turn with nothing attached holds now. Both mean the same thing,
+// so neither is an error.
+func decodeAttachments(stored string) ([]attach.Attachment, error) {
+	if stored == "" {
+		return nil, nil
+	}
+
+	var files []attach.Attachment
+	if err := json.Unmarshal([]byte(stored), &files); err != nil {
+		return nil, fmt.Errorf("decode attachments: %w", err)
+	}
+
+	return files, nil
+}
+
+func encodeAttachments(files []attach.Attachment) (string, error) {
+	if len(files) == 0 {
+		return "", nil
+	}
+
+	encoded, err := json.Marshal(files)
+	if err != nil {
+		return "", fmt.Errorf("encode attachments: %w", err)
+	}
+
+	return string(encoded), nil
 }
 
 // The empty string is what every row written before the column existed holds,
@@ -513,15 +551,23 @@ func (r *Repository) Append(conversationID string, message Message) (Message, er
 		return Message{}, err
 	}
 
+	// Written with the turn rather than filled in afterwards the way an
+	// assistant row's are: a question and the picture it is about arrive
+	// together and are one act.
+	attachments, err := encodeAttachments(stored.Attachments)
+	if err != nil {
+		return Message{}, err
+	}
+
 	if _, err := transaction.Exec(`
 		INSERT INTO chat_messages (
 			id, conversation_id, role, content, position,
 			model, wire, input_tokens, output_tokens,
-			status, error_message, created_at, tool_calls
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			status, error_message, created_at, tool_calls, attachments
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, stored.ID, stored.ConversationID, stored.Role, stored.Content, stored.Position,
 		stored.Model, stored.Wire, stored.InputTokens, stored.OutputTokens,
-		stored.Status, stored.ErrorMessage, stored.CreatedAt, toolCalls); err != nil {
+		stored.Status, stored.ErrorMessage, stored.CreatedAt, toolCalls, attachments); err != nil {
 		return Message{}, err
 	}
 
@@ -581,11 +627,11 @@ func (r *Repository) Finish(messageID string, message Message) (Message, error) 
 		UPDATE chat_messages
 		SET content = ?, model = ?, wire = ?,
 		    input_tokens = ?, output_tokens = ?,
-		    status = ?, error_message = ?, tool_calls = ?, steps = ?
+		    status = ?, error_message = ?, tool_calls = ?, steps = ?, reasoning = ?
 		WHERE id = ?
 	`, message.Content, message.Model, message.Wire,
 		message.InputTokens, message.OutputTokens,
-		status, message.ErrorMessage, toolCalls, message.Steps, messageID)
+		status, message.ErrorMessage, toolCalls, message.Steps, message.Reasoning, messageID)
 	if err != nil {
 		return Message{}, err
 	}

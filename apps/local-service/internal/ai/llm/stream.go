@@ -24,33 +24,71 @@ import (
 // fall back should be able to ask beforehand rather than discover it halfway
 // through a response.
 type Streamer interface {
-	// Stream calls onText for each piece of the answer as it arrives, and
+	// Stream hands each piece of the answer to the sink as it arrives, and
 	// returns the whole thing once it is complete.
 	//
-	// A callback rather than a channel or an iterator: the caller is an HTTP
+	// Callbacks rather than a channel or an iterator: the caller is an HTTP
 	// handler writing server-sent events, so it wants to be pushed to, and
 	// this way cancellation and cleanup stay ordinary Go. An error returned
-	// from onText stops the stream and comes back from Stream — that is how a
-	// disconnected browser stops work that no longer has a reader.
-	Stream(ctx context.Context, request Context, opts Options, onText func(string) error) (Response, error)
+	// from a callback stops the stream and comes back from Stream — that is
+	// how a disconnected browser stops work that no longer has a reader.
+	Stream(ctx context.Context, request Context, opts Options, sink Sink) (Response, error)
+}
+
+// Sink is where a stream's pieces go as they arrive.
+//
+// A struct rather than one more parameter, because what arrives on a stream is
+// not all one kind of thing. Prose and a reasoning model's working both come a
+// fragment at a time and must not be run together: one is the answer and the
+// other is how the model got to it, and a caller that received them as one
+// flow would have no way to tell them apart afterwards. A caller that only
+// wants the answer leaves Reasoning nil.
+type Sink struct {
+	Text      func(string) error
+	Reasoning func(string) error
+}
+
+// TextSink is the common case — a caller that wants the prose and nothing else.
+func TextSink(onText func(string) error) Sink {
+	return Sink{Text: onText}
+}
+
+// A nil callback is not an error. Which pieces a caller cares about is its own
+// business, and making every wire check before every call would put that
+// decision in the wrong place.
+func (s Sink) text(chunk string) error {
+	if s.Text == nil {
+		return nil
+	}
+
+	return s.Text(chunk)
+}
+
+func (s Sink) reasoning(chunk string) error {
+	if s.Reasoning == nil {
+		return nil
+	}
+
+	return s.Reasoning(chunk)
 }
 
 // StreamOrComplete streams when the client can and falls back to one whole
 // answer when it cannot.
 //
-// The fallback is not a degraded stream: onText is called once, with
-// everything. That keeps the caller's code identical in both cases, which
-// matters because whether streaming is available depends on which endpoint the
-// user happened to configure.
+// The fallback is not a degraded stream: each callback is called once, with
+// everything it would have received in pieces, and in the order the pieces
+// would have arrived. That keeps the caller's code identical in both cases,
+// which matters because whether streaming is available depends on which
+// endpoint the user happened to configure.
 func StreamOrComplete(
 	ctx context.Context,
 	client Client,
 	request Context,
 	opts Options,
-	onText func(string) error,
+	sink Sink,
 ) (Response, error) {
 	if streamer, ok := client.(Streamer); ok {
-		return streamer.Stream(ctx, request, opts, onText)
+		return streamer.Stream(ctx, request, opts, sink)
 	}
 
 	response, err := client.Complete(ctx, request, opts)
@@ -58,8 +96,17 @@ func StreamOrComplete(
 		return Response{}, err
 	}
 
+	// Working first, then the answer: that is the order a model produces them
+	// in, and a surface replaying them the other way round would show the
+	// conclusion before the thinking that reached it.
+	if thinking := response.Thinking(); thinking != "" {
+		if err := sink.reasoning(thinking); err != nil {
+			return Response{}, err
+		}
+	}
+
 	if text := response.Text(); text != "" {
-		if err := onText(text); err != nil {
+		if err := sink.text(text); err != nil {
 			return Response{}, err
 		}
 	}

@@ -129,6 +129,56 @@ func TestAnEmptyTurnIsLeftOut(t *testing.T) {
 	}
 }
 
+// A reasoning model refuses the next request unless the reasoning that
+// produced a call travels back with the message carrying it — DeepSeek's
+// deepseek-reasoner is where this was found. It goes ahead of the call, the
+// way it would have arrived from the model in the first place.
+func TestReasoningIsReplayedAheadOfTheCallItProduced(t *testing.T) {
+	context := BuildContext([]Message{
+		{Role: "user", Content: "create a note about parsers"},
+		{
+			Role:      "assistant",
+			Reasoning: "the workspace has nothing on this yet",
+			ToolCalls: []ToolCall{
+				{ID: "call-1", Name: "create_note", Input: `{"title":"Parsers"}`, Output: "created", Status: ToolCallOK},
+			},
+		},
+	})
+
+	call := context.Messages[1]
+	if len(call.Content) != 2 {
+		t.Fatalf("the call turn is %+v", call)
+	}
+	if call.Content[0].Kind != llm.KindThinking || call.Content[0].Text != "the workspace has nothing on this yet" {
+		t.Errorf("first block = %+v, want the reasoning ahead of the call", call.Content[0])
+	}
+	if call.Content[1].Kind != llm.KindToolCall {
+		t.Errorf("second block = %+v, want the call", call.Content[1])
+	}
+}
+
+// Reasoning attached to a turn with nothing answerable in it — the call is
+// still pending, or was recorded before ids were kept — has nothing to travel
+// alongside, so it is left out rather than sent as reasoning with no call.
+func TestReasoningWithNoAnsweredCallIsLeftOut(t *testing.T) {
+	context := BuildContext([]Message{
+		{Role: "user", Content: "fix the port"},
+		{
+			Role:      "assistant",
+			Content:   "I can change that.",
+			Reasoning: "the note says 7742, should be 7743",
+			ToolCalls: []ToolCall{{ID: "call-1", Name: "edit_note", Input: `{}`, Status: ToolCallPending}},
+		},
+	})
+
+	call := context.Messages[1]
+	for _, block := range call.Content {
+		if block.Kind == llm.KindThinking {
+			t.Errorf("reasoning was sent with no call behind it: %+v", call.Content)
+		}
+	}
+}
+
 // A turn whose prose never arrived but whose tools ran is not empty. It is the
 // record of what the model looked up, and dropping it takes that away from the
 // next turn.

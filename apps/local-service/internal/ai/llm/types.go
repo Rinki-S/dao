@@ -42,6 +42,26 @@ const (
 	KindToolCall ContentKind = "tool_call"
 	// KindToolResult is what running it produced, on its way back up.
 	KindToolResult ContentKind = "tool_result"
+	// KindImage is a picture somebody attached, for a model that can see.
+	//
+	// Only ever sent up. A model can describe an image but cannot return one,
+	// so nothing decodes this on the way back.
+	KindImage ContentKind = "image"
+	// KindDocument is a file attached whole — a PDF is the case this exists
+	// for.
+	//
+	// Separate from KindImage because the wires disagree about it more than
+	// they disagree about anything else: one takes a PDF as a first-class
+	// block and the other has no concept of one at all. A single "attachment"
+	// kind would have hidden that difference inside a media type string and
+	// left each wire to rediscover it.
+	//
+	// So a document carries both of the things a wire might need. Data is the
+	// file, for a wire that can read one. Text is the same file's words, got
+	// out of it before it reached this package, for a wire that cannot — and
+	// the two travel together because which one is usable is a property of the
+	// endpoint that happens to be configured, not of the attachment.
+	KindDocument ContentKind = "document"
 )
 
 // ContentBlock is one part of a message.
@@ -72,6 +92,18 @@ type ContentBlock struct {
 	// it — told that a file does not exist, a model asks for a different one;
 	// handed nothing, it invents the contents.
 	IsError bool `json:"isError,omitempty"`
+
+	// MediaType and Data belong to an image or a document. Data is standard
+	// base64 with no data: prefix and no newlines — both wires want the bytes
+	// encoded, and each wraps them differently, so the wrapping is the wire's
+	// business and not this struct's.
+	MediaType string `json:"mediaType,omitempty"`
+	Data      string `json:"data,omitempty"`
+
+	// Filename is what the file was called. Carried because a wire that cannot
+	// take a document has to say something about it in words, and "the
+	// attached file" is a worse sentence than the name the person recognises.
+	Filename string `json:"filename,omitempty"`
 }
 
 func TextBlock(text string) ContentBlock {
@@ -84,6 +116,14 @@ func ToolCallBlock(id, name string, input json.RawMessage) ContentBlock {
 
 func ToolResultBlock(id, text string, isError bool) ContentBlock {
 	return ContentBlock{Kind: KindToolResult, ID: id, Text: text, IsError: isError}
+}
+
+func ImageBlock(mediaType, data, filename string) ContentBlock {
+	return ContentBlock{Kind: KindImage, MediaType: mediaType, Data: data, Filename: filename}
+}
+
+func DocumentBlock(mediaType, data, filename string) ContentBlock {
+	return ContentBlock{Kind: KindDocument, MediaType: mediaType, Data: data, Filename: filename}
 }
 
 // ToolDefinition is a tool offered to the model.
@@ -157,6 +197,21 @@ func (r Response) Text() string {
 	text := ""
 	for _, block := range r.Content {
 		if block.Kind == KindText {
+			text += block.Text
+		}
+	}
+	return text
+}
+
+// Thinking is the model's working across every KindThinking block, with the
+// prose and the calls left out. Kept separate from Text for the same reason
+// the kind exists at all: a caller replaying a turn that used tools needs this
+// back on the wires that require it, and every other caller needs it never to
+// show up where an answer would.
+func (r Response) Thinking() string {
+	text := ""
+	for _, block := range r.Content {
+		if block.Kind == KindThinking {
 			text += block.Text
 		}
 	}

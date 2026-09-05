@@ -12,6 +12,26 @@ import (
 	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm"
 )
 
+// utf16Len is the length of a string as JavaScript would measure it.
+//
+// Not len() and not the rune count. The only consumer of this number is a
+// renderer cutting the reply at the point a tool ran, and there a string index
+// is a UTF-16 offset: every character below U+10000 counts once and everything
+// above it — emoji, most of them — counts twice. Measuring in bytes would put
+// the cut several characters late in any reply containing an accent; measuring
+// in runes would put it early in one containing an emoji.
+func utf16Len(text string) int {
+	length := 0
+	for _, r := range text {
+		length++
+		if r > 0xFFFF {
+			length++
+		}
+	}
+
+	return length
+}
+
 // turnRun is one run of the loop into an assistant row that already exists.
 //
 // Shared by the two ways a run starts — somebody said something, or somebody
@@ -63,6 +83,22 @@ func (h *Handler) runTurn(w http.ResponseWriter, r *http.Request, flusher http.F
 
 			return writeEvent(w, flusher, EventDelta, DeltaEvent{Text: chunk})
 		},
+		OnReasoning: func(chunk string) error {
+			// The same disconnection check as the prose, for the same reason:
+			// a reasoning model can think for half a minute before it says
+			// anything, so this is often the only traffic on the stream, and
+			// therefore the only place a departed reader would be noticed.
+			//
+			// Not accumulated here. What gets stored is what the loop collected
+			// across the whole turn, and a second copy assembled on this side
+			// would be a second answer to the question of what the model
+			// thought.
+			if err := r.Context().Err(); err != nil {
+				return err
+			}
+
+			return writeEvent(w, flusher, EventReasoning, ReasoningEvent{Text: chunk})
+		},
 		OnToolStart: func(id string, name string, input json.RawMessage) {
 			// Recorded and announced in the same place, so what the reader was
 			// told and what the transcript keeps cannot disagree.
@@ -73,12 +109,20 @@ func (h *Handler) runTurn(w http.ResponseWriter, r *http.Request, flusher http.F
 			// that stops to ask somebody, there is no result to fill in, so it
 			// stays pending until they answer.
 			used = append(used, ToolCall{
-				ID:     id,
-				Name:   name,
+				ID:   id,
+				Name: name,
+				// Where in the reply this happened, so the transcript can draw
+				// it where the model did it rather than gathering every call
+				// above the answer.
+				At:     utf16Len(reply.String()),
 				Input:  string(input),
 				Status: ToolCallPending,
 			})
-			_ = writeEvent(w, flusher, EventTool, ToolEvent{Name: name, Input: string(input)})
+			_ = writeEvent(w, flusher, EventTool, ToolEvent{
+				Name:  name,
+				Input: string(input),
+				At:    utf16Len(reply.String()),
+			})
 		},
 		OnToolEnd: func(id string, _ string, output string, failed bool) {
 			// What the model was told. Not shown to the reader — the line
@@ -124,6 +168,7 @@ func (h *Handler) runTurn(w http.ResponseWriter, r *http.Request, flusher http.F
 		Status:       StatusOK,
 		ToolCalls:    used,
 		Steps:        result.Steps,
+		Reasoning:    result.Reasoning,
 	}
 	switch {
 	case errors.Is(runErr, context.Canceled):

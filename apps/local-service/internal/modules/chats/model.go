@@ -1,6 +1,9 @@
 package chats
 
-import "github.com/rinki-s/dao/apps/local-service/internal/modules/proposals"
+import (
+	"github.com/rinki-s/dao/apps/local-service/internal/ai/attach"
+	"github.com/rinki-s/dao/apps/local-service/internal/modules/proposals"
+)
 
 // Roles a stored turn can have.
 //
@@ -81,6 +84,24 @@ type ToolCall struct {
 	// the tool proposed something rather than doing it, and until that is
 	// answered the call has no result to replay.
 	Status string `json:"status,omitempty"`
+
+	// At is how much of the reply had been written when this call was made.
+	//
+	// A turn is stored as one run of prose and one list of calls, which loses
+	// the thing a reader most wants to know: the model said something, went
+	// and looked, and then carried on. Without this the interface can only put
+	// every call at the top, which reads as though it did all its looking
+	// before it said a word.
+	//
+	// Counted in UTF-16 code units rather than bytes or runes, because the one
+	// thing that has to be able to cut the text at this point is JavaScript,
+	// where a string index is a UTF-16 offset. A byte offset would land in the
+	// middle of the first non-ASCII character above it.
+	//
+	// Zero on every call recorded before this existed, which puts them all at
+	// the front — exactly where they used to be drawn, so an old conversation
+	// reads as it always did rather than wrongly.
+	At int `json:"at"`
 }
 
 // Answered reports whether this call can be replayed to a model. A call with no
@@ -126,6 +147,34 @@ type Message struct {
 	// reload shows, and a field held back would make that true only of the
 	// fields somebody remembered to include.
 	Steps int `json:"steps"`
+
+	// Reasoning is a reasoning model's working across every step of this turn
+	// that asked for a tool, kept so the turn can be replayed later without
+	// losing it.
+	//
+	// It is kept for two reasons that would each be enough on their own.
+	//
+	// BuildContext hands it back on a resumed turn: the propose-then-apply flow
+	// reloads this exact message from the database and replays it, and a
+	// reasoning model that produced a tool call refuses the next request unless
+	// the reasoning that produced it travels with it.
+	//
+	// And it is shown, folded away above the answer, for anybody who wants to
+	// see how the model got there. Which is why it goes to the client rather
+	// than staying behind: a reload has to be able to show what the stream
+	// showed, and a turn whose thinking only existed while it was arriving
+	// would be one that emptied itself the moment the window was reopened.
+	Reasoning string `json:"reasoning,omitempty"`
+
+	// Attachments is what was attached to this turn, in the order it was
+	// attached. Only a user turn ever has any: a model can describe a picture
+	// but cannot hand one back.
+	//
+	// Where the files were, not the files. Nothing is copied, so each of these
+	// is a path plus the size and modification time it had at the time — which
+	// is what lets a later turn tell "the file somebody attached" from
+	// "whatever is at that path now".
+	Attachments []attach.Attachment `json:"attachments,omitempty"`
 }
 
 // ConversationDetail is a conversation together with its turns, which is how
@@ -153,8 +202,15 @@ type RenameConversationRequest struct {
 
 // SendMessageRequest is one turn from the user. The reply is not part of it:
 // it arrives over the stream the request opens.
+//
+// Attachments arrive as paths rather than as bytes. The renderer never reads
+// the files — it names them, having had them chosen through the desktop's own
+// file dialog — and the service reads each one when it needs it. Uploading the
+// bytes to a local service that is about to read the same file off the same
+// disk would be a copy made for no reason.
 type SendMessageRequest struct {
-	Content string `json:"content"`
+	Content     string              `json:"content"`
+	Attachments []attach.Attachment `json:"attachments,omitempty"`
 }
 
 // The events a turn's stream can carry.
@@ -169,11 +225,16 @@ type SendMessageRequest struct {
 // on a reload with everything else — this only saves the client from having to
 // go and ask for what it was just told.
 const (
-	EventStart    = "start"
-	EventDelta    = "delta"
-	EventTool     = "tool"
-	EventProposal = "proposal"
-	EventDone     = "done"
+	EventStart = "start"
+	EventDelta = "delta"
+	// EventReasoning is a piece of a reasoning model's working, on an event of
+	// its own rather than folded into delta. Two kinds of text arriving on one
+	// event would leave the client to guess which was the answer, and it would
+	// be guessing about the part it is least able to check.
+	EventReasoning = "reasoning"
+	EventTool      = "tool"
+	EventProposal  = "proposal"
+	EventDone      = "done"
 )
 
 // ToolEvent says that the model is looking something up.
@@ -188,6 +249,13 @@ const (
 type ToolEvent struct {
 	Name  string `json:"name"`
 	Input string `json:"input"`
+
+	// Where in the reply so far this happened, so the line can be drawn where
+	// the model did it while the answer is still arriving. Sent rather than
+	// counted again on the other side: both would be measuring the same
+	// deltas, and two measurements of one thing are two things that can
+	// disagree once a stream drops a chunk.
+	At int `json:"at"`
 }
 
 // StartEvent opens the stream. The user's turn comes back because the server
@@ -205,5 +273,15 @@ type StartEvent struct {
 
 // DeltaEvent is one piece of the reply as it arrives.
 type DeltaEvent struct {
+	Text string `json:"text"`
+}
+
+// ReasoningEvent is one piece of the model's working as it arrives.
+//
+// Sent whether or not anybody has asked to see it. Whether to show the
+// thinking is a preference of the window's, and a service that decided it
+// would be deciding it for every window at once — including the one that
+// turned it on halfway through a long reply.
+type ReasoningEvent struct {
 	Text string `json:"text"`
 }

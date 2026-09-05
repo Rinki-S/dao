@@ -117,6 +117,63 @@ func TestTheNextRequestCarriesTheWholeExchange(t *testing.T) {
 	}
 }
 
+// The working of every step, in order — the one that reached for a tool and
+// the one that finally answered. Both are worth keeping: the first has to go
+// back to the model alongside the call it produced, and the second is the
+// thinking behind the answer, which is the part a reader most wants to see.
+func TestReasoningIsKeptFromEveryStep(t *testing.T) {
+	search := &stub{name: "search_notes", answer: "one note"}
+	model := llmtest.Sequence(
+		llmtest.Turn{
+			Reasoning: "let me search first",
+			Calls:     llmtest.ToolCall("call-1", "search_notes", `{"query":"parser"}`).Calls,
+		},
+		llmtest.Turn{Reasoning: "one note is enough", Text: "done", Stop: llm.StopEnd},
+	)
+
+	result := run(t, &Loop{Client: model, Tools: []Tool{search}})
+
+	if result.Reasoning != "let me search first\n\none note is enough" {
+		t.Errorf("Reasoning = %q, want both steps' working in order", result.Reasoning)
+	}
+
+	// The step's own working goes back up with the call it produced, which is
+	// what a reasoning model requires to accept the next request.
+	second := model.Requests[1].Messages
+	call := second[1]
+	if call.Content[0].Kind != llm.KindThinking || call.Content[0].Text != "let me search first" {
+		t.Fatalf("message 1's first block = %+v, want the reasoning ahead of the call", call.Content[0])
+	}
+	if call.Content[1].Kind != llm.KindToolCall {
+		t.Errorf("message 1's second block = %+v, want the call", call.Content[1])
+	}
+}
+
+// The working reaches the caller as it arrives, not only at the end. A
+// reasoning model can think for half a minute before it says anything, and a
+// surface with nothing to show for that time reads as a hang.
+func TestReasoningIsReportedWhileItArrives(t *testing.T) {
+	model := &llmtest.StreamingFake{
+		Fake:   llmtest.Fake{Turns: []llmtest.Turn{{Reasoning: "weighing it up", Text: "done", Stop: llm.StopEnd}}},
+		Chunks: 2,
+	}
+
+	var working []string
+	loop := &Loop{
+		Client:      model,
+		OnReasoning: func(chunk string) error { working = append(working, chunk); return nil },
+	}
+
+	result := run(t, loop)
+
+	if len(working) != 2 || strings.Join(working, "") != "weighing it up" {
+		t.Errorf("working arrived as %q, want it in pieces", working)
+	}
+	if result.Reasoning != "weighing it up" {
+		t.Errorf("Reasoning = %q", result.Reasoning)
+	}
+}
+
 // The caller's own slice must come back untouched. A chat handler holding the
 // transcript it read from the database should not find a run's intermediate
 // turns spliced into it.

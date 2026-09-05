@@ -23,11 +23,16 @@ import (
 // one, and a fake that could not produce it would leave the loop's most common
 // step untested.
 type Turn struct {
-	Text  string
-	Calls []llm.ContentBlock
-	Usage llm.Usage
-	Stop  llm.StopReason
-	Err   error
+	Text string
+	// Reasoning queues a KindThinking block ahead of Text and Calls, for
+	// exercising a caller that has to carry a reasoning model's working back
+	// out — DeepSeek's deepseek-reasoner being the model this exists to stand
+	// in for.
+	Reasoning string
+	Calls     []llm.ContentBlock
+	Usage     llm.Usage
+	Stop      llm.StopReason
+	Err       error
 }
 
 // ToolCall queues one call, for the common case of a turn that is nothing else.
@@ -79,8 +84,11 @@ func (f *Fake) Complete(_ context.Context, request llm.Context, opts llm.Options
 	if response.StopReason == "" {
 		response.StopReason = llm.StopEnd
 	}
+	if turn.Reasoning != "" {
+		response.Content = append(response.Content, llm.ContentBlock{Kind: llm.KindThinking, Text: turn.Reasoning})
+	}
 	if turn.Text != "" {
-		response.Content = []llm.ContentBlock{llm.TextBlock(turn.Text)}
+		response.Content = append(response.Content, llm.TextBlock(turn.Text))
 	}
 	response.Content = append(response.Content, turn.Calls...)
 	if turn.Err != nil {
@@ -123,17 +131,30 @@ func Streamed(answer string, chunks int) *StreamingFake {
 // Stream delivers the queued answer in pieces and only then returns the turn's
 // error, if it has one. That order is the point: it is the shape of a stream
 // that dies part-way through, having already handed the caller real text.
+//
+// The working goes first, in pieces of its own, which is the order a reasoning
+// model produces them in: it finishes thinking before it starts answering.
 func (f *StreamingFake) Stream(
 	ctx context.Context,
 	request llm.Context,
 	opts llm.Options,
-	onText func(string) error,
+	sink llm.Sink,
 ) (llm.Response, error) {
 	response, err := f.Fake.Complete(ctx, request, opts)
 
-	for _, chunk := range pieces(response.Text(), f.Chunks) {
-		if writeErr := onText(chunk); writeErr != nil {
-			return response, writeErr
+	if sink.Reasoning != nil {
+		for _, chunk := range pieces(response.Thinking(), f.Chunks) {
+			if writeErr := sink.Reasoning(chunk); writeErr != nil {
+				return response, writeErr
+			}
+		}
+	}
+
+	if sink.Text != nil {
+		for _, chunk := range pieces(response.Text(), f.Chunks) {
+			if writeErr := sink.Text(chunk); writeErr != nil {
+				return response, writeErr
+			}
 		}
 	}
 
