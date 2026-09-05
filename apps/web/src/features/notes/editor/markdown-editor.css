@@ -4,6 +4,10 @@
 
 .dao-markdown-editor__prose {
   min-height: 100%;
+  /* The editor's own face, which follows the interface until somebody points
+     it somewhere else in Settings. Writing a long document and scanning a
+     sidebar are different jobs, and only one of them is worth a serif. */
+  font-family: var(--font-editor);
   /* Text sits in a centred column of at most --dao-note-measure, but the
      editable surface stays full width so clicking anywhere still focuses. */
   padding-block: 1.5rem;
@@ -24,7 +28,9 @@
 
 .dao-markdown-editor__prose :where(h1, h2, h3, h4, h5, h6) {
   margin: 1.5em 0 0.5em;
-  font-family: var(--font-heading);
+  /* The editor's face, not the interface's: a heading belongs to the document
+     it is in. */
+  font-family: var(--font-editor);
   font-weight: 600;
   line-height: 1.25;
 }
