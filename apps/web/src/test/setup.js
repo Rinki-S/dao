@@ -31,6 +31,47 @@ class ResizeObserverMock {
 
 globalThis.ResizeObserver = ResizeObserverMock;
 
+/**
+ * jsdom implements no IntersectionObserver, and it lays nothing out, so there
+ * is no honest answer it could give about what is on screen.
+ *
+ * This one reports everything as visible and hands each instance to the test,
+ * so a test that cares — the transcript only follows a reply for a reader who
+ * is at the bottom of it — can say otherwise.
+ */
+class IntersectionObserverMock {
+  constructor(callback) {
+    this.callback = callback;
+    this.elements = new Set();
+    IntersectionObserverMock.instances.push(this);
+  }
+
+  observe(element) {
+    this.elements.add(element);
+    this.callback([{ target: element, isIntersecting: true }], this);
+  }
+
+  unobserve(element) {
+    this.elements.delete(element);
+  }
+
+  disconnect() {
+    this.elements.clear();
+  }
+
+  /** Report what the test says, rather than what jsdom cannot know. */
+  report(isIntersecting) {
+    this.callback(
+      [...this.elements].map((target) => ({ target, isIntersecting })),
+      this,
+    );
+  }
+}
+
+IntersectionObserverMock.instances = [];
+
+globalThis.IntersectionObserver = IntersectionObserverMock;
+
 Object.defineProperty(Document.prototype, 'elementFromPoint', {
   configurable: true,
   value() {

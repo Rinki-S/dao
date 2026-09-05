@@ -23,6 +23,8 @@ import { SearchWorkspace } from '@/features/search/components/SearchWorkspace.js
 import { SettingsDialog } from '@/features/settings/components/SettingsDialog.jsx';
 import { TasksWorkspace } from '@/features/tasks/components/TasksWorkspace.jsx';
 import { useAppearance } from '@/hooks/use-appearance.js';
+import { useFonts } from '@/hooks/use-fonts.js';
+import { useShowThinking } from '@/hooks/use-show-thinking.js';
 import { useDaoWorkspace } from './use-dao-workspace.js';
 
 function EmptyHome({ model }) {
@@ -42,6 +44,12 @@ function EmptyHome({ model }) {
 export function DaoApp() {
   const model = useDaoWorkspace();
   const { appearance, setAppearance } = useAppearance();
+  // Held here rather than in the pane that draws it, so that the switch in
+  // Settings and the transcript are reading the same value.
+  const { showThinking, setShowThinking } = useShowThinking();
+  // Applied to the document by the hook, so every surface picks the choices up
+  // from the CSS tokens rather than being handed them.
+  const { fonts, setFont } = useFonts();
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Peeking the hidden sidebar back in: owned here because the sidebar and the
   // trigger are siblings and both have to move together.
@@ -98,7 +106,13 @@ export function DaoApp() {
       return <TodayWorkspace model={model} onOpenSettings={() => setSettingsOpen(true)} />;
     if (model.activeView === 'tasks') return <TasksWorkspace model={model} />;
     if (model.activeView === 'search') return <SearchWorkspace model={model} />;
-    return <ChatsWorkspace model={model} onOpenSettings={() => setSettingsOpen(true)} />;
+    return (
+      <ChatsWorkspace
+        model={model}
+        showThinking={showThinking}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+    );
   })();
 
   return (
@@ -120,9 +134,13 @@ export function DaoApp() {
           </SidebarInset>
           <SettingsDialog
             appearance={appearance}
+            fonts={fonts}
             model={model}
             open={settingsOpen}
+            showThinking={showThinking}
             onAppearanceChange={setAppearance}
+            onFontChange={setFont}
+            onShowThinkingChange={setShowThinking}
             onOpenChange={setSettingsOpen}
             onReplayOnboarding={() => {
               setSettingsOpen(false);

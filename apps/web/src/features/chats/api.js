@@ -6,6 +6,7 @@ import {
   DeltaEventSchema,
   DoneEventSchema,
   ProposalEventSchema,
+  ReasoningEventSchema,
   StartEventSchema,
   ToolEventSchema,
 } from './schemas.js';
@@ -126,7 +127,7 @@ function outcomeFor(status) {
  * events in the same order, ending on the same stored row. A second copy of
  * this walk would be a second set of decisions about what a missing done means.
  */
-async function readTurn(response, { onStart, onDelta, onTool, onProposal } = {}) {
+async function readTurn(response, { onStart, onDelta, onReasoning, onTool, onProposal } = {}) {
   // Everything the service can refuse, it refuses before the first event, so a
   // failure here is still an ordinary response with a status worth reading.
   if (!response.ok) {
@@ -143,6 +144,9 @@ async function readTurn(response, { onStart, onDelta, onTool, onProposal } = {})
         break;
       case 'delta':
         onDelta?.(DeltaEventSchema.parse(event.data).text);
+        break;
+      case 'reasoning':
+        onReasoning?.(ReasoningEventSchema.parse(event.data).text);
         break;
       case 'tool':
         onTool?.(ToolEventSchema.parse(event.data));
@@ -182,11 +186,19 @@ async function readTurn(response, { onStart, onDelta, onTool, onProposal } = {})
  * The callbacks report progress; the promise resolves with the assistant row
  * the stream ended on, which is the one the transcript now holds.
  */
-export async function sendMessage(conversationId, content, { signal, ...callbacks } = {}) {
+export async function sendMessage(
+  conversationId,
+  content,
+  { attachments = [], signal, ...callbacks } = {},
+) {
   const response = await apiFetch(`/api/chats/${encodeURIComponent(conversationId)}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content }),
+    // Attachments go as the paths they were chosen at, not as bytes. The
+    // service reads the files itself, off the same disk, and posting their
+    // contents here would be a copy made to reach a process that can already
+    // see them.
+    body: JSON.stringify({ content, attachments }),
     signal,
   });
 

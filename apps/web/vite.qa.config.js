@@ -284,6 +284,18 @@ const APPLIED_REPLY = {
 // at at all. Discarding it still works.
 const refusesToApply = new Set(['qa-proposal-1']);
 
+// A reasoning model's working, in the pieces it would arrive in.
+//
+// Plain prose with none of the reply's Markdown in it, deliberately: the
+// disclosure renders this as text, and a fixture full of headings would make
+// a panel that had wrongly rendered it look correct.
+const QA_WORKING = [
+  'They are asking why the last token goes missing. ',
+  'That sounds like the lexer flushing on the character after a token, ',
+  'which would mean end of input never flushes. ',
+  'I should check the notes before saying so.',
+];
+
 // Written to exercise what a reply is actually made of — prose, a list, a
 // fenced block, a table, a link — so the rendered shapes can be looked at
 // rather than assumed. It streams in pieces, so the pane can be watched filling
@@ -381,17 +393,32 @@ function streamChatReply(request, response, conversationId) {
       return streamProposedChange(response, conversationId, assistantId, stored, asked);
     }
 
-    // A tool runs before the reply starts, the way one does when the model
-    // looks something up first.
-    const toolCalls = [
-      { name: 'search_notes', input: JSON.stringify({ query: 'lexer' }) },
-      { name: 'read_tasks', input: '{}' },
-    ];
-    for (const call of toolCalls) {
-      response.write(`event: tool\ndata: ${JSON.stringify(call)}\n\n`);
+    // A reasoning model thinks before it does anything else, in pieces of its
+    // own. Sent whether or not the window is set to show it, because that is
+    // what the service does: what gets drawn is the reader's preference, not
+    // the provider's business.
+    for (const piece of QA_WORKING) {
+      response.write(`event: reasoning\ndata: ${JSON.stringify({ text: piece })}\n\n`);
     }
 
+    // A tool runs before the reply starts, the way one does when the model
+    // looks something up first.
+    //
+    // One before a word is said and one part way through, so the pass can see
+    // that a line is drawn where the call happened rather than gathered above
+    // the answer. `at` is how much of the reply had been written at the time,
+    // in UTF-16 code units, which is what the service counts.
     const words = QA_REPLY.split(' ');
+    const breakAfter = 24;
+    const midpoint = words.slice(0, breakAfter).join(' ').length;
+
+    const toolCalls = [
+      { name: 'search_notes', input: JSON.stringify({ query: 'lexer' }), at: 0 },
+      { name: 'read_tasks', input: '{}', at: midpoint },
+    ];
+
+    response.write(`event: tool\ndata: ${JSON.stringify(toolCalls[0])}\n\n`);
+
     let index = 0;
 
     // A reader who presses stop closes the connection, and the service's answer
@@ -411,6 +438,13 @@ function streamChatReply(request, response, conversationId) {
         const text = index === 0 ? words[index] : ` ${words[index]}`;
         response.write(`event: delta\ndata: ${JSON.stringify({ text })}\n\n`);
         index += 1;
+
+        // The second call, in the middle of the answer rather than ahead of
+        // it. This is the case the whole arrangement exists for.
+        if (index === breakAfter) {
+          response.write(`event: tool\ndata: ${JSON.stringify(toolCalls[1])}\n\n`);
+        }
+
         return;
       }
 
@@ -431,6 +465,9 @@ function streamChatReply(request, response, conversationId) {
         // The same calls on the stored turn, so what the pane shows while the
         // reply arrives and what it shows on reload can be compared.
         toolCalls,
+        // And the same working, for the same reason: the disclosure has to say
+        // the same thing after a reload as it did while the turn was arriving.
+        reasoning: QA_WORKING.join(''),
       };
       stored.push(assistant);
 

@@ -37,6 +37,26 @@ export const ToolCallSchema = z.object({
   id: z.string().default(''),
   output: z.string().default(''),
   status: z.string().default(''),
+
+  // How much of the reply had been written when this ran, as a UTF-16 offset
+  // — which is what a JavaScript string index is, so it can cut the text
+  // directly. Zero on every call stored before the service recorded this,
+  // which puts them all at the front, exactly where they used to be drawn.
+  at: z.number().default(0),
+});
+
+// A file attached to a turn.
+//
+// Size and modifiedAt are what the file measured when it was attached. They
+// are not shown; they exist because attachments are not copied, so on a later
+// turn the service re-reads the path and these are what tell "the file that
+// was sent" from "whatever is there now".
+export const AttachmentSchema = z.object({
+  path: z.string(),
+  filename: z.string(),
+  mediaType: z.string().default(''),
+  size: z.number().default(0),
+  modifiedAt: z.string().default(''),
 });
 
 export const MessageSchema = z.object({
@@ -55,6 +75,17 @@ export const MessageSchema = z.object({
   // What the model did before it answered, in order. Absent on a turn that
   // looked nothing up, and on every turn stored before this existed.
   toolCalls: z.array(ToolCallSchema).default([]),
+
+  // What was attached to this turn. Paths and the numbers that say whether
+  // the file is still the one that was sent — never the bytes: nothing is
+  // copied, and the renderer has no use for the contents it does not display.
+  attachments: z.array(AttachmentSchema).default([]),
+
+  // A reasoning model's working. Absent from every other model's turns, and
+  // from every turn stored before this existed, which is what the default is
+  // for: a conversation from last week is not a conversation with a missing
+  // field, it is one where nothing was thinking out loud.
+  reasoning: z.string().default(''),
 });
 
 export const ConversationSchema = z.object({
@@ -147,6 +178,14 @@ export const DeltaEventSchema = z.object({
   text: z.string(),
 });
 
+// One piece of a reasoning model's working, on its own event so that it can
+// never be mistaken for a piece of the answer. It arrives whether or not this
+// window is set to show it: what a person has chosen to look at is decided
+// here, not by the service on everybody's behalf.
+export const ReasoningEventSchema = z.object({
+  text: z.string(),
+});
+
 // Sent when a tool starts, so the pause can be filled with what is causing it.
 // It carries no phrasing: how to say "searched your notes for parser" is this
 // side's business, where the rest of the product's words live.
@@ -157,6 +196,7 @@ export const DeltaEventSchema = z.object({
 export const ToolEventSchema = z.object({
   name: z.string(),
   input: z.string().default(''),
+  at: z.number().default(0),
 });
 
 // Sent before done when a turn stopped to ask somebody something.

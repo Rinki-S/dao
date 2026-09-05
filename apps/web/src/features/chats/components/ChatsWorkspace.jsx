@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   IconAlertTriangle,
+  IconArrowUp,
   IconInfoCircle,
+  IconPaperclip,
   IconMessageCircle,
   IconPlayerStop,
-  IconSend,
   IconTool,
 } from '@tabler/icons-react';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert.jsx';
@@ -16,13 +17,16 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty.jsx';
+import { InputGroup, InputGroupAddon, InputGroupTextarea } from '@/components/ui/input-group.jsx';
 import { ScrollArea } from '@/components/ui/scroll-area.jsx';
-import { Spinner } from '@/components/ui/spinner.jsx';
-import { Textarea } from '@/components/ui/textarea.jsx';
 import { useTitlebarInset } from '@/components/shell/use-titlebar-inset.js';
 import { cn } from '@/lib/utils';
+import { Attachments } from './Attachments.jsx';
 import { Markdown } from './Markdown.jsx';
+import { Thinking } from './Thinking.jsx';
 import { ProposalCard } from './ProposalCard.jsx';
+import { ReplyDots } from './ReplyDots.jsx';
+import { interleave } from '../interleave.js';
 import { useConversations } from '../use-conversations.js';
 import {
   CHAT_OUTCOMES,
@@ -127,22 +131,44 @@ function describeTool({ name, input }) {
  * be able to answer about itself is "did it read my notes?", and an answer that
  * only appeared while it was being written does not answer it tomorrow.
  */
-function ToolActivity({ calls }) {
-  // Guarded rather than trusted. The schema defaults this to an empty array, so
-  // it is always there — but a turn is not worth losing over a missing field,
-  // and rendering nothing is a better failure than taking down the transcript
-  // it was meant to annotate.
-  if (!calls || calls.length === 0) return null;
+function ToolLine({ call }) {
+  return (
+    <p className="flex items-center gap-2 text-muted-foreground text-xs">
+      <IconTool aria-hidden="true" className="size-3.5 shrink-0" />
+      <span className="truncate">{describeTool(call)}</span>
+    </p>
+  );
+}
+
+/**
+ * A reply, with each tool line where the model ran it.
+ *
+ * Not every call above the answer, which is what a turn stored as one run of
+ * prose and one list of calls invites. The model says something, goes and
+ * looks, and carries on — and a transcript that gathers the looking above the
+ * saying reads as though it had done all of it before speaking.
+ *
+ * The prose is rendered in pieces, which is the cost. Only the last piece is
+ * final: the ones before it are followed by more of the same reply, and
+ * telling the renderer so is what keeps a list or a fence that continues past
+ * a tool line from being read as finished at the cut.
+ */
+function Reply({ content, calls, final = true }) {
+  const parts = useMemo(() => interleave(content ?? '', calls ?? []), [content, calls]);
+  if (parts.length === 0) return null;
+
+  const last = parts.findLast((part) => part.kind === 'text');
 
   return (
-    <ul className="flex flex-col gap-1">
-      {calls.map((call, index) => (
-        <li className="flex items-center gap-2 text-muted-foreground text-xs" key={index}>
-          <IconTool aria-hidden="true" className="size-3.5 shrink-0" />
-          <span className="truncate">{describeTool(call)}</span>
-        </li>
-      ))}
-    </ul>
+    <>
+      {parts.map((part, index) =>
+        part.kind === 'call' ? (
+          <ToolLine call={part.call} key={index} />
+        ) : (
+          <Markdown final={final && part === last} key={index} text={part.text} />
+        ),
+      )}
+    </>
   );
 }
 
@@ -154,23 +180,30 @@ function ToolActivity({ calls }) {
  * nothing gains from. The reply is rendered, because the model was asked to
  * write Markdown and does.
  */
-function Turn({ message }) {
+function Turn({ message, showThinking }) {
   if (message.role === 'user') {
     return (
-      <div className="flex justify-end">
-        <p className="max-w-[85%] whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 text-sm">
-          {message.content}
-        </p>
+      <div className="flex flex-col items-end gap-1.5">
+        {/* Above the words, the way they were attached: the file is picked
+            and then something is said about it. */}
+        <Attachments files={message.attachments} />
+        {message.content ? (
+          <p className="max-w-[85%] whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 text-sm">
+            {message.content}
+          </p>
+        ) : null}
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <ToolActivity calls={message.toolCalls} />
+      {/* Above the tools and the reply, where it happened: the model thought,
+          then looked things up, then answered. */}
+      {showThinking ? <Thinking text={message.reasoning} /> : null}
       {/* No wrapper for size or spacing: the reply brings its own, so that a
           note and a reply are laid out by the same rules. */}
-      {message.content ? <Markdown text={message.content} /> : null}
+      <Reply calls={message.toolCalls} content={message.content} />
       {message.status === 'failed' ? (
         <Alert variant="error">
           <IconAlertTriangle />
@@ -202,7 +235,7 @@ function Turn({ message }) {
  * conversations is a list of conversations that contain something — thinking
  * better of a question should not leave a row behind.
  */
-export function ChatsWorkspace({ model, onOpenSettings }) {
+export function ChatsWorkspace({ model, showThinking = false, onOpenSettings }) {
   const titlebarInset = useTitlebarInset();
   const workspaceId = model.currentWorkspace?.id ?? '';
 
@@ -246,14 +279,25 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   );
 
   const [draft, setDraft] = useState('');
+  // The files staged against the turn not yet sent. Paths and names only —
+  // nothing here has read a byte of them, and nothing needs to.
+  const [staged, setStaged] = useState([]);
   // The turn in flight: what the user just said, what is being looked up, and
   // the reply so far.
   const [pending, setPending] = useState('');
   const [activity, setActivity] = useState([]);
   const [streaming, setStreaming] = useState('');
+  // The working as it arrives. Held whether or not it is being shown: turning
+  // the preference on halfway through a long think should reveal what has
+  // already been thought, not start from wherever the reader happened to flip
+  // the switch.
+  const [working, setWorking] = useState('');
   const [sending, setSending] = useState(false);
 
   const bottom = useRef(null);
+  // Whether the transcript should stay stuck to the end. True until somebody
+  // scrolls away from it, and true again the moment they come back.
+  const following = useRef(true);
   // The turn in flight, in refs as well as in state.
   //
   // Stopping reads them from inside a catch, where the state captured when the
@@ -261,6 +305,7 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   // are what the reader was actually shown by the time they pressed the button.
   const running = useRef(null);
   const streamed = useRef('');
+  const streamedWorking = useRef('');
   const streamedTools = useRef([]);
   const assistantId = useRef('');
   // The conversation whose turns are already in hand.
@@ -327,10 +372,48 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
     });
   }
 
-  // Following the answer as it is written is the whole point of streaming it.
+  // Whether the reader is at the end of the transcript, and so whether the
+  // pane should keep them there.
+  //
+  // Watched rather than measured. The alternative is comparing scrollTop
+  // against scrollHeight on every token, which means reading layout during a
+  // stream and picking a tolerance in pixels; an observer on the last element
+  // answers the same question by looking at it, and answers it again for free
+  // when the window is resized or the composer grows.
   useEffect(() => {
+    const sentinel = bottom.current;
+    if (!sentinel) return undefined;
+
+    const watcher = new IntersectionObserver(
+      ([entry]) => {
+        following.current = entry.isIntersecting;
+      },
+      // The scroller itself, not the window. The transcript is clipped by the
+      // scroll area, and the default root would be answering about a viewport
+      // that is not the one doing the scrolling.
+      { root: sentinel.closest('[data-slot="scroll-area-viewport"]') },
+    );
+
+    watcher.observe(sentinel);
+
+    return () => watcher.disconnect();
+  }, []);
+
+  // Following the answer as it is written is the whole point of streaming it —
+  // but only for somebody who was following it.
+  //
+  // Scrolling up during a reply is how you read what was said earlier, and a
+  // pane that scrolled to the bottom on every token made that impossible: each
+  // arriving word dragged the transcript back down out of the reader's hands.
+  // So the effect asks first, and the answer is the state from before this
+  // token arrived — the observer's callback runs at the end of the frame,
+  // after this. Scrolling back to the bottom starts the following again,
+  // because that is the same gesture as asking to be kept there.
+  useEffect(() => {
+    if (!following.current) return;
+
     bottom.current?.scrollIntoView({ block: 'end' });
-  }, [messages, streaming, pending, activity, proposed]);
+  }, [messages, streaming, working, pending, activity, proposed]);
 
   /**
    * Everything that happens after a turn's request is opened.
@@ -342,14 +425,16 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
    * keep when a stream dies, what to call a reader who pressed stop, what to
    * store so the pane and a reload agree.
    */
-  async function carry(conversationId, begin, { restore = '' } = {}) {
+  async function carry(conversationId, begin, { restore = '', restoreAttachments = [] } = {}) {
     setActivity([]);
     setStreaming('');
+    setWorking('');
     setSending(true);
     setProblem({ id: conversationId, outcome: null, failure: '' });
 
     running.current = new AbortController();
     streamed.current = '';
+    streamedWorking.current = '';
     streamedTools.current = [];
     assistantId.current = '';
 
@@ -368,6 +453,10 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
           streamed.current += text;
           setStreaming((current) => current + text);
         },
+        onReasoning: (text) => {
+          streamedWorking.current += text;
+          setWorking((current) => current + text);
+        },
         onTool: (call) => {
           streamedTools.current = [...streamedTools.current, call];
           setActivity((current) => [...current, call]);
@@ -383,10 +472,11 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
 
       addTurn(conversationId, reply);
       // Cleared together with the streamed text: the stored turn that just
-      // landed carries the same calls, so leaving these would show each of them
-      // twice.
+      // landed carries the same calls and the same working, so leaving these
+      // would show each of them twice.
       setActivity([]);
       setStreaming('');
+      setWorking('');
 
       // Re-read rather than patched in place: the first turn gives a
       // conversation its title, and every turn changes the order of the list.
@@ -414,10 +504,12 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
           // The service stored them, so a reload shows them; the pane should
           // not disagree with itself for the rest of the session.
           toolCalls: streamedTools.current,
+          reasoning: streamedWorking.current,
         });
         setPending('');
         setActivity([]);
         setStreaming('');
+        setWorking('');
 
         // A stopped turn still made a conversation, and one missing from the
         // list until the next reload is one the reader cannot get back to.
@@ -434,23 +526,76 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
       setPending('');
       setActivity([]);
       setStreaming('');
+      setWorking('');
       // Nothing was sent, so the words are handed back rather than lost to a
       // failure the user is about to be asked to do something about. There are
       // none to hand back when the turn was started by a decision.
       if (restore) setDraft((current) => current || restore);
+      // And the files with them. A refused send that quietly dropped the
+      // attachments would leave somebody retyping a question whose subject
+      // they would have to go and find again.
+      if (restoreAttachments.length > 0) {
+        setStaged((current) => (current.length > 0 ? current : restoreAttachments));
+      }
     } finally {
       running.current = null;
       setSending(false);
     }
   }
 
+  /**
+   * Stage files chosen through the desktop's own dialog.
+   *
+   * The dialog is the only way to learn a real path: a file input in a web
+   * page hands back a name and a blob and deliberately not a location, and a
+   * location is the whole of what gets stored.
+   */
+  async function chooseAttachments() {
+    if (!window.dao?.chooseAttachments) return;
+
+    let result;
+    try {
+      result = await window.dao.chooseAttachments();
+    } catch (error) {
+      // A button that does nothing is the worst way to fail, and this is the
+      // one call in the pane that can fail without producing anything at all
+      // to look at. The bridge is a process boundary: the renderer reloads on
+      // save and the main process does not, so a build whose preload has moved
+      // on from the running Electron rejects here with "no handler
+      // registered" — silently, until this said so.
+      setProblem({
+        id: selectedId,
+        outcome: CHAT_OUTCOMES.failed,
+        failure: `The file chooser could not be opened: ${error.message}`,
+      });
+
+      return;
+    }
+
+    if (result?.canceled) return;
+
+    setStaged((current) => {
+      // Keyed on the path, so choosing the same file twice stages it once. The
+      // service would read it twice and the model would be shown it twice.
+      const held = new Set(current.map((file) => file.path));
+      const added = (result?.paths ?? [])
+        .filter((path) => !held.has(path))
+        .map((path) => ({ path, filename: path.split('/').pop() ?? path }));
+
+      return [...current, ...added];
+    });
+  }
+
   async function submit(event) {
     event.preventDefault();
 
     const content = draft.trim();
-    if (!content || sending || !workspaceId) return;
+    // A file on its own is a message. What cannot be sent is nothing at all.
+    if ((!content && staged.length === 0) || sending || !workspaceId) return;
 
+    const attachments = staged;
     setDraft('');
+    setStaged([]);
     setPending(content);
     // Before the conversation is created, not after: creating one is a request
     // of its own, and a second press while it is in flight would create a
@@ -492,9 +637,11 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
     // Saying something else instead of answering is an answer: no. Nothing here
     // has to arrange for the card to say so — the service sets aside whatever
     // was waiting before it stores this turn, and sends the row it set aside.
-    await carry(conversationId, (events) => sendMessage(conversationId, content, events), {
-      restore: content,
-    });
+    await carry(
+      conversationId,
+      (events) => sendMessage(conversationId, content, { ...events, attachments }),
+      { restore: content, restoreAttachments: attachments },
+    );
   }
 
   /**
@@ -552,7 +699,7 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
   const loose = proposed.filter((change) => !placed.has(change.toolCallId));
 
   return (
-    <section aria-label="Chats" className="flex h-full min-h-0 flex-col">
+    <section aria-label="Chats" className="relative flex h-full min-h-0 flex-col">
       {/* The surface's own top bar, and the only one now that the conversation
           list lives in the app's sidebar. Same height and inset as Today and
           Search, which is what keeps the traffic lights optically centred and
@@ -577,7 +724,10 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
       </header>
 
       <ScrollArea className="min-h-0 flex-1" overscrollContain>
-        <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
+        {/* Bottom padding rather than a margin, and generous: the last turn
+            has to be able to scroll clear of the composer floating over it,
+            and the composer grows as somebody types into it. */}
+        <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4 pb-36">
           {empty ? (
             <Empty>
               <EmptyHeader>
@@ -595,7 +745,7 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
 
           {messages.map((message) => (
             <Fragment key={message.id}>
-              <Turn message={message} />
+              <Turn message={message} showThinking={showThinking} />
               {under(message).map((change) => (
                 <ProposalCard busy={sending} key={change.id} proposal={change} onDecide={decide} />
               ))}
@@ -610,20 +760,24 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
             </div>
           ) : null}
 
-          <ToolActivity calls={activity} />
+          {showThinking ? <Thinking live text={working} /> : null}
 
           {/* Rendered while it streams, not only once it lands, so the reply
-                does not visibly re-lay-itself-out the moment it finishes.
-                final={false} is what tells the renderer that a half-written
-                fence is a fence still being written rather than a stray
-                backtick. */}
-          {streaming ? <Markdown final={false} text={streaming} /> : null}
+                does not visibly re-lay-itself-out the moment it finishes — and
+                with the tool lines already in place, so a call does not jump
+                from the top of the answer to the middle of it when the turn is
+                stored. final={false} is what tells the renderer that a
+                half-written fence is a fence still being written rather than a
+                stray backtick. */}
+          <Reply calls={activity} content={streaming} final={false} />
 
           {loose.map((change) => (
             <ProposalCard busy={sending} key={change.id} proposal={change} onDecide={decide} />
           ))}
 
-          {sending && !streaming && activity.length === 0 ? <Spinner aria-hidden="true" /> : null}
+          {sending && !streaming && activity.length === 0 && !(showThinking && working) ? (
+            <ReplyDots />
+          ) : null}
 
           {/* The reply is announced as a state, not as text. A live region
                 carrying every token as it lands would read the answer out one
@@ -659,46 +813,155 @@ export function ChatsWorkspace({ model, onOpenSettings }) {
         </div>
       </ScrollArea>
 
-      <form className="shrink-0 border-t p-4" onSubmit={submit}>
-        <div className="mx-auto flex max-w-3xl items-end gap-2">
-          <Textarea
-            aria-label="Message"
-            disabled={!workspaceId}
-            placeholder="Ask something…"
-            size="sm"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              // Enter sends, Shift+Enter breaks the line. The other way round
-              // is defensible, but every other chat works this way and muscle
-              // memory is not something to be clever with.
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
-            }}
-          />
-          {/* The same corner, so the button that started the reply is the
-                button that ends it — and type="button" while it stops, or
-                pressing it would submit the form it sits in. It is never
-                disabled: the moment a reply is worth stopping is exactly the
-                moment it is running. */}
-          {sending ? (
-            <Button aria-label="Stop" size="icon" type="button" variant="outline" onClick={stop}>
-              <IconPlayerStop aria-hidden="true" />
-            </Button>
-          ) : (
-            <Button
-              aria-label="Send"
-              disabled={!draft.trim() || !workspaceId}
-              size="icon"
-              type="submit"
-            >
-              <IconSend aria-hidden="true" />
-            </Button>
-          )}
-        </div>
-      </form>
+      {/* The composer floats over the transcript rather than sitting under a
+          rule dividing the two. What separates them is the fade above it,
+          which is the separation a page already makes: things nearer the
+          bottom are on their way out of view. A hairline would have drawn a
+          second edge across a pane that already has one under its header. */}
+      <div className="absolute inset-x-0 bottom-0 z-10">
+        {/* Drawn above the composer rather than behind it: text has to be gone
+            by the time it reaches the top edge of the box, or it reappears in
+            the gap beside it.
+
+            The only part of this band you can see through, and so the only
+            part that has to let a click reach what is under it. The composer
+            below is opaque, and passing clicks through that would hand them to
+            text nobody can see. */}
+        <div className="pointer-events-none h-12 bg-gradient-to-b from-transparent to-background" />
+
+        <form className="bg-background px-4 pb-4" onSubmit={submit}>
+          {/* The width and the centring live on a block wrapper, not on the
+              group itself: an input group is inline-flex, and auto margins do
+              not centre an inline-level box — it had been sitting against the
+              left edge while the transcript above it was centred. */}
+          <div className="mx-auto max-w-2xl">
+            {/* The textarea is sized from here rather than from its own
+                className, which lands on the control's wrapper and never
+                reaches the element that has the height.
+
+                Three things, all on the inner textarea. A floor shorter than
+                the group's own, which is sized for a form field somebody
+                composes in rather than a chat box that is usually one line. A
+                ceiling, because the control grows with its content —
+                field-sizing-content and nothing to stop it means a long
+                question eventually eats the conversation it is about. And the
+                scrolling that ceiling implies, said out loud rather than left
+                to the default. Important throughout: the group sets the floor
+                with a selector of the same shape, so these have to outrank it
+                rather than tie with it. */}
+            {/* The corner is concentric with the send button, not chosen.
+                The button is size-7 and fully round, so its radius is 14px;
+                it sits 11px inside the addon's padding and 1px inside the
+                group's border, so 12px from the outer edge. A radius shares a
+                centre with the circle inside it when it is the sum: 14 + 12 =
+                26. The group's own rounded-lg was 10px — tighter than the
+                circle it contains, which is what makes a corner look pinched.
+
+                The inset ring is one border further in, at 25px, because
+                inset-0 puts it against the padding box rather than the border
+                box. */}
+            {/* The staged files sit above the box rather than inside it: the
+                composer grows as somebody types, and a row of chips inside a
+                control that already has a ceiling would be competing with the
+                words for the same bounded height. */}
+            {staged.length > 0 ? (
+              <div className="mb-1.5">
+                <Attachments
+                  files={staged}
+                  onRemove={(file) =>
+                    setStaged((current) => current.filter((held) => held.path !== file.path))
+                  }
+                />
+              </div>
+            ) : null}
+
+            <InputGroup className="rounded-[26px] before:rounded-[25px] **:[textarea]:min-h-14! **:[textarea]:max-h-40! **:[textarea]:overflow-y-auto!">
+              <InputGroupTextarea
+                aria-label="Message"
+                disabled={!workspaceId}
+                placeholder="Ask something…"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  // An input method is mid-word, and this Enter belongs to it.
+                  //
+                  // Typing Chinese, Japanese or Korean means typing a reading
+                  // and then pressing Enter to choose among the candidates
+                  // offered for it. That Enter arrives here as an ordinary
+                  // keydown, indistinguishable from the one that means send —
+                  // so without this, choosing a character sent the half-typed
+                  // message it was part of. The composition has to be allowed
+                  // to finish; the next Enter, once it has, is the real one.
+                  //
+                  // keyCode is deprecated and is checked anyway: it is 229
+                  // while an IME is handling a key, and it is the only signal
+                  // some browsers give on the keydown that ends a composition,
+                  // where isComposing has already gone false.
+                  if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+
+                  // Enter sends, Shift+Enter breaks the line. The other way
+                  // round is defensible, but every other chat works this way
+                  // and muscle memory is not something to be clever with.
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+              />
+              {/* After the textarea in the DOM, which the input group
+                  requires: the addon is what click-to-focus reaches past. */}
+              <InputGroupAddon align="block-end">
+                {/* The slot on the left, which finally has something to do.
+                  Absent rather than disabled where there is no desktop bridge
+                  to open a dialog with: a web page cannot learn a file's path,
+                  and a path is the whole of what gets stored — so in a browser
+                  the feature does not exist rather than existing and failing. */}
+                {window.dao?.chooseAttachments ? (
+                  <Button
+                    aria-label="Attach files"
+                    className="rounded-full"
+                    disabled={sending || !workspaceId}
+                    size="icon-sm"
+                    type="button"
+                    variant="ghost"
+                    onClick={chooseAttachments}
+                  >
+                    <IconPaperclip aria-hidden="true" />
+                  </Button>
+                ) : null}
+
+                {/* The same corner, so the button that started the reply is the
+                  button that ends it — and type="button" while it stops, or
+                  pressing it would submit the form it sits in. It is never
+                  disabled: the moment a reply is worth stopping is exactly the
+                  moment it is running. */}
+                {sending ? (
+                  <Button
+                    aria-label="Stop"
+                    className="ms-auto rounded-full"
+                    size="icon-sm"
+                    type="button"
+                    variant="outline"
+                    onClick={stop}
+                  >
+                    <IconPlayerStop aria-hidden="true" />
+                  </Button>
+                ) : (
+                  <Button
+                    aria-label="Send"
+                    className="ms-auto rounded-full"
+                    disabled={(!draft.trim() && staged.length === 0) || !workspaceId}
+                    size="icon-sm"
+                    type="submit"
+                  >
+                    <IconArrowUp aria-hidden="true" />
+                  </Button>
+                )}
+              </InputGroupAddon>
+            </InputGroup>
+          </div>
+        </form>
+      </div>
     </section>
   );
 }

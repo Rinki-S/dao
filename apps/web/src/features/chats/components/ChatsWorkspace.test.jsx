@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -83,21 +83,21 @@ function assistant(overrides = {}) {
  * provider, and half of what is worth testing lives in the seam between them —
  * New chat and Delete are pressed on one side and answered on the other.
  */
-function renderChats(overrides = {}) {
+function renderChats({ showThinking = false, ...overrides } = {}) {
   const current = { ...model, ...overrides };
 
   return render(
     <ConversationsProvider model={current}>
       <SidebarProvider>
         <ChatHistory />
-        <ChatsWorkspace model={current} onOpenSettings={vi.fn()} />
+        <ChatsWorkspace model={current} showThinking={showThinking} onOpenSettings={vi.fn()} />
       </SidebarProvider>
     </ConversationsProvider>,
   );
 }
 
-async function ask(text = 'a question') {
-  renderChats();
+async function ask(text = 'a question', options = {}) {
+  renderChats(options);
   await userEvent.type(screen.getByLabelText('Message'), text);
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
 }
@@ -678,5 +678,421 @@ describe('a change the model proposed', () => {
 
     expect(await screen.findByText('You discarded this change')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+  });
+});
+describe("the model's thinking", () => {
+  /** A send whose reply arrives after the model has thought out loud. */
+  function thinksThenReplies(working, prose, stored) {
+    api.sendMessage.mockImplementation(async (_id, content, { onStart, onReasoning, onDelta }) => {
+      onStart?.({ userMessage: message({ content }), assistantMessageId: 'message-2' });
+      for (const piece of working) onReasoning?.(piece);
+      for (const piece of prose) onDelta?.(piece);
+
+      return stored;
+    });
+  }
+
+  it('leaves the working out when it has not been asked for', async () => {
+    thinksThenReplies(
+      ['weighing ', 'it up'],
+      ['An answer.'],
+      assistant({ reasoning: 'weighing it up' }),
+    );
+
+    await ask('a question', { showThinking: false });
+
+    expect(await screen.findByText('An answer.')).toBeInTheDocument();
+    // Not merely folded away — absent. Somebody who has not asked to see the
+    // thinking should not be given a control for it.
+    expect(screen.queryByText('Thought about this')).toBeNull();
+    expect(screen.queryByText(/weighing it up/)).toBeNull();
+  });
+
+  it('shows the working folded away, and opens it when asked', async () => {
+    thinksThenReplies(
+      ['weighing ', 'it up'],
+      ['An answer.'],
+      assistant({ reasoning: 'weighing it up' }),
+    );
+
+    await ask('a question', { showThinking: true });
+
+    const disclosure = await screen.findByText('Thought about this');
+    // Folded: the words are not on screen until somebody opens it.
+    expect(screen.queryByText('weighing it up')).toBeNull();
+
+    await userEvent.click(disclosure);
+
+    expect(await screen.findByText('weighing it up')).toBeInTheDocument();
+  });
+
+  it('never lets the working become part of the reply', async () => {
+    thinksThenReplies(
+      ['the note says 7742'],
+      ['The port is 7743.'],
+      assistant({ content: 'The port is 7743.', reasoning: 'the note says 7742' }),
+    );
+
+    await ask('what port?', { showThinking: true });
+
+    // The stored reply is the answer alone. A pane that had run the two
+    // together would have put the model's second thoughts in the transcript
+    // as though it had said them.
+    const reply = await screen.findByText('The port is 7743.');
+    expect(reply.textContent).not.toContain('7742');
+  });
+
+  it('shows the working of a turn read back from the service', async () => {
+    // A reload, not a stream. The working has to survive being stored, or
+    // the disclosure is something that only exists while nobody needs it.
+    api.listConversations.mockResolvedValue([
+      { id: 'chat-1', workspaceId: 'workspace-1', title: 'Ports', createdAt: '', updatedAt: '' },
+    ]);
+    api.getConversation.mockResolvedValue({
+      id: 'chat-1',
+      workspaceId: 'workspace-1',
+      title: 'Ports',
+      createdAt: '',
+      updatedAt: '',
+      messages: [message(), assistant({ reasoning: 'recalling the note' })],
+      proposals: [],
+    });
+
+    renderChats({ showThinking: true });
+    await userEvent.click(await screen.findByRole('button', { name: /Ports/ }));
+
+    await userEvent.click(await screen.findByText('Thought about this'));
+    expect(await screen.findByText('recalling the note')).toBeInTheDocument();
+  });
+});
+
+describe('attachments', () => {
+  beforeEach(() => {
+    window.dao = {
+      chooseAttachments: vi.fn().mockResolvedValue({
+        canceled: false,
+        paths: ['/Users/me/diagram.png'],
+      }),
+    };
+  });
+
+  afterEach(() => {
+    delete window.dao;
+  });
+
+  it('sends the files that were staged, as paths', async () => {
+    replies(['Looking.'], assistant());
+    renderChats();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Attach files' }));
+    expect(await screen.findByText('diagram.png')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText('Message'), 'what is this?');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    // Paths, not bytes. The service reads the file off the same disk, and
+    // posting its contents would copy it to reach a process that can
+    // already see it.
+    const [, , options] = api.sendMessage.mock.calls[0];
+    expect(options.attachments).toEqual([
+      { path: '/Users/me/diagram.png', filename: 'diagram.png' },
+    ]);
+  });
+
+  it('sends a file with nothing said about it', async () => {
+    replies(['A diagram.'], assistant());
+    renderChats();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Attach files' }));
+
+    // A picture on its own is a message, so Send has to be reachable with an
+    // empty box.
+    const send = await screen.findByRole('button', { name: 'Send' });
+    expect(send).toBeEnabled();
+
+    await userEvent.click(send);
+    expect(api.sendMessage).toHaveBeenCalled();
+  });
+
+  it('stages a file once however many times it is chosen', async () => {
+    renderChats();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Attach files' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Attach files' }));
+
+    // The service would read it twice and the model would be shown it twice.
+    expect(await screen.findAllByText('diagram.png')).toHaveLength(1);
+  });
+
+  it('says so when the file chooser cannot be opened', async () => {
+    // The bridge is a process boundary: the renderer reloads on save and the
+    // Electron process does not, so a preload that has moved on from the
+    // running app rejects here. Silence would look exactly like a button
+    // that does nothing.
+    window.dao.chooseAttachments.mockRejectedValue(
+      new Error("No handler registered for 'dao:choose-attachments'"),
+    );
+    renderChats();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Attach files' }));
+
+    expect(await screen.findByText(/file chooser could not be opened/i)).toBeInTheDocument();
+  });
+
+  it('lets a staged file be taken off again', async () => {
+    renderChats();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Attach files' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove diagram.png' }));
+
+    expect(screen.queryByText('diagram.png')).toBeNull();
+  });
+
+  it('hands the files back when the send is refused', async () => {
+    api.sendMessage.mockRejectedValue(
+      new ChatError(CHAT_OUTCOMES.failed, 'that file is too large to attach'),
+    );
+    renderChats();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Attach files' }));
+    await userEvent.type(screen.getByLabelText('Message'), 'what is this?');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    // Nothing was sent. Dropping the attachment would leave somebody
+    // retyping a question whose subject they would have to go and find
+    // again.
+    expect(await screen.findByText('diagram.png')).toBeInTheDocument();
+    expect(screen.getByLabelText('Message')).toHaveValue('what is this?');
+  });
+
+  it('shows what was attached to a stored turn', async () => {
+    // Named, not drawn. Nothing was copied, so a thumbnail would mean
+    // reading the file back on every render — and the file may since have
+    // moved, which would make the picture of a past turn depend on what is
+    // true now.
+    replies(
+      ['Looking.'],
+      assistant({
+        role: 'user',
+        content: 'what is this?',
+        attachments: [{ path: '/Users/me/diagram.png', filename: 'diagram.png' }],
+      }),
+    );
+
+    await ask();
+
+    expect(await screen.findByTitle('/Users/me/diagram.png')).toHaveTextContent('diagram.png');
+  });
+});
+
+describe('where a tool line is drawn', () => {
+  it('puts the line where the model ran it, not above the answer', async () => {
+    api.sendMessage.mockImplementation(async (_id, content, { onStart, onDelta, onTool }) => {
+      onStart?.({ userMessage: message({ content }), assistantMessageId: 'message-2' });
+      onDelta?.('Let me look. ');
+      onTool?.({ name: 'search_notes', input: '{"query":"parser"}', at: 13 });
+      onDelta?.('You wrote about parsers.');
+
+      return assistant({
+        content: 'Let me look. You wrote about parsers.',
+        toolCalls: [
+          {
+            id: 'call-1',
+            name: 'search_notes',
+            input: '{"query":"parser"}',
+            output: 'a note',
+            status: 'ok',
+            at: 13,
+          },
+        ],
+      });
+    });
+
+    await ask();
+
+    const turn = (await screen.findByText('You wrote about parsers.')).closest('div.flex-col');
+    const shown = turn.textContent;
+
+    // The order on screen is the order it happened in: said, looked, carried
+    // on. Gathering the looking above the saying reads as though the model
+    // had done all of it before it spoke.
+    expect(shown.indexOf('Let me look.')).toBeLessThan(shown.indexOf('Searched your notes'));
+    expect(shown.indexOf('Searched your notes')).toBeLessThan(
+      shown.indexOf('You wrote about parsers.'),
+    );
+  });
+
+  it('leaves a call with no offset above the answer, as it always was', async () => {
+    // Every turn stored before offsets existed. An old conversation should
+    // read the way it always did rather than wrongly.
+    replies(
+      ['An answer.'],
+      assistant({
+        content: 'An answer.',
+        toolCalls: [{ id: 'call-1', name: 'read_tasks', input: '{}', output: '-', status: 'ok' }],
+      }),
+    );
+
+    await ask();
+
+    const turn = (await screen.findByText('An answer.')).closest('div.flex-col');
+    expect(turn.textContent.indexOf('Read your task list')).toBeLessThan(
+      turn.textContent.indexOf('An answer.'),
+    );
+  });
+});
+
+describe('following a reply that is still arriving', () => {
+  /** The observer watching the end of the transcript. */
+  function watcher() {
+    const instances = globalThis.IntersectionObserver.instances;
+    return instances[instances.length - 1];
+  }
+
+  beforeEach(() => {
+    globalThis.IntersectionObserver.instances.length = 0;
+    Element.prototype.scrollIntoView.mockClear();
+  });
+
+  it('keeps a reader who is at the end there as the reply arrives', async () => {
+    replies(['One ', 'two ', 'three.'], assistant({ content: 'One two three.' }));
+
+    await ask();
+    await screen.findByText('One two three.');
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('leaves a reader who has scrolled up where they are', async () => {
+    api.sendMessage.mockImplementation(async (_id, content, { onStart, onDelta }) => {
+      onStart?.({ userMessage: message({ content }), assistantMessageId: 'message-2' });
+
+      // Away from the end, the way somebody reading back through the
+      // conversation would be.
+      watcher().report(false);
+      Element.prototype.scrollIntoView.mockClear();
+
+      onDelta?.('One ');
+      onDelta?.('two ');
+      onDelta?.('three.');
+
+      return assistant({ content: 'One two three.' });
+    });
+
+    await ask();
+    await screen.findByText('One two three.');
+
+    // Scrolling up during a reply is how you read what was said earlier, and
+    // a pane that jumped to the bottom on every token made that impossible.
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('starts following again when they scroll back to the end', async () => {
+    api.sendMessage.mockImplementation(async (_id, content, { onStart, onDelta }) => {
+      onStart?.({ userMessage: message({ content }), assistantMessageId: 'message-2' });
+
+      watcher().report(false);
+      onDelta?.('One ');
+
+      // Back at the end, which is the same gesture as asking to be kept
+      // there.
+      watcher().report(true);
+      Element.prototype.scrollIntoView.mockClear();
+      onDelta?.('two.');
+
+      return assistant({ content: 'One two.' });
+    });
+
+    await ask();
+    await screen.findByText('One two.');
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+});
+
+describe('the wait before a reply begins', () => {
+  it('shows the dots until the first word arrives, then stops', async () => {
+    let release;
+    const held = new Promise((resolve) => {
+      release = resolve;
+    });
+
+    api.sendMessage.mockImplementation(async (_id, content, { onStart, onDelta }) => {
+      onStart?.({ userMessage: message({ content }), assistantMessageId: 'message-2' });
+      await held;
+      onDelta?.('An answer.');
+
+      return assistant();
+    });
+
+    renderChats();
+    await userEvent.type(screen.getByLabelText('Message'), 'a question');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    const dots = document.querySelector('[data-slot="reply-dots"]');
+    expect(dots).toBeInTheDocument();
+    // One braille cell, from the sequence every terminal harness turns.
+    expect(dots.textContent).toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/);
+    // Decorative. The pane says the same thing in words through a live
+    // region, and a screen reader given this would read out "braille pattern
+    // dots-1-2-4" ten times a second.
+    expect(dots).toHaveAttribute('aria-hidden', 'true');
+
+    release();
+
+    // Gone the moment there is something to read: the dots stand in for an
+    // answer, and standing beside one would be saying it is still coming.
+    expect(await screen.findByText('An answer.')).toBeInTheDocument();
+    expect(document.querySelector('[data-slot="reply-dots"]')).toBeNull();
+  });
+});
+
+describe('typing with an input method', () => {
+  /** The composer, with a half-typed reading already in it. */
+  async function composing(text = 'nihon') {
+    replies(['An answer.'], assistant());
+    renderChats();
+
+    const box = screen.getByLabelText('Message');
+    await userEvent.type(box, text);
+
+    return box;
+  }
+
+  it('lets Enter choose a candidate instead of sending', async () => {
+    const box = await composing();
+
+    // The Enter that picks a character out of the list an IME is offering.
+    // It arrives as an ordinary keydown, and sending on it posts the
+    // half-typed word it was part of.
+    fireEvent.keyDown(box, { key: 'Enter', isComposing: true });
+
+    // The reading is still in the box. This is the assertion that bites: a
+    // send empties the composer before it does anything asynchronous, so a
+    // box that still holds the half-typed word is proof nothing was sent.
+    expect(box).toHaveValue('nihon');
+    await waitFor(() => expect(api.sendMessage).not.toHaveBeenCalled());
+  });
+
+  it('leaves the composition alone when only keyCode says so', async () => {
+    // Some browsers report the keydown that ends a composition with
+    // isComposing already false and keyCode 229. Deprecated, and the only
+    // signal there is.
+    const box = await composing();
+
+    fireEvent.keyDown(box, { key: 'Enter', keyCode: 229 });
+
+    expect(box).toHaveValue('nihon');
+    await waitFor(() => expect(api.sendMessage).not.toHaveBeenCalled());
+  });
+
+  it('sends on the Enter that follows, once the word is settled', async () => {
+    const box = await composing();
+
+    fireEvent.keyDown(box, { key: 'Enter', isComposing: true });
+    // The composition is over; this one is the real one.
+    fireEvent.keyDown(box, { key: 'Enter' });
+
+    await waitFor(() => expect(api.sendMessage).toHaveBeenCalled());
   });
 });
