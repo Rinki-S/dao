@@ -207,6 +207,24 @@ export async function sendMessage(
 }
 
 /**
+ * Ask the model again for a turn that failed.
+ *
+ * Into the same row, so the transcript ends up holding what was asked and what
+ * eventually came back rather than a log of the provider's bad afternoon. The
+ * stream is the same one a message opens, ending on the same done event
+ * carrying the same row — which is why the reply lands where the failure was
+ * without this side arranging anything.
+ */
+export async function retryMessage(conversationId, messageId, { signal, ...callbacks } = {}) {
+  const response = await apiFetch(
+    `/api/chats/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/retry`,
+    { method: 'POST', signal },
+  );
+
+  return readTurn(response, callbacks);
+}
+
+/**
  * What some paths would be attached as.
  *
  * Asked as soon as files are chosen, so a file too large or of a kind that

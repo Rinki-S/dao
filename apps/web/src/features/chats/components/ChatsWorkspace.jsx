@@ -6,6 +6,7 @@ import {
   IconPaperclip,
   IconMessageCircle,
   IconPlayerStop,
+  IconRefresh,
   IconTool,
 } from '@tabler/icons-react';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert.jsx';
@@ -34,6 +35,7 @@ import {
   describeAttachments,
   getConversation,
   resolveProposal,
+  retryMessage,
   sendMessage,
 } from '../api.js';
 
@@ -229,7 +231,7 @@ function Cost({ messages }) {
  * nothing gains from. The reply is rendered, because the model was asked to
  * write Markdown and does.
  */
-function Turn({ message, showThinking }) {
+function Turn({ message, busy, showThinking, onRetry }) {
   if (message.role === 'user') {
     return (
       <div className="flex flex-col items-end gap-1.5">
@@ -260,6 +262,17 @@ function Turn({ message, showThinking }) {
             {message.content ? 'This reply stops mid-thought' : 'This reply never arrived'}
           </AlertTitle>
           <AlertDescription>{message.errorMessage}</AlertDescription>
+          {/* Only on the turn that can actually be tried again, which is the
+              last one. Offering it further up would be offering to answer a
+              question the conversation has since moved past. */}
+          {onRetry ? (
+            <AlertAction>
+              <Button disabled={busy} size="xs" variant="outline" onClick={onRetry}>
+                <IconRefresh aria-hidden="true" />
+                Try again
+              </Button>
+            </AlertAction>
+          ) : null}
         </Alert>
       ) : null}
 
@@ -399,10 +412,22 @@ export function ChatsWorkspace({ model, showThinking = false, onOpenSettings }) 
   // it so a reply that lands after the reader has moved on is filed against the
   // conversation it belongs to rather than appended to whatever is on screen.
   function addTurn(conversationId, message) {
-    setTranscript((current) => ({
-      id: conversationId,
-      messages: current.id === conversationId ? [...current.messages, message] : [message],
-    }));
+    setTranscript((current) => {
+      const held = current.id === conversationId ? current.messages : [];
+      // Replaced when it is already there, appended when it is not. A retry
+      // answers into the row that failed and comes back carrying its id, so
+      // without this the conversation would grow a second copy of a turn it
+      // already has.
+      const at = held.findIndex((turn) => turn.id === message.id);
+
+      return {
+        id: conversationId,
+        messages:
+          at === -1
+            ? [...held, message]
+            : held.map((turn, index) => (index === at ? message : turn)),
+      };
+    });
   }
 
   // One change onto the conversation it belongs to, replacing it if it is
@@ -655,6 +680,26 @@ export function ChatsWorkspace({ model, showThinking = false, onOpenSettings }) 
     });
   }
 
+  /**
+   * Ask the model again for the turn that failed.
+   *
+   * The failed turn is taken off the transcript first, so the pane is not
+   * showing an error and its replacement being written at the same time. It
+   * comes back on the done event — as the new reply, or as the same failure
+   * again if the second attempt goes the same way.
+   */
+  async function again(message) {
+    if (sending || !selectedId) return;
+
+    const conversationId = selectedId;
+    setTranscript((current) => ({
+      id: current.id,
+      messages: current.messages.filter((turn) => turn.id !== message.id),
+    }));
+
+    await carry(conversationId, (events) => retryMessage(conversationId, message.id, events));
+  }
+
   async function submit(event) {
     event.preventDefault();
 
@@ -817,7 +862,16 @@ export function ChatsWorkspace({ model, showThinking = false, onOpenSettings }) 
 
           {messages.map((message) => (
             <Fragment key={message.id}>
-              <Turn message={message} showThinking={showThinking} />
+              <Turn
+                busy={sending}
+                message={message}
+                showThinking={showThinking}
+                onRetry={
+                  message.status === 'failed' && message.id === messages[messages.length - 1]?.id
+                    ? () => again(message)
+                    : undefined
+                }
+              />
               {under(message).map((change) => (
                 <ProposalCard busy={sending} key={change.id} proposal={change} onDecide={decide} />
               ))}

@@ -1043,6 +1043,18 @@ number, because the thing worth knowing is that a long thread is expensive
 _because_ every turn re-sends the ones before it — which a total shows and a
 per-turn figure hides.
 
+**A failed turn can be asked again, in place.** Sending the same question a
+second time already worked — the words are handed back to the composer when a
+send is refused — but it leaves the transcript holding the question twice with
+a dead turn between the two copies. A retry answers into the row that failed,
+so what a conversation records is what was asked and what eventually came
+back rather than a log of the provider's bad afternoon. Only the last turn,
+and only a failed one: a retry further up would ask the model to answer a
+question the conversation has since moved past, and a reply somebody stopped
+on purpose is a decision, not a failure. The half-answer the failed row holds
+is left out of the history rather than sent, or the model carries on from a
+sentence it never finished.
+
 **And the seam nobody had crossed.** Attachments and proposals both replay a
 whole transcript, so a conversation holding both is where the cost of not
 copying is actually paid: every attached file is read again on every apply.
@@ -1052,7 +1064,7 @@ the same claim as the two of them together.
 ### Validation
 
 - Go `test ./...`, `vet ./...` and `gofmt` clean; renderer lint, formatting,
-  347 tests and production build pass; 92 desktop tests pass
+  351 tests and production build pass; 92 desktop tests pass
 - the wire difference is pinned from both sides: an image goes to Anthropic as
   a base64 source and to the OpenAI wire as a data URL in a parts array, a
   document goes to one as a file and to the other as its own words, and a turn

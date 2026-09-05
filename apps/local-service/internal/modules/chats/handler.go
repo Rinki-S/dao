@@ -104,6 +104,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/chats/{id}", h.delete)
 	mux.HandleFunc("POST /api/chats/{id}/messages", h.send)
 	mux.HandleFunc("POST /api/chats/{id}/proposals/{proposalId}", h.resolve)
+	mux.HandleFunc("POST /api/chats/{id}/messages/{messageId}/retry", h.retry)
 	mux.HandleFunc("POST /api/chats/attachments", h.describeAttachments)
 }
 

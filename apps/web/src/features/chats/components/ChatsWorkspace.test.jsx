@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   listConversations: vi.fn(),
   renameConversation: vi.fn(),
   resolveProposal: vi.fn(),
+  retryMessage: vi.fn(),
   sendMessage: vi.fn(),
 }));
 
@@ -1196,5 +1197,93 @@ describe('what a conversation has cost', () => {
 
     // A new chat should not be wearing a zero.
     expect(screen.queryByText(/in ·/)).toBeNull();
+  });
+});
+
+describe('trying a failed reply again', () => {
+  /** A conversation whose last turn failed, read back from the service. */
+  function broken(overrides = {}) {
+    api.listConversations.mockResolvedValue([
+      { id: 'chat-1', workspaceId: 'workspace-1', title: 'Ports', createdAt: '', updatedAt: '' },
+    ]);
+    api.getConversation.mockResolvedValue({
+      id: 'chat-1',
+      workspaceId: 'workspace-1',
+      title: 'Ports',
+      createdAt: '',
+      updatedAt: '',
+      messages: [
+        message({ content: 'a question' }),
+        assistant({
+          content: '',
+          status: 'failed',
+          errorMessage: 'provider returned 429: slow down',
+          ...overrides,
+        }),
+      ],
+      proposals: [],
+    });
+  }
+
+  async function openIt() {
+    renderChats();
+    await userEvent.click(await screen.findByRole('button', { name: /Ports/ }));
+  }
+
+  it('offers another go on the turn that failed', async () => {
+    broken();
+    await openIt();
+
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  it('answers into the turn that failed rather than adding one', async () => {
+    broken();
+    api.retryMessage.mockImplementation(async (_id, messageId, { onStart, onDelta }) => {
+      onStart?.({ assistantMessageId: messageId });
+      onDelta?.('The answer, second time.');
+
+      return assistant({ content: 'The answer, second time.', status: 'ok' });
+    });
+
+    await openIt();
+    await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByText('The answer, second time.')).toBeInTheDocument();
+    // The failure is gone rather than sitting above its own replacement.
+    expect(screen.queryByText(/slow down/)).toBeNull();
+    // And the question was not asked twice.
+    expect(screen.getAllByText('a question')).toHaveLength(1);
+  });
+
+  it('shows the failure again when the second go fails too', async () => {
+    broken();
+    api.retryMessage.mockImplementation(async (_id, messageId, { onStart }) => {
+      onStart?.({ assistantMessageId: messageId });
+
+      return assistant({
+        content: '',
+        status: 'failed',
+        errorMessage: 'provider returned 429: slow down',
+      });
+    });
+
+    await openIt();
+    await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+    // Taken off the transcript while it runs and put back by the done event,
+    // which is how a second failure reappears rather than vanishing.
+    expect(await screen.findByText(/slow down/)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  it('does not offer it on a reply somebody stopped', async () => {
+    // Asking again for a turn they ended would be answering their decision
+    // with its opposite.
+    broken({ status: 'stopped', errorMessage: '', content: 'half an answer' });
+    await openIt();
+
+    await screen.findByText('half an answer');
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 });
