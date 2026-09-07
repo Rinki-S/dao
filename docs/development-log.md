@@ -636,7 +636,7 @@ Planned scope:
 - keep failed-save behavior intact so unsaved editor state is not lost
 - add a focused formatting toolbar, keyboard-friendly editing, and Dao theme integration
 - expose Paragraph and H1-H6 through one block-type selector; keep low-frequency dividers, remote image references, and GFM tables in a compact Insert menu
-- keep local image attachments deferred until the Go file layer owns asset copying and note-relative path resolution
+- keep local image attachments deferred until the Go file layer owns asset copying and note-relative path resolution — _superseded_: chat attachments landed under "The Real Provider" below, and copy nothing at all, so the asset layer this waited on turned out not to be a prerequisite for them. A note's own inline images are still deferred.
 - support the initial Markdown subset with explicit round-trip tests, including headings, emphasis, links, lists, task lists, blockquotes, code, tables, dividers, and images
 - require real Tiptap-to-Markdown autosave coverage and a second-round-trip idempotence check before merge
 - treat Tiptap Markdown support as a compatibility boundary because `@tiptap/markdown` is currently beta and semantic round trips may normalize source formatting
@@ -681,27 +681,401 @@ Validation:
 - Go `test ./...` and `vet ./...` pass
 - browser and real Electron visual QA are recorded in project-root `design-qa.md`
 
-Chats remains a disabled placeholder until the AI Harness milestone.
+Chats remained a disabled placeholder until the milestones below.
 
-## Later Milestone: AI Summary Loop
+## Milestone: AI Summary Loop
 
-Recommended branch:
+Status: complete
+
+Branch:
 
 ```txt
-feat/ai-summary
+feat/ai-harness
+```
+
+Completed scope:
+
+- reach a model through one interface and two wire protocols, Anthropic and OpenAI-compatible, so a vendor is a base URL, a key and a model name
+- keep the model credential out of the database and out of the renderer: the desktop process holds it in the OS keychain and hands it to the service through the environment, and the service never writes it down, logs it, or returns it
+- carry a credential that can renew itself, so an OAuth token refreshes across sleep without restarting the service
+- let an endpoint declare that it needs no credential, for a local model
+- record every run in an execution trace, including the ones that failed
+- gather one day of a workspace and summarise it, validating the answer against a schema before anything is shown
+- require confirmation before a summary is kept, and write the note from the trace rather than from the renderer's copy
+- deliver an answer while it is still being written
+
+## Milestone: Chats
+
+Status: complete
+
+Branch:
+
+```txt
+feat/chat
+```
+
+Completed scope:
+
+- keep a conversation as rows in the order it happened, with turn order as a column rather than an inference from a second-precision timestamp
+- answer a turn over a server-sent event stream that always ends the same way, so what the client holds after the stream is what a reload shows
+- render a reply's Markdown without ever building HTML from it, then move that to markstream and give it the note editor's look
+- offer the model the workspace's notes and tasks through read-only tools, bound to one workspace with no argument that could name another
+- run the agent loop: ask, run what the model asks for, ask again, bounded
+- record what the model looked up on the turn it looked it up for, so a reload still answers "did it read my notes?"
+- let a reply be stopped, and record that as stopping rather than as a failure
+- put conversations in the search index, both sides of them
+
+Also in this branch:
+
+- make the foreign keys six migrations declare actually hold, by opening the database with them enforced
+- set the interface in Iosevka Aile and code in Iosevka Extended, bundled rather than assumed
+
+Validation:
+
+- Go `test ./...` and `vet ./...` pass; renderer formatting, lint, tests and production build pass
+- each milestone verified against a copy of the real database, with a fake provider standing in for the model
+- browser visual QA in both appearances
+
+## Milestone: The Workspace Folder
+
+Status: complete
+
+Branch:
+
+```txt
+feat/workspace-folder
 ```
 
 Goal:
 
 ```txt
-Dao starts the first AI feature by generating structured summaries from existing local workspace context through the AI Harness boundary.
+The folder and the app describe the same thing, whichever one you change.
 ```
 
-Planned scope:
+Everything before this treated the folder as somewhere the app kept its output. A
+note was a row that happened to have a file. That reading held only while nothing
+else touched the folder, and it broke in every direction at once: files carried
+identifiers nobody could read, edits made elsewhere were invisible until a restart
+and then silently overwritten, deleting a note left the file behind, and deleting a
+folder left the whole directory. The app was not wrong about its rows. It was wrong
+about what a note is.
 
-- read `docs/ai-harness.md` before implementation
-- define the first AI summary contract
-- keep AI calls out of random React components and feature modules
-- validate AI output with Zod before using it
-- require user confirmation before writing AI-generated changes
-- keep tool calling and agent workflows deferred
+The file is the note. Everything below follows from taking that literally.
+
+Completed scope:
+
+- name files after their titles, with a number for a collision, so what is in the folder is readable by a person and not only by the app; migrate the existing ones, deepest first, rewriting the stored paths of everything underneath
+- watch the workspace folder, debounced, and tell the difference between somebody else's edit and the app's own save by comparing file mtime against the row's `updated_at`
+- reconcile what the watcher reports, in five cases and no more: a file edited elsewhere refreshes its note and reindexes it, a file gone forgets it, a file back at a deleted note's path revives that note rather than adopting a duplicate of it, a file nobody knows about becomes a note titled from its name, and anything else does nothing
+- refuse a save that would write over an edit made in another program: the caller sends what it read, the service compares it against both the row and the file's mtime, and answers a mismatch with 409 and the text on disk
+- answer that refusal in the editor as news rather than as an error, with keep mine, take theirs, and show both — because choosing against a version you cannot see is a coin toss dressed as consent
+- tell the window when the folder changed, over one server-sent event stream carrying no payload, so the renderer refetches what it needs instead of trusting a second description of the same data
+- delete the file when the note is deleted, and say before the button is pressed that it does not go to the Trash
+- empty a folder onto the workspace root before removing it — notes with their files, subfolders whole — and refuse, by the name of what is in the way, when it still holds something the app did not put there
+
+Also in this branch:
+
+- give the shell a height instead of a minimum, so that every `overflow-auto` beneath it has a bounded box to scroll inside; the editor, Today, Search, Chats and the sidebar were all inert for the same reason
+- move the conversation list into the app's own sidebar, replacing Recents and the workspace tree while Chats is the active view, and lift the list and the selection into a provider the sidebar and the pane share
+- open the window at a size capped to a fraction of the display, rather than at very nearly the display
+- pull the interface's letter spacing in by 2%
+
+What this milestone is worth remembering for:
+
+- **Filesystem work goes before the commit.** A rename or a removal that fails aborts the transaction and reports it, with nothing destroyed. The reverse order — commit, then touch the disk — means a failure leaves the app describing a folder that is not there, which is the one outcome every confirmation dialog rules out.
+- **`os.Remove`, never `os.RemoveAll`.** A folder that is still not empty after the app takes its own things out is holding something the app did not put there. Refusing is an answer somebody can act on; recursively deleting their file because it was in the way is not.
+- **Derived beats cleared.** State that carries what it belongs to — a transcript that knows its conversation, a list that knows its workspace — answers "is this still current?" on the render it happens. An effect that clears answers one render late, which is long enough to show one conversation's turns under another's title.
+- **A second row for one file is worse than a wrong row.** It splits the note's identity, and every link, recent and search result goes on pointing at the half nothing can reach.
+
+Validation:
+
+- Go `test ./...` and `vet ./...` pass; renderer formatting, lint, 257 tests and production build pass; 92 desktop tests pass
+- each part verified against the running app and the real workspace folder, including the failure paths: a save refused with the text on disk while the file was left as the other program wrote it, a folder delete refused by the name of a stray PDF with nothing moved on either side, and a note whose file could not be removed left intact along with its file
+
+## Milestone: Tools That Write
+
+Status: complete
+
+Branch:
+
+```txt
+feat/ai-write
+```
+
+Goal:
+
+```txt
+The model can propose a change to a note or the task list, and a human agrees to it before anything is written.
+```
+
+### Decisions taken, so they are not reopened
+
+- **Targeted replace**, not a whole new body. The model sends `old_text` and `new_text`, and the change is refused unless `old_text` appears exactly once. Chosen knowing a small local model gets exact quoting wrong often; the answer to that is the recovery path below, not a different shape.
+- **Confirmed inline in the transcript**, where it was asked for, rather than in the note editor or a separate queue.
+- **The model finds out.** Answering a change carries the turn on, so it can check its work or follow up. This is why the transcript had to become replayable.
+- **Saying something else abandons a waiting change.** Not a convenience: an unanswered tool call cannot be replayed, so without it the next message fails on the wire.
+- **A turn has a step ceiling of its own** (`maxTurnSteps`, 16), because a continuation handed the loop's full bound again makes propose-apply-propose-apply endless.
+
+### Completed scope
+
+The service:
+
+- a stored tool call carries the model's id, the tool's output, and `ok` / `failed` / `pending`, and `BuildContext` replays calls with the results that answer them — a call with no id or no result is dropped rather than sent half-formed
+- `proposals`: a change worked out and not made, keyed to the conversation and to the model's own call id, holding both texts and the `updated_at` it was worked out against
+- `agent.ErrAwaitingApproval` stops the loop; a tool now receives the whole `agent.Call`, because one that waits has to record something findable later
+- `internal/diff`: line-level LCS, common ends trimmed first
+- `edit_note`: exactly-one-match, and a miss is answered with the line the model was reaching for, found by flattening whitespace on both sides — the failure it cannot see by re-reading its own attempt
+- `POST /api/chats/{id}/proposals/{proposalId}` applies or discards from the stored row, answers the waiting call, and runs the loop again over the mended transcript
+- every proposal that leaves the repository carries its comparison, computed by `internal/diff` on the way out — the loose end that had `internal/diff` written, tested and called by nothing
+- a proposal's status records what happened rather than what was asked for: an apply the note refused lands as `failed`, which is neither `applied` nor `discarded`
+- both streams say where a change now stands — the one that follows a decision, and the one that follows somebody talking past it — through the `proposal` event that already existed
+
+The interface:
+
+- a card in the transcript under the turn that asked for it, joined on the model's own call id: the note's title, the comparison, Discard and Apply
+- the comparison is drawn from what the service sent, never recomputed here, and long stretches of untouched text are folded into a count rather than dropped
+- read back with the conversation, so a change nobody answered is still waiting after a reload and one somebody answered still says so
+- a decision streams the continuation into the same conversation, through the same reader a message uses — the two ways a turn can start now share everything after the request is opened
+- sending something else instead of answering sets the waiting change aside on this side too, because the service sends the row it set aside
+- an answered card says what was recorded, including a write that was refused; a status this build does not recognise is still answered, and does not come back offering the buttons a second time
+
+### What this milestone is worth remembering for
+
+- **The picture and the change are one thing, or the confirmation is theatre.** The comparison is computed once, by the code that owns the two texts, and travels with the row that applying will write. A second implementation in the renderer would agree with it almost always, and the times it did not would be exactly the times somebody agreed to something else.
+- **Say what the person did, not what became of their file — unless somebody wrote down what became of the file.** The card says "You applied this change" because that is the part it witnessed. It took a second pass to notice that the row was not saying even that much: it recorded the decision, so a change the note refused sat there marked `applied`. With a `failed` status the write's own answer outlives the turn, and the card can state it without guessing. The rule is not that a surface should be vague; it is that it must not assert what nobody told it.
+- **A field that is absent says absent.** The continuation's `start` event used to carry a zero-valued user turn, which the client would have had to recognise as meaning nobody spoke. A pointer and `omitempty` say it on the wire instead.
+- **Optimism that can be replaced by a sentence from the other side should be.** The card was settled locally on the `start` event, timed to the moment the service commits — which was the right timing for the wrong idea. The pane knows which decision it sent and never knows what came of it, so the guess was wrong in precisely the case that mattered. The stream now carries the row the service wrote, through the event the card was already listening to, and both guesses went away rather than being corrected. Timing a guess well is worth much less than not having to guess.
+- **Eliding is the interface's job, and only the interface's.** The service sends every line because it cannot know how wide the pane is; a diff that had already dropped its context could not be asked for it back.
+
+### Validation
+
+- Go `test ./...` and `vet ./...` pass; renderer formatting, lint, 285 tests and production build pass; 92 desktop tests pass
+- the wire the two halves meet on is tested from the service side: the change goes out before the turn it belongs to, the conversation comes back carrying it with its comparison, the transcript holds the call the card joins on, and a continuation nobody started carries no user turn
+- the paths that must not move the card were checked by breaking them: a decision the service refused leaves the change waiting, and a message sent instead of an answer sets it aside
+- the status fix was checked the same way: with the write's answer ignored again, a refused apply is recorded as `applied`, and with each stream's `proposal` event removed the card is never told what became of the change
+- `vite.qa.config.js` grew a conversation stopped on a change, a live turn that proposes one, and a resolve route that answers in the service's order — exercised over HTTP, including answering the same change twice, and refusing to apply the seeded change so the third state can be looked at at all
+- not done: the browser visual pass, and a run against a real provider in the Electron shell
+
+### After that
+
+`create_note`, `edit_tasks` and `rename`/`move`/`delete` — the same machinery pointed at different targets, each needing its own confirmation because there is no diff to draw for a note being created and no content to compare for one being renamed.
+
+## Milestone: The Other Four Tools
+
+Status: complete, apart from the same two gaps the last one left.
+
+`create_note`, `edit_tasks`, `rename_note` and `delete_note`. The machinery from the last milestone pointed at four more targets — which is the whole claim being tested here, and it mostly held.
+
+### Decisions
+
+**One shape for a proposal, whatever kind of change it is.** What a tool recorded used to be edit-shaped: a note id and two texts, with nothing saying what sort of change it was, because there was only one sort. Every one of the five is still the same two things — something to show, and enough to perform it with — so it became one struct with a kind, and one `Propose` on the workspace instead of one function per tool. What a caller has to have thought about is confirmation, and that is a single question. Five nilable fields would have been five chances to leave one out.
+
+**A creation has no before and a deletion has no after, and both are the empty string rather than a flag.** This is where the previous milestone's premise turned out to be wrong. It had recorded that "there is no diff to draw for a note being created" — but `split("")` is nil, so the comparison drawn from an empty before is every line marked as arriving, and from an empty after every line marked as going. Both are exactly the right picture, and neither needed a special case. The generalisation cost nothing because the two texts were already the honest representation.
+
+**A rename compares the titles, not the note.** The two texts are the thing being changed, and a rename changes a name. Putting the body in them would draw a picture of something the tool does not touch.
+
+**A deletion is checked against the text that was shown, not against a timestamp.** The one change with nothing to undo it. What the person agreed to losing is what was on the card, so a note edited in between holds something they were never shown and never said yes to — and that is a refusal, not a stale-write conflict to be resolved.
+
+**A created note lands at the workspace root.** Which folder something belongs in is a judgement about how a person keeps their own work. The model cannot see the folders, and a note in the wrong place is one drag from the right one.
+
+**The button says what it is about to do.** "Apply" is a fair word for a change to some text and a poor one for losing a note, and a person scanning a transcript reads the button before the heading. So the confirm label, the icon, and the line that says what has not happened yet are all per kind — "Nothing has been written yet" is no comfort to somebody looking at a deletion. Delete is the only one that gets the destructive colour, and it is still the second button rather than the first.
+
+### What this milestone is worth remembering for
+
+- **A generalisation that costs nothing is evidence the first shape was right.** Four tools were added and the proposal row, the diff, the card, the stream, the resolve path and the status rules all took them without modification. The only new code on the interface side is vocabulary — labels, icons, one sentence per kind. That is the return on having made the first one carry its comparison and its two texts rather than an edit-shaped payload.
+- **A premise recorded in a log is still a premise.** "There is no diff to draw for a note being created" was written down as settled and was simply false; the code that would have proved it wrong already existed. Worth checking the claims a milestone inherits before designing around them.
+- **The irreversible one deserves different words, not just a different colour.** Everything else about a deletion card is shared with the other four. What is not shared is what it is safe to promise, and that is a sentence, not a style.
+
+### Validation
+
+- Go `test ./...`, `vet ./...` and `gofmt` clean; renderer lint, formatting, 288 tests and production build pass
+- each tool refuses what it cannot honestly propose: an empty note, a title that spans lines or runs past 120 characters, a rename to the name it already has, a deletion of a note that is not there
+- the title rule is enforced in `create_note` and `rename_note` from one function, because a rule applied in one of two places is a rule with a way around it
+- `vite.qa.config.js` reaches all five kinds on a word in the message — rename, delete, create, tasks, change — each verified over HTTP to produce its own kind
+- the browser pass was finally done, and covers what no test asserts: all five cards drawn, the deletion in destructive red with Discard still first, a refused apply showing "This change could not be applied" directly above the model's reply saying the same thing, a change set aside by talking past it, and an answered card coming back intact through a full page reload
+- still not done at the time: a run against a real model provider in the Electron shell. Everything above was driven by fixtures, so what remained untested was whether a real model reaches for these five tools sensibly — which is a question about the descriptions, not the machinery. That run happened, and is the milestone below
+
+## Milestone: The Real Provider
+
+Status: complete.
+
+Branch:
+
+```txt
+feat/ai-write
+```
+
+Goal:
+
+```txt
+Point the harness at a real model and fix what that turns up.
+```
+
+The last two milestones were built against fixtures and a fake provider, and
+closed on the same open item both times: nobody had run this against an actual
+endpoint. Doing so answered the question that had been recorded — a real model
+does reach for the five tools sensibly, and the descriptions needed no work —
+and immediately raised one nobody had asked.
+
+### What the real provider turned up
+
+**A reasoning model's working has to go back with the call it produced.**
+DeepSeek's `deepseek-reasoner` answered the first turn and then refused the
+next one outright: a 400 saying `reasoning_content` must be passed back. The
+service had never captured it. Neither wire needed it before, because nothing
+in this build asks Anthropic for extended thinking, so nothing had ever
+returned any — the field existed in the type system and was dead.
+
+It matters most in exactly the flow this app is built around. Propose-then-apply
+reloads a turn from the database days later and replays it, so the fix is not
+"send it back on the next request" but "keep it, in a column, for as long as
+the transcript lives". The Anthropic wire still drops it, which stays correct
+there.
+
+That is worth writing down as a general point: **a fixture cannot refuse you.**
+Every wire-level test in this repo passes a request to a server that was told
+what to say. None of them could have produced this, because the fake had no
+opinion about what a well-formed second request looks like. The bug was one
+real conversation deep.
+
+### Decisions taken
+
+**Attachments copy nothing.** A path, plus the size and modification time the
+file had when it was attached. The pair is the whole of the mechanism: on a
+later turn the file is read again, and those two say whether what comes back is
+what was actually sent. A file that has moved or changed cannot be replayed,
+and the turn says so in the model's place for it.
+
+This was chosen over copying into the workspace folder and over a content-
+addressed store outside it, knowing the cost. The cost is real and is paid in
+words: a transcript can end up describing a file it can no longer show. What it
+buys is that attaching something does not put a copy of it anywhere, which for
+a local-first app holding somebody's own files is the more honest default.
+
+Saying so is the part that took thought. A model asked a follow-up about a
+picture it can no longer see, and told nothing, answers from the conversation
+around it and sounds exactly as confident as it did when it could see. So an
+unreadable attachment is replayed as a sentence in the place the file would
+have been, which is the same rule the tools already follow: a failure the model
+has to act on goes to the model as content, not up as an error.
+
+**An image and a document are different kinds, not one kind with a media
+type.** The wires disagree about documents more than they disagree about
+anything else. Anthropic reads a PDF itself; the OpenAI wire has no such
+concept at all. A single "attachment" kind would have hidden that behind a
+string and left each wire to rediscover it. So a document carries both
+readings of itself — the file, and the words got out of it beforehand — and
+which one is usable is a property of the endpoint that happens to be
+configured rather than of the attachment.
+
+**Where a tool ran is a number on the call, not a new shape for a turn.** A
+turn was stored as one run of prose and one list of calls, which loses the
+thing a reader most wants: the model said something, went and looked, and
+carried on. Recording how much of the reply had been written at the moment of
+each call puts that back for the price of one integer, and every call stored
+before it reads as zero — which puts them all at the front, exactly where they
+used to be drawn. Backward compatibility fell out of the representation
+instead of being a branch.
+
+Counted in UTF-16 code units. Not bytes, not runes: the only thing that has to
+cut the text at that point is a renderer, where a string index is a UTF-16
+offset. A byte offset lands several characters late in any reply with an accent
+in it; a rune count lands early in one with an emoji, splitting a surrogate
+pair.
+
+**A correction fitted to one typeface is not a correction.** Public Sans and
+JetBrains Mono replaced Iosevka, and the global -2% letter spacing went with
+them — it had been measured against Iosevka Aile, which is drawn narrow and
+spaced loose. Public Sans reads cramped at the same setting, and the interface
+font is now whatever somebody chose, so there is no face left to tune against.
+Both new faces are variable, which took the bundled fonts from about eight
+megabytes to about two hundred kilobytes.
+
+### What this milestone is worth remembering for
+
+- **A fixture cannot refuse you.** The provider bug that stopped this working
+  was invisible to every test in the repo, and would have stayed invisible for
+  as long as the fake provider was the only thing being asked. Wire-level tests
+  prove the request is shaped the way this code believes; only a real endpoint
+  has an opinion about whether that belief is right.
+- **Preload is not hot-reloaded.** A paperclip that did nothing was not a bug in
+  the paperclip. The renderer reloads on save and the Electron process does not,
+  so the bridge had moved on from the running app — and the click failed
+  silently because `ipcRenderer.invoke` rejects, and nothing was catching it.
+  A call across a process boundary is the one that can fail with nothing to
+  look at, and so is the last one that should be left without a catch.
+- **A test that cannot fail is worse than no test.** The first pass at the IME
+  guard had two tests and only one of them could ever have gone red; the other
+  asserted on a mock that had not been called _yet_, because sending awaits a
+  request first. Deleting the guard and re-running is cheap, and is the only
+  thing that tells you which of your tests are load-bearing.
+- **Following a reply is a thing the reader asks for, not a thing the pane
+  does.** Scrolling to the bottom on every token makes it impossible to read
+  back through a conversation while one is arriving. The question is not "has
+  new text arrived" but "was this person at the end when it did".
+
+### What the run left to tidy
+
+Four things, done after the first pass and worth naming because each is the
+same kind of mistake: the app knowing something and not saying it.
+
+**A refusal belongs where the choosing happens.** An attachment over the limit
+was refused by the send, which is after somebody has written a message to go
+with it. Picking a file now asks the service what it would be attached as, and
+the answer names the file it will not take. The service is asked rather than
+the rule copied, because a limit enforced in two places is two limits that can
+drift — and the size it reports is shown on the chip, which is the number
+somebody wants before they send rather than after.
+
+**A file that has gone should not be drawn as though it went.** The model was
+already told; the person reading was not. Whether an attachment can still be
+read is a fact about the disk now, so it is computed wherever a message leaves
+the repository and never stored — the same reasoning as a proposal's
+comparison, and for the same reason: a column holding it is wrong the moment
+somebody tidies their folder.
+
+**What a conversation cost, in tokens.** The counts were stored per turn from
+the first AI milestone and displayed nowhere. In tokens and not in money,
+which is not a shortcut: this app lets somebody point at any endpoint with any
+model name, so a figure in dollars would be a rate card invented for a
+provider it was told nothing about. A running total rather than a per-turn
+number, because the thing worth knowing is that a long thread is expensive
+_because_ every turn re-sends the ones before it — which a total shows and a
+per-turn figure hides.
+
+**A failed turn can be asked again, in place.** Sending the same question a
+second time already worked — the words are handed back to the composer when a
+send is refused — but it leaves the transcript holding the question twice with
+a dead turn between the two copies. A retry answers into the row that failed,
+so what a conversation records is what was asked and what eventually came
+back rather than a log of the provider's bad afternoon. Only the last turn,
+and only a failed one: a retry further up would ask the model to answer a
+question the conversation has since moved past, and a reply somebody stopped
+on purpose is a decision, not a failure. The half-answer the failed row holds
+is left out of the history rather than sent, or the model carries on from a
+sentence it never finished.
+
+**And the seam nobody had crossed.** Attachments and proposals both replay a
+whole transcript, so a conversation holding both is where the cost of not
+copying is actually paid: every attached file is read again on every apply.
+That now has a test, because two features that were each correct alone is not
+the same claim as the two of them together.
+
+### Validation
+
+- Go `test ./...`, `vet ./...` and `gofmt` clean; renderer lint, formatting,
+  351 tests and production build pass; 92 desktop tests pass
+- the wire difference is pinned from both sides: an image goes to Anthropic as
+  a base64 source and to the OpenAI wire as a data URL in a parts array, a
+  document goes to one as a file and to the other as its own words, and a turn
+  with no picture in it keeps the string form every compatible endpoint
+  understands
+- the attachment staleness check was verified by breaking it: a file rewritten
+  to the same length with a later timestamp is refused, and a deleted one is
+  reported rather than silently dropped
+- the IME guard was verified by removing it and confirming each test goes red
+- `vite.qa.config.js` streams reasoning, and fires one tool call before a word
+  is said and one part way through, so a browser pass can see a line drawn
+  where the call happened rather than above the answer
+- the real provider run is done, against DeepSeek in the Electron shell, which
+  is what this milestone is named for

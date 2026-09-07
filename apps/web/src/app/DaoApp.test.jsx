@@ -114,7 +114,7 @@ describe('DaoApp shell', () => {
     // between the two states, but text clipped to zero width is not something
     // anyone can perceive, so it is hidden from assistive technology too — the
     // name comes from aria-label either way.
-    for (const label of ['Tasks', 'Chats', 'Search']) {
+    for (const label of ['Today', 'Tasks', 'Chats', 'Search']) {
       const item = nav.getByRole('button', { name: label });
       expect(item).not.toHaveAttribute('aria-current');
       expect(within(item).getByText(label)).toHaveAttribute('aria-hidden', 'true');

@@ -113,6 +113,13 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, http.StatusNotFound, "project not found")
 			return
 		}
+		// Not a failure to delete the folder — a decision not to. The message
+		// names what is in the way, so it is the message and not a category
+		// that reaches the person who has to move it.
+		if errors.Is(err, ErrFolderNotEmpty) {
+			httpx.Error(w, http.StatusConflict, err.Error())
+			return
+		}
 		httpx.Error(w, http.StatusInternalServerError, "failed to delete project")
 		return
 	}

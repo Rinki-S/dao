@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
+@import './fonts/fonts.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -112,9 +113,37 @@
 }
 
 @theme inline {
-  --font-heading: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
-  --font-mono: 'SFMono-Regular', ui-monospace, Menlo, monospace;
+  /* Public Sans for the interface and the editor, JetBrains Mono for code —
+     both bundled, see fonts/fonts.css. The system stacks stay behind them: a
+     face still loading, or one file that failed to decode, should fall back to
+     the platform's own text font rather than to Times.
+
+     Each of the three is a --chosen-* first. That variable is set on the root
+     element only when somebody has picked a font in Settings, so unset means
+     "nobody chose" and the bundled face answers — which is what makes the
+     default a real default rather than a value that has to be written down
+     before the app can render. The system stack stays behind a chosen face
+     too: a font can be uninstalled between one launch and the next, and the
+     interface should degrade to the platform's text font rather than to
+     whatever the browser reaches for last.
+
+     --font-editor is the note editor's prose. Separate from --font-sans
+     because reading and writing a long document is not the same task as
+     scanning a sidebar, and somebody who wants a serif to write in should not
+     have to put their menus in it. It follows the interface by default, so it
+     is one font until somebody says otherwise. */
+  --font-heading:
+    var(--chosen-font-interface, 'Public Sans Variable'), -apple-system, BlinkMacSystemFont,
+    'SF Pro Display', 'Segoe UI', sans-serif;
+  --font-sans:
+    var(--chosen-font-interface, 'Public Sans Variable'), -apple-system, BlinkMacSystemFont,
+    'SF Pro Text', 'Segoe UI', sans-serif;
+  --font-editor:
+    var(--chosen-font-editor, var(--chosen-font-interface, 'Public Sans Variable')), -apple-system,
+    BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  --font-mono:
+    var(--chosen-font-mono, 'JetBrains Mono Variable'), 'SFMono-Regular', ui-monospace, Menlo,
+    monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -199,6 +228,13 @@ body,
 html {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  /* No global tracking any more. The -2% that used to be here was measured
+     against Iosevka Aile, which is drawn on a narrow frame and spaced for its
+     own metrics — loose at interface sizes, and worth pulling in. Public Sans
+     is spaced conventionally and reads cramped at the same setting, and the
+     interface font is now whatever somebody chose, so there is no face to tune
+     against at all. A correction fitted to one typeface, applied to every
+     typeface, is not a correction. */
 }
 
 body {
@@ -231,4 +267,79 @@ button {
 
 .app-no-drag {
   -webkit-app-region: no-drag;
+}
+
+/* Every native scroller, styled like the ScrollArea's own.
+ *
+ * Some scrollers cannot be a ScrollArea. A textarea scrolls its own content
+ * and no component can wrap that; so does anything a third-party editor owns.
+ * Left alone they draw the platform's scrollbar inside surfaces it knows
+ * nothing about — a grey trough with square ends against the app's own 6px
+ * rounded thumb.
+ *
+ * So the same thumb everywhere, from the token that was already defined for
+ * it and used by nothing: 6px, fully rounded, inset from the edge, and no
+ * track, no buttons, no corner. The two properties at the top are the
+ * standard spelling; the pseudo-elements are what Chromium actually honours,
+ * and this app is Chromium. Both are here so the rule outlives that.
+ *
+ * Layered, so the standard properties give way to an ordinary utility. The
+ * ::-webkit rules do not: a pseudo-element is only overridden by another rule
+ * for the same pseudo-element, which is why the one exception below is
+ * written out rather than set from the component that needs it.
+ *
+ * The cost, and it is a real one: a Chromium scrollbar with ::-webkit rules
+ * on it stops being an overlay scrollbar. On macOS these no longer fade away
+ * and no longer float above the content — they hold a 10px gutter open for as
+ * long as there is anything to scroll. That is the trade every app that
+ * styles its scrollbars makes, and it is the only way to have them match.
+ */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    /* The transparent border is the inset. A scrollbar thumb takes no margin,
+       so padding it out from a 10px gutter with a 2px border clipped to the
+       content box is how it ends up 6px wide and clear of the edge. */
+    min-height: 24px;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    background: var(--color-scrollbar);
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--foreground) 32%, transparent);
+    background-clip: content-box;
+  }
+
+  /* Except where one is already drawn. A ScrollArea viewport is overflow:
+     scroll with its own thumb rendered over it, so styling the native one
+     here would put two scrollbars down the same edge — and on any platform
+     whose scrollbars take up space, the native one would hold a gutter open
+     beside a thumb that is already floating in it. Base UI leaves this to
+     whoever styles the component; nothing had been telling it to.
+
+     Both spellings, because hiding it in one and sizing it in the other is
+     how you get a scrollbar that is invisible and still occupies its gutter. */
+  [data-slot='scroll-area-viewport'] {
+    scrollbar-width: none;
+  }
+
+  [data-slot='scroll-area-viewport']::-webkit-scrollbar {
+    display: none;
+  }
 }

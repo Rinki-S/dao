@@ -65,7 +65,7 @@ func (r *Repository) Create(req CreateWorkspaceRequest) (Workspace, error) {
 	if err != nil {
 		return Workspace{}, err
 	}
-	rootPath := files.WorkspaceFolderPath(workingDirectory, req.Name, id)
+	rootPath := files.WorkspaceFolderPath(workingDirectory, req.Name)
 
 	workspace := Workspace{
 		ID:          id,

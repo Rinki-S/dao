@@ -14,9 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select.jsx';
+import { Switch } from '@/components/ui/switch.jsx';
 import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs.jsx';
+import { AiProviderSettings } from '@/features/ai/components/AiProviderSettings.jsx';
+import { FontPicker } from './FontPicker.jsx';
 import { waitForAllPendingNoteSaves } from '@/features/notes/note-save-queue.js';
 import { APPEARANCES, APPEARANCE_LABELS } from '@/lib/appearance.js';
+import { FONT_ROLES } from '@/lib/fonts.js';
 
 const APPEARANCE_OPTIONS = APPEARANCES.map((value) => ({
   label: APPEARANCE_LABELS[value],
@@ -43,11 +47,15 @@ function SettingRow({ title, description, children }) {
 
 export function SettingsDialog({
   appearance,
+  fonts,
   model,
   open,
+  showThinking,
   onAppearanceChange,
+  onFontChange,
   onOpenChange,
   onReplayOnboarding,
+  onShowThinkingChange,
 }) {
   const [restartStatus, setRestartStatus] = useState('idle');
 
@@ -70,6 +78,7 @@ export function SettingsDialog({
             <TabsList className="w-40 shrink-0 self-start" variant="underline">
               <TabsTab value="general">General</TabsTab>
               <TabsTab value="appearance">Appearance</TabsTab>
+              <TabsTab value="ai">AI</TabsTab>
               <TabsTab value="advanced">Advanced</TabsTab>
             </TabsList>
             <div className="min-h-56 min-w-0 flex-1">
@@ -106,6 +115,37 @@ export function SettingsDialog({
                     </SelectPopup>
                   </Select>
                 </SettingRow>
+                {/* One row per face. The control is wide enough to read a
+                    name in: a font picker whose field truncates is one that
+                    cannot answer the question it exists for. */}
+                {FONT_ROLES.map((role) => (
+                  <SettingRow description={role.description} key={role.id} title={role.label}>
+                    <div className="w-56">
+                      <FontPicker
+                        fallbackLabel={role.fallback}
+                        id={`font-${role.id}`}
+                        value={fonts?.[role.id] ?? ''}
+                        onChange={(family) => onFontChange?.(role.id, family)}
+                      />
+                    </div>
+                  </SettingRow>
+                ))}
+              </TabsPanel>
+              {/* A hidden panel unmounts, so this reads the current settings
+                  each time the tab is opened rather than showing what they
+                  were when the dialog was first built. */}
+              <TabsPanel value="ai">
+                <SettingRow
+                  description="Reasoning models work through a question before answering. Folded away above the reply."
+                  title="Show the model's thinking"
+                >
+                  <Switch
+                    aria-label="Show the model's thinking"
+                    checked={showThinking}
+                    onCheckedChange={onShowThinkingChange}
+                  />
+                </SettingRow>
+                <AiProviderSettings />
               </TabsPanel>
               <TabsPanel value="advanced">
                 <SettingRow

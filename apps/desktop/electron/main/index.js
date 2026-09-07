@@ -1,4 +1,14 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron'
+import {
+    app,
+    BrowserWindow,
+    dialog,
+    ipcMain,
+    nativeTheme,
+    powerMonitor,
+    screen,
+    session,
+    shell,
+} from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -8,6 +18,18 @@ import {
     waitForLocalServiceExit,
     waitForServiceHealth,
 } from './service-manager.js'
+import {
+    clearCredential,
+    credentialStatus,
+    readCredential,
+    readServiceSecret,
+    writeModelApiKey,
+    writeModelToken,
+    writeNoCredential,
+} from './credential-store.js'
+import { createRefreshScheduler } from './refresh-scheduler.js'
+import { connect, refresh } from './oauth/flow.js'
+import { getProvider, listProviders } from './oauth/providers.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -19,10 +41,30 @@ let isStoppingLocalService = false
 let restartLocalServicePromise = null
 let mainWindow = null
 
+/**
+ * How big the window opens the first time.
+ *
+ * A fixed 1488x1024 was most of a laptop screen and nearly all of a small one,
+ * which is a decision the app has no business making — an editor that opens
+ * maximised has taken the desktop over rather than joined it.
+ *
+ * So: a comfortable size, capped to a fraction of the display it opens on. The
+ * cap is what keeps it a window on a 13" screen; the fixed sizes are what stop
+ * it growing to fill a 5K one. The minimums win over both, since below them the
+ * sidebar and the editor's measure stop fitting side by side at all.
+ */
+function defaultWindowSize() {
+    const { width, height } = screen.getPrimaryDisplay().workAreaSize
+
+    return {
+        width: Math.max(960, Math.min(1200, Math.round(width * 0.76))),
+        height: Math.max(640, Math.min(820, Math.round(height * 0.8))),
+    }
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 1488,
-        height: 1024,
+        ...defaultWindowSize(),
         minWidth: 960,
         minHeight: 640,
         icon: appIconPath,
@@ -55,6 +97,33 @@ function createWindow() {
     })
 }
 
+// The file types the chat will accept, kept in step with the service's own
+// allowlist in internal/ai/attach. Duplicated deliberately rather than fetched:
+// this only decides what the dialog offers, and the service checks again before
+// anything is stored — a dialog that offered more than the service takes would
+// be a refusal after the choosing rather than before it.
+const ATTACHABLE = [
+    { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] },
+    { name: 'Documents', extensions: ['pdf', 'md', 'txt', 'csv', 'json', 'log', 'yaml', 'yml'] },
+]
+
+// Paths, not bytes. The renderer never reads an attachment — it names one, and
+// the service reads the file itself. Anything else would copy a file through
+// two processes to reach a service running on the same disk.
+ipcMain.handle('dao:choose-attachments', async () => {
+    const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+        title: 'Attach files',
+        properties: ['openFile', 'multiSelections'],
+        filters: ATTACHABLE,
+    })
+
+    if (result.canceled || result.filePaths.length === 0) {
+        return { canceled: true, paths: [] }
+    }
+
+    return { canceled: false, paths: result.filePaths }
+})
+
 ipcMain.handle('dao:select-working-directory', async () => {
     const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
         title: 'Choose working directory',
@@ -82,6 +151,94 @@ ipcMain.handle('dao:set-appearance', (_event, source) => {
     return { ok: true, error: '' }
 })
 
+ipcMain.handle('dao:get-model-key-status', () => credentialStatus())
+
+ipcMain.handle('dao:list-oauth-providers', () => listProviders())
+
+/**
+ * Sign in to a provider and keep what it hands back.
+ *
+ * The browser is opened by this process because it is the only one that can:
+ * the loopback listener has to belong to whoever is going to read the code
+ * out of it.
+ */
+ipcMain.handle('dao:connect-provider', async (_event, providerId) => {
+    let provider
+    try {
+        provider = getProvider(providerId)
+    } catch (error) {
+        return { ok: false, error: error.message }
+    }
+
+    try {
+        const result = await connect({
+            provider,
+            openExternal: (url) => shell.openExternal(url),
+        })
+
+        const stored =
+            result.kind === 'api-key'
+                ? writeModelApiKey(result.key, provider.id)
+                : writeModelToken(result.token, provider.id)
+
+        if (!stored.ok) {
+            return stored
+        }
+
+        const pushed = await pushCurrentCredential()
+        // Only a token has a lifetime to schedule against; a key is left alone.
+        await refreshScheduler.start()
+
+        return pushed
+    } catch (error) {
+        return {
+            ok: false,
+            error: error instanceof Error ? error.message : 'Sign-in failed',
+        }
+    }
+})
+
+// Saving a credential pushes it to the running service rather than restarting
+// it. Restarting was how a startup-only value took effect; now that the
+// service can be handed a new one, there is nothing to restart for.
+ipcMain.handle('dao:set-model-api-key', async (_event, key) => {
+    const result = writeModelApiKey(key)
+    if (!result.ok) {
+        return result
+    }
+
+    // A typed key has no expiry, so anything scheduled against a previous
+    // token no longer applies.
+    refreshScheduler.stop()
+
+    return pushCurrentCredential()
+})
+
+// Declaring that the endpoint needs nothing. Same shape as saving a key,
+// because it is the same decision — what this workspace authenticates with —
+// and it replaces whatever was stored before rather than sitting beside it.
+ipcMain.handle('dao:set-model-no-key', async () => {
+    const result = writeNoCredential()
+    if (!result.ok) {
+        return result
+    }
+
+    refreshScheduler.stop()
+
+    return pushCurrentCredential()
+})
+
+ipcMain.handle('dao:clear-model-api-key', async () => {
+    const result = clearCredential()
+    if (!result.ok) {
+        return result
+    }
+
+    refreshScheduler.stop()
+
+    return pushCurrentCredential()
+})
+
 ipcMain.handle('dao:restart-local-service', async () => {
     if (!serviceConfig) {
         return { ok: false, error: 'Local service is not configured' }
@@ -102,17 +259,51 @@ ipcMain.handle('dao:restart-local-service', async () => {
     return restartLocalServicePromise
 })
 
+// The permissions this window may ask Chromium for, and the only ones.
+//
+// `local-fonts` is what backs the font pickers in Settings: listing the
+// families installed on the machine goes through the Local Font Access API,
+// which is permissioned because the set of fonts somebody has installed is a
+// good fingerprint of who they are. Dao asks for it only when a picker is
+// opened, and the answer never leaves the renderer.
+//
+// Everything else is refused. The default handler grants a good deal by
+// simply not being set, and a local-first app that never records audio should
+// not be one dependency away from being able to.
+const ALLOWED_PERMISSIONS = new Set(['local-fonts'])
+
 app.whenReady().then(async () => {
     if (process.platform === 'darwin') {
         app.dock.setIcon(appIconPath)
     }
 
-    serviceConfig = createServiceConfig()
+    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+        callback(ALLOWED_PERMISSIONS.has(permission))
+    })
+
+    // Asked instead of the handler above for permissions Chromium checks
+    // synchronously, which the font query is one of. Both have to agree or the
+    // query is refused without a prompt ever being shown.
+    session.defaultSession.setPermissionCheckHandler((_webContents, permission) =>
+        ALLOWED_PERMISSIONS.has(permission),
+    )
+
+    const startupCredential = readServiceSecret()
+    serviceConfig = createServiceConfig(startupCredential.secret, startupCredential.kind)
     localService = startLocalService(serviceConfig)
 
     await waitForServiceHealth(serviceConfig.baseUrl)
 
     createWindow()
+
+    await refreshScheduler.start()
+
+    // A timer does not run while the machine is asleep, so on waking its
+    // appointment has usually passed and the token is already dead. This is
+    // the tick that matters on a laptop.
+    powerMonitor.on('resume', () => {
+        void refreshScheduler.tick()
+    })
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
@@ -149,6 +340,64 @@ async function restartLocalService() {
     localService = startLocalService(serviceConfig)
     await waitForServiceHealth(serviceConfig.baseUrl)
 }
+
+/**
+ * Hand the running service whatever credential is now stored.
+ *
+ * The config is updated too, so that a restart for some other reason starts
+ * the service with the same credential this pushed.
+ */
+async function pushCredentialToService(secret, kind) {
+    if (!serviceConfig) {
+        throw new Error('Local service is not configured')
+    }
+
+    serviceConfig = { ...serviceConfig, modelApiKey: secret, modelCredentialKind: kind }
+
+    const response = await fetch(`${serviceConfig.baseUrl}/api/ai/credential`, {
+        method: 'PUT',
+        headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${serviceConfig.sessionToken}`,
+        },
+        body: JSON.stringify({ kind, secret }),
+    })
+
+    if (!response.ok) {
+        throw new Error(`the local service refused the credential (${response.status})`)
+    }
+}
+
+async function pushCurrentCredential() {
+    try {
+        const current = readServiceSecret()
+        await pushCredentialToService(current.secret, current.kind)
+        return { ok: true, error: '' }
+    } catch (error) {
+        return {
+            ok: false,
+            error: error instanceof Error ? error.message : 'Failed to update the credential',
+        }
+    }
+}
+
+// Renewal lives here rather than in the service because this is the process
+// holding the refresh token and the keychain, and it has to be — the
+// authorisation callback lands here. The service is handed access tokens and
+// uses them.
+const refreshScheduler = createRefreshScheduler({
+    readCredential,
+    writeToken: writeModelToken,
+    pushToService: pushCredentialToService,
+    refreshToken: (providerId, refreshTokenValue) =>
+        refresh({ provider: getProvider(providerId), refreshToken: refreshTokenValue }),
+    onEvent(event) {
+        if (event.type === 'needs-reconnect') {
+            console.warn(`dao: the model credential needs reconnecting — ${event.error}`)
+        }
+        mainWindow?.webContents.send('dao:credential-event', event)
+    },
+})
 
 process.on('exit', stopServiceOnce)
 process.on('SIGINT', () => {

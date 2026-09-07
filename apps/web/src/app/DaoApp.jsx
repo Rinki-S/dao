@@ -1,4 +1,3 @@
-import { IconMessageCircle } from '@tabler/icons-react';
 import { useState } from 'react';
 import { DaoSidebar } from '@/components/shell/DaoSidebar.jsx';
 import { WorkingDirectoryOnboarding } from '@/components/app/WorkingDirectoryOnboarding.jsx';
@@ -15,12 +14,17 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar.jsx';
 import { WindowSidebarTrigger } from '@/components/shell/WindowSidebarTrigger.jsx';
 import { TitlebarPeekContext } from '@/components/shell/use-titlebar-inset.js';
 import { Spinner } from '@/components/ui/spinner.jsx';
+import { ChatsWorkspace } from '@/features/chats/components/ChatsWorkspace.jsx';
+import { ConversationsProvider } from '@/features/chats/components/ConversationsProvider.jsx';
 import { CommandPalette } from '@/features/command-palette/components/CommandPalette.jsx';
 import { NoteEditorPanel } from '@/features/notes/components/NoteEditorPanel.jsx';
+import { TodayWorkspace } from '@/features/ai/components/TodayWorkspace.jsx';
 import { SearchWorkspace } from '@/features/search/components/SearchWorkspace.jsx';
 import { SettingsDialog } from '@/features/settings/components/SettingsDialog.jsx';
 import { TasksWorkspace } from '@/features/tasks/components/TasksWorkspace.jsx';
 import { useAppearance } from '@/hooks/use-appearance.js';
+import { useFonts } from '@/hooks/use-fonts.js';
+import { useShowThinking } from '@/hooks/use-show-thinking.js';
 import { useDaoWorkspace } from './use-dao-workspace.js';
 
 function EmptyHome({ model }) {
@@ -40,6 +44,12 @@ function EmptyHome({ model }) {
 export function DaoApp() {
   const model = useDaoWorkspace();
   const { appearance, setAppearance } = useAppearance();
+  // Held here rather than in the pane that draws it, so that the switch in
+  // Settings and the transcript are reading the same value.
+  const { showThinking, setShowThinking } = useShowThinking();
+  // Applied to the document by the hook, so every surface picks the choices up
+  // from the CSS tokens rather than being handed them.
+  const { fonts, setFont } = useFonts();
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Peeking the hidden sidebar back in: owned here because the sidebar and the
   // trigger are siblings and both have to move together.
@@ -92,50 +102,53 @@ export function DaoApp() {
       ) : (
         <EmptyHome model={model} />
       );
+    if (model.activeView === 'today')
+      return <TodayWorkspace model={model} onOpenSettings={() => setSettingsOpen(true)} />;
     if (model.activeView === 'tasks') return <TasksWorkspace model={model} />;
     if (model.activeView === 'search') return <SearchWorkspace model={model} />;
     return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <IconMessageCircle aria-hidden="true" />
-          </EmptyMedia>
-          <EmptyTitle>Chats will live here.</EmptyTitle>
-          <EmptyDescription>
-            The navigation is reserved for Dao's future AI context, but no AI behavior is enabled
-            yet.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <ChatsWorkspace
+        model={model}
+        showThinking={showThinking}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
     );
   })();
 
   return (
-    <SidebarProvider>
-      <TitlebarPeekContext.Provider value={sidebarPeek}>
-        <CommandPalette model={model} onOpenSettings={() => setSettingsOpen(true)} />
-        <DaoSidebar
-          model={model}
-          peeking={sidebarPeek}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onPeekChange={setSidebarPeek}
-        />
-        <WindowSidebarTrigger peeking={sidebarPeek} onPeekChange={setSidebarPeek} />
-        <SidebarInset>
-          <div className="min-h-0 flex-1 overflow-hidden">{content}</div>
-        </SidebarInset>
-        <SettingsDialog
-          appearance={appearance}
-          model={model}
-          open={settingsOpen}
-          onAppearanceChange={setAppearance}
-          onOpenChange={setSettingsOpen}
-          onReplayOnboarding={() => {
-            setSettingsOpen(false);
-            setReplayOnboarding(true);
-          }}
-        />
-      </TitlebarPeekContext.Provider>
-    </SidebarProvider>
+    // Above the sidebar as well as the workspace: the two are siblings, and the
+    // conversation list is now shown by one and added to by the other.
+    <ConversationsProvider model={model}>
+      <SidebarProvider>
+        <TitlebarPeekContext.Provider value={sidebarPeek}>
+          <CommandPalette model={model} onOpenSettings={() => setSettingsOpen(true)} />
+          <DaoSidebar
+            model={model}
+            peeking={sidebarPeek}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onPeekChange={setSidebarPeek}
+          />
+          <WindowSidebarTrigger peeking={sidebarPeek} onPeekChange={setSidebarPeek} />
+          <SidebarInset>
+            <div className="min-h-0 flex-1 overflow-hidden">{content}</div>
+          </SidebarInset>
+          <SettingsDialog
+            appearance={appearance}
+            fonts={fonts}
+            model={model}
+            open={settingsOpen}
+            showThinking={showThinking}
+            onAppearanceChange={setAppearance}
+            onFontChange={setFont}
+            onShowThinkingChange={setShowThinking}
+            onOpenChange={setSettingsOpen}
+            onReplayOnboarding={() => {
+              setSettingsOpen(false);
+              setReplayOnboarding(true);
+            }}
+          />
+        </TitlebarPeekContext.Provider>
+      </SidebarProvider>
+    </ConversationsProvider>
   );
 }

@@ -4,6 +4,7 @@ import { listActivities } from '@/features/activities/api.js';
 import { notifyActivityChanged } from '@/features/activities/events.js';
 import { ensureWelcomeNote } from '@/features/onboarding/welcome-note.js';
 import { createNote, deleteNote, listNotes, updateNote } from '@/features/notes/api.js';
+import { watchWorkspace } from '@/lib/workspace-events.js';
 import {
   createProject,
   deleteProject,
@@ -36,6 +37,10 @@ export function useDaoWorkspace() {
   const [activeView, setActiveView] = useState('home');
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [revealedProjectId, setRevealedProjectId] = useState('');
+  // The conversation a search hit asked for. Held here rather than in Chats
+  // because the surface that answers a search is not the one that ran it, and
+  // the id has to survive the switch between them.
+  const [revealedChatId, setRevealedChatId] = useState('');
 
   const currentWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === currentWorkspaceId) ?? null,
@@ -154,6 +159,17 @@ export function useDaoWorkspace() {
     };
   }, [refreshData, restoreWorkspaceContext]);
 
+  // The workspace folder is a folder the user is invited to open, so what they
+  // do there has to reach the window without them thinking about it. The
+  // service watches the folder and says when it stopped matching; the answer to
+  // that is the same refetch every other change already uses.
+  //
+  // Subscribing rather than polling, and rather than refetching on focus:
+  // polling asks a question that is almost always answered "nothing", and
+  // focus misses everything that happens while the window is in front of you —
+  // which is most of it, if the other program is on another screen.
+  useEffect(() => watchWorkspace(() => void refreshData()), [refreshData]);
+
   async function completeOnboarding({ path, workspace }) {
     setStatus('loading');
     const nextWorkingDirectory = await updateWorkingDirectory({ path });
@@ -226,9 +242,26 @@ export function useDaoWorkspace() {
     setProjects((current) => current.map((item) => (item.id === updated.id ? updated : item)));
   }
 
+  // Deleting a folder removes the directory, so it can now be refused: one that
+  // still holds a file Dao did not put there is not deleted, because deleting
+  // it would take that file with it. A refusal that showed nothing would read
+  // as the button being broken.
   async function removeProject(project) {
-    await deleteProject(project.id, { deleteNotes: false });
-    setProjects((current) => current.filter((item) => item.id !== project.id));
+    try {
+      await deleteProject(project.id, { deleteNotes: false });
+    } catch (deleteError) {
+      toastManager.add({
+        type: 'error',
+        title: `Could not delete “${project.name}”`,
+        description: messageFrom(deleteError, 'The folder was left where it was.'),
+      });
+      return;
+    }
+
+    // The whole set is refetched: the folder's notes moved to the workspace
+    // root and its subfolders moved with them, so more rows changed than the
+    // one that was deleted.
+    await refreshData();
     setRevealedProjectId('');
   }
 
@@ -268,8 +301,22 @@ export function useDaoWorkspace() {
     notifyActivityChanged();
   }
 
+  // Deleting a note removes its file, so this can fail on something real — a
+  // read-only folder, a file another program is holding. Nothing is deleted
+  // when it does, and saying so is the difference between that and a button
+  // that does nothing.
   async function removeNote(note) {
-    await deleteNote(note.id);
+    try {
+      await deleteNote(note.id);
+    } catch (deleteError) {
+      toastManager.add({
+        type: 'error',
+        title: `Could not delete “${note.title}”`,
+        description: messageFrom(deleteError, 'The note and its file were left alone.'),
+      });
+      return;
+    }
+
     const nextNotes = notes.filter((item) => item.id !== note.id);
     setNotes(nextNotes);
     const nextRecents = pruneRecents(readRecents(), { notes: nextNotes });
@@ -307,6 +354,11 @@ export function useDaoWorkspace() {
       setActiveView('tasks');
       return;
     }
+    if (result.entityType === 'chat') {
+      setRevealedChatId(result.entityId);
+      setActiveView('chats');
+      return;
+    }
     const entity = notes.find((note) => note.id === result.entityId);
     if (result.projectId) setRevealedProjectId(result.projectId);
     if (entity) openEntity(entity);
@@ -326,6 +378,8 @@ export function useDaoWorkspace() {
     selectedEntity,
     selectedNote,
     revealedProjectId,
+    revealedChatId,
+    setRevealedChatId,
     setActiveView,
     setRevealedProjectId,
     completeOnboarding,

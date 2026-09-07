@@ -99,7 +99,7 @@ func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 		return Note{}, err
 	}
 
-	filePath := files.MarkdownNoteFilePath(parentDir, req.Title, id)
+	filePath := files.MarkdownNoteFilePath(parentDir, req.Title, "")
 
 	if err := os.WriteFile(filePath, []byte(req.Content), 0644); err != nil {
 		return Note{}, err
@@ -201,7 +201,21 @@ func (r *Repository) Create(req CreateNoteRequest) (Note, error) {
 	return note, nil
 }
 
-func (r *Repository) UpdateContent(id string, content string) (Note, error) {
+// UpdateContent writes a note's file, unless somebody else already did.
+//
+// expectedUpdatedAt is what the caller believed the note said when it read it.
+// Empty skips the check, which is how a caller says "I have seen the conflict
+// and I mean it".
+//
+// Two ways the file can have moved on, and both have to be caught:
+//
+// The row's updated_at no longer matches what the caller expected — an external
+// edit the watcher has already reconciled, which is the ordinary case.
+//
+// The file itself is newer than the row — an external edit the watcher has not
+// caught up with yet. Without this second check there is a window, a fraction
+// of a second wide, in which a save silently wins over an edit it never saw.
+func (r *Repository) UpdateContent(id string, content string, expectedUpdatedAt string) (Note, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	note, err := scanNote(r.db.QueryRow(`
@@ -217,6 +231,12 @@ func (r *Repository) UpdateContent(id string, content string) (Note, error) {
 	previousContent, err := os.ReadFile(note.FilePath)
 	if err != nil {
 		return Note{}, err
+	}
+
+	if expectedUpdatedAt != "" {
+		if conflict := r.conflict(note, expectedUpdatedAt, previousContent); conflict != nil {
+			return Note{}, conflict
+		}
 	}
 
 	if err := os.WriteFile(note.FilePath, []byte(content), 0644); err != nil {
@@ -301,9 +321,9 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 	}
 
 	// The title is the file name and the folder is the directory, so renaming
-	// and moving are the same operation: recompute the path. The id is in the
-	// name, which is what makes the destination unique without a collision
-	// check.
+	// and moving are the same operation: recompute the path. The file this note
+	// already occupies is passed along, because a note keeping its title must
+	// keep its name rather than being numbered out of the way of itself.
 	previousPath := note.FilePath
 	parentDir := filepath.Dir(previousPath)
 
@@ -316,7 +336,7 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 		}
 	}
 
-	nextPath := files.MarkdownNoteFilePath(parentDir, note.Title, note.ID)
+	nextPath := files.MarkdownNoteFilePath(parentDir, note.Title, previousPath)
 	moved := nextPath != previousPath
 
 	if moved {
@@ -389,7 +409,33 @@ func (r *Repository) Update(id string, req UpdateNoteRequest) (Note, error) {
 	return note, nil
 }
 
+// Delete removes a note: its row, its place in the search index, and its file.
+//
+// The file goes too, because in a workspace that is a folder of Markdown files
+// the file is the note. Marking only the row left a real file behind that the
+// app had stopped showing — invisible, still findable by everything else on the
+// machine, and waiting to come back the moment anything wrote to it.
+//
+// It goes before the commit rather than after. Removing it after means a
+// removal that fails leaves the app insisting the note is gone while the file
+// is still in the folder, which is the one thing the dialog that asked for this
+// promises will not happen. Removing it first means a removal that fails aborts
+// the whole delete and says so, with nothing destroyed.
+//
+// That leaves one window: the file goes and the commit then fails. The note is
+// still listed, pointing at nothing — and the watcher already knows what that
+// means, so the next event forgets it. The window resolves itself, and it
+// resolves onto the outcome that was asked for.
 func (r *Repository) Delete(id string) error {
+	var filePath string
+	// Read before the transaction so an unknown note fails here, where nothing
+	// has been begun, rather than partway through one.
+	if err := r.db.QueryRow(`
+		SELECT file_path FROM notes WHERE id = ? AND deleted_at IS NULL
+	`, id).Scan(&filePath); err != nil {
+		return err
+	}
+
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	tx, err := r.db.Begin()
@@ -416,6 +462,13 @@ func (r *Repository) Delete(id string) error {
 	}
 
 	if err := r.indexer.DeleteTx(tx, "note", id); err != nil {
+		return err
+	}
+
+	// A file that is already gone is not a failure. Somebody deleting it in the
+	// folder is another way of asking for exactly this, and it is how the
+	// watcher asks.
+	if err := os.Remove(filePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 
@@ -477,4 +530,29 @@ func scanNote(scanner noteScanner) (Note, error) {
 	}
 
 	return note, nil
+}
+
+// conflict reports whether the file moved on since the caller read it.
+func (r *Repository) conflict(note Note, expectedUpdatedAt string, onDisk []byte) error {
+	moved := note.UpdatedAt != expectedUpdatedAt
+
+	if !moved {
+		// The watcher may not have caught up. Compared against the row rather
+		// than against what the caller expects, because those are the same
+		// string here and the file is the thing that might be ahead of both.
+		if info, err := os.Stat(note.FilePath); err == nil {
+			if saved, err := time.Parse(time.RFC3339, note.UpdatedAt); err == nil {
+				// The same second of tolerance the reconciler uses, and for the
+				// same reason: updated_at is stored to the second, so the app's
+				// own save always looks a fraction newer than it claims to be.
+				moved = info.ModTime().After(saved.Add(time.Second))
+			}
+		}
+	}
+
+	if !moved {
+		return nil
+	}
+
+	return &Conflict{Note: note, OnDisk: string(onDisk), UpdatedAt: note.UpdatedAt}
 }

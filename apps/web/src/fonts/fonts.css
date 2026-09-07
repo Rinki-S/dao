@@ -1,0 +1,30 @@
+/* The app's two bundled typefaces.
+ *
+ * Bundled rather than named and hoped for. A font referenced by family name
+ * only renders on a machine that happens to have it installed, and this is a
+ * desktop app that is meant to look the same wherever it is opened — and to
+ * work with nothing on the network, which rules out a font CDN.
+ *
+ * These are the defaults, not the whole story: Settings lets somebody point
+ * the interface, the editor and the code face at anything installed on their
+ * own machine. What is bundled is what the app looks like when nobody has
+ * chosen, which is most of the time and is the only thing a fresh install can
+ * rely on.
+ *
+ * Public Sans is the interface face — a neutral grotesque, drawn for screen
+ * text at small sizes. JetBrains Mono is the code face. Both are SIL OFL 1.1
+ * and both are variable fonts, which is why there are no per-weight imports
+ * here: one file covers 100–900, so asking for a weight costs nothing and the
+ * pair together is about 300 KB rather than the eight megabytes a set of
+ * static weights came to.
+ */
+
+/* Upright and italic separately: fontsource's index is the upright range only,
+   and prose in a note or a reply does set italics. */
+@import '@fontsource-variable/public-sans/index.css';
+@import '@fontsource-variable/public-sans/wght-italic.css';
+
+/* No italic for the code face. Nothing in this app sets code in italics —
+   there is no syntax highlighting — so the second file would be bytes spent on
+   a style nothing asks for. */
+@import '@fontsource-variable/jetbrains-mono/index.css';

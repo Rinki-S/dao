@@ -1,0 +1,211 @@
+package chats
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/rinki-s/dao/apps/local-service/internal/ai/attach"
+	"github.com/rinki-s/dao/apps/local-service/internal/ai/llm"
+)
+
+func attachedFile(t *testing.T, name string, body []byte) attach.Attachment {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, body, 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	attachment, err := attach.Describe(path)
+	if err != nil {
+		t.Fatalf("Describe: %v", err)
+	}
+
+	return attachment
+}
+
+// A picture and no words is a message. Left to the emptiness check that keeps
+// half-written assistant rows out of the request, it would have been dropped
+// before the model ever saw it.
+func TestATurnThatIsOnlyAnAttachmentIsStillSent(t *testing.T) {
+	picture := attachedFile(t, "shot.png", []byte{0x89, 'P', 'N', 'G'})
+
+	context := BuildContext([]Message{
+		{Role: "user", Content: "", Attachments: []attach.Attachment{picture}},
+	})
+
+	if len(context.Messages) != 1 {
+		t.Fatalf("got %d messages, want the turn kept", len(context.Messages))
+	}
+	if got := context.Messages[0].Content[0].Kind; got != llm.KindImage {
+		t.Errorf("block kind = %q, want the picture", got)
+	}
+}
+
+func TestAnAttachmentIsReplayedBesideTheWordsItCameWith(t *testing.T) {
+	picture := attachedFile(t, "shot.png", []byte{0x89, 'P', 'N', 'G'})
+
+	context := BuildContext([]Message{
+		{Role: "user", Content: "what is this?", Attachments: []attach.Attachment{picture}},
+	})
+
+	blocks := context.Messages[0].Content
+	if len(blocks) != 2 {
+		t.Fatalf("got %d blocks, want the question and the picture", len(blocks))
+	}
+	if blocks[0].Kind != llm.KindText || blocks[1].Kind != llm.KindImage {
+		t.Errorf("blocks = %+v", blocks)
+	}
+	if blocks[1].Data == "" {
+		t.Error("the picture was replayed with no bytes in it")
+	}
+}
+
+// The cost of not copying, and the reason a size and a time are stored beside
+// the path. The model is told, in the place the file would have been, rather
+// than being handed whatever is at that path now — or nothing at all.
+func TestAFileThatChangedSinceItWasAttachedIsReplayedAsASentence(t *testing.T) {
+	picture := attachedFile(t, "shot.png", []byte("original"))
+
+	if err := os.WriteFile(picture.Path, []byte("replaced"), 0o600); err != nil {
+		t.Fatalf("rewrite: %v", err)
+	}
+	later := time.Now().Add(2 * time.Second)
+	if err := os.Chtimes(picture.Path, later, later); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+
+	context := BuildContext([]Message{
+		{Role: "user", Content: "what is this?", Attachments: []attach.Attachment{picture}},
+	})
+
+	blocks := context.Messages[0].Content
+	if len(blocks) != 2 {
+		t.Fatalf("got %d blocks, want the question and something in the picture's place", len(blocks))
+	}
+
+	// Words, not an image, and not silence. A model asked a follow-up about a
+	// picture it can no longer see, and told nothing, answers as confidently
+	// as it did when it could.
+	if blocks[1].Kind != llm.KindText {
+		t.Fatalf("second block = %+v, want a sentence", blocks[1])
+	}
+	if !strings.Contains(blocks[1].Text, "shot.png") {
+		t.Errorf("text = %q, want the file named", blocks[1].Text)
+	}
+}
+
+func TestAnAttachmentSurvivesBeingStoredAndReadBack(t *testing.T) {
+	repo := newRepo(t)
+	conversation := newConversation(t, repo)
+	picture := attachedFile(t, "shot.png", []byte{0x89, 'P', 'N', 'G'})
+
+	if _, err := repo.Append(conversation.ID, Message{
+		Role:        RoleUser,
+		Content:     "what is this?",
+		Attachments: []attach.Attachment{picture},
+	}); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+
+	stored, err := repo.Messages(conversation.ID)
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	if len(stored[0].Attachments) != 1 {
+		t.Fatalf("stored attachments = %+v", stored[0].Attachments)
+	}
+
+	// Every field the replay check depends on. A row that came back without
+	// the size or the time would re-read the path and believe whatever it
+	// found there.
+	got := stored[0].Attachments[0]
+	if got.Path != picture.Path || got.Filename != "shot.png" {
+		t.Errorf("attachment = %+v", got)
+	}
+	if got.Size != picture.Size || got.ModifiedAt != picture.ModifiedAt {
+		t.Errorf("attachment = %+v, want the size and time it was attached with", got)
+	}
+	if got.MediaType != "image/png" {
+		t.Errorf("media type = %q", got.MediaType)
+	}
+}
+
+// The seam between the two features that both replay a transcript. Applying a
+// change reloads the whole conversation and sends it again, which means every
+// attachment in it is read again — so an attachment and a proposal in one
+// conversation is the case where the cost of not copying is actually paid.
+func TestAConversationCarriesItsAttachmentsIntoAResumedTurn(t *testing.T) {
+	picture := attachedFile(t, "shot.png", []byte{0x89, 'P', 'N', 'G'})
+
+	context := BuildContext([]Message{
+		{Role: "user", Content: "what is this?", Attachments: []attach.Attachment{picture}},
+		{
+			Role:    "assistant",
+			Content: "I can rename that note.",
+			ToolCalls: []ToolCall{
+				{ID: "call-1", Name: "rename_note", Input: `{}`, Output: "renamed", Status: ToolCallOK},
+			},
+		},
+	})
+
+	// The picture is still in the first turn, whole, on the request that
+	// carries the answered call. A replay that dropped it would have the model
+	// deciding about a change while no longer able to see what it was for.
+	first := context.Messages[0].Content
+	if len(first) != 2 || first[1].Kind != llm.KindImage || first[1].Data == "" {
+		t.Fatalf("the first turn came back as %+v", first)
+	}
+
+	// And the exchange that follows it is intact: the call, then its result.
+	if got := len(context.Messages); got != 3 {
+		t.Fatalf("got %d messages, want the question, the call and its result", got)
+	}
+	if context.Messages[1].Content[1].Kind != llm.KindToolCall {
+		t.Errorf("the assistant turn is %+v", context.Messages[1])
+	}
+	if context.Messages[2].Content[0].Kind != llm.KindToolResult {
+		t.Errorf("the result turn is %+v", context.Messages[2])
+	}
+}
+
+// Checked on the way out rather than remembered, because whether a file is
+// still there is a fact about the disk now.
+func TestAStoredAttachmentSaysWhetherItCanStillBeRead(t *testing.T) {
+	repo := newRepo(t)
+	conversation := newConversation(t, repo)
+	picture := attachedFile(t, "shot.png", []byte{0x89, 'P', 'N', 'G'})
+
+	if _, err := repo.Append(conversation.ID, Message{
+		Role:        RoleUser,
+		Content:     "what is this?",
+		Attachments: []attach.Attachment{picture},
+	}); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+
+	stored, err := repo.Messages(conversation.ID)
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	if stored[0].Attachments[0].Unreadable {
+		t.Error("a file that is still there was reported as gone")
+	}
+
+	if err := os.Remove(picture.Path); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+
+	stored, err = repo.Messages(conversation.ID)
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	// A transcript that showed the name as though the file went would be
+	// claiming something it cannot check.
+	if !stored[0].Attachments[0].Unreadable {
+		t.Error("a file that is gone was reported as present")
+	}
+}

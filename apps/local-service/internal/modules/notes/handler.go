@@ -130,10 +130,20 @@ func (h *Handler) updateContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	note, err := h.repo.UpdateContent(id, req.Content)
+	note, err := h.repo.UpdateContent(id, req.Content, req.ExpectedUpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			httpx.Error(w, http.StatusNotFound, "note not found")
+			return
+		}
+
+		// A refused save is not a failed one. The status says the request was
+		// fine and the world was not what it assumed, and the body carries
+		// what the world actually says — so the editor can offer a choice
+		// without a second round trip to find out what it is choosing between.
+		var conflict *Conflict
+		if errors.As(err, &conflict) {
+			httpx.JSON(w, http.StatusConflict, conflict)
 			return
 		}
 

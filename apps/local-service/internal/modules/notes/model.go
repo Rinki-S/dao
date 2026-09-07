@@ -29,6 +29,33 @@ type CreateNoteRequest struct {
 
 type UpdateNoteContentRequest struct {
 	Content string `json:"content"`
+
+	// ExpectedUpdatedAt is what the note said when the editor last read it.
+	//
+	// The file is not the editor's alone — a person can change it in Finder
+	// while a window is open on it, and without this the next autosave writes
+	// over what they did from a copy read before the change. Sending what it
+	// believes is true is how a writer asks whether it still is.
+	//
+	// Empty means "write regardless", which is what the caller sends after
+	// being shown a conflict and choosing to keep its own version.
+	ExpectedUpdatedAt string `json:"expectedUpdatedAt"`
+}
+
+// Conflict is what a refused save carries back: the note as the app now knows
+// it, and the text that is actually on disk.
+//
+// Both, because the editor has to offer a choice, and offering one means
+// showing what the other option contains — asking somebody to decide between
+// their own work and something they cannot see is not a choice.
+type Conflict struct {
+	Note      Note   `json:"note"`
+	OnDisk    string `json:"onDisk"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+func (c *Conflict) Error() string {
+	return "the file changed since it was read"
 }
 
 type UpdateNoteRequest struct {

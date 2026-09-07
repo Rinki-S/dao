@@ -66,12 +66,23 @@ describe('projects api', () => {
     });
   });
 
-  it('throws when deleting a project fails', async () => {
+  // Deleting a folder removes its directory, so it can be refused rather than
+  // fail: it still holds a file Dao did not put there, and the service names
+  // it. That sentence is the whole value of the refusal — a status code sends
+  // somebody looking, "receipt.pdf" tells them where.
+  it('carries the reason a delete was refused', async () => {
     const fetchMock = vi.fn(async () =>
-      Response.json({ error: 'project not found' }, { status: 404 }),
+      Response.json({ error: 'folder is not empty: receipt.pdf' }, { status: 409 }),
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(deleteProject('project-1')).rejects.toThrow('Failed to delete project: 404');
+    await expect(deleteProject('project-1')).rejects.toThrow('folder is not empty: receipt.pdf');
+  });
+
+  it('falls back to the status when the failure said nothing', async () => {
+    const fetchMock = vi.fn(async () => new Response('', { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(deleteProject('project-1')).rejects.toThrow('Failed to delete project: 500');
   });
 });

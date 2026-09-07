@@ -68,6 +68,19 @@ export async function deleteProject(id, input = { deleteNotes: false }) {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to delete project: ${response.status}`);
+    // Deleting a folder can be refused rather than fail — it still holds
+    // something Dao did not put there — and the service says which file. That
+    // sentence is the whole value of the refusal, so it is read out rather than
+    // flattened into a status code.
+    throw new Error(await reasonFrom(response, `Failed to delete project: ${response.status}`));
+  }
+}
+
+async function reasonFrom(response, fallback) {
+  try {
+    const body = await response.json();
+    return typeof body?.error === 'string' && body.error ? body.error : fallback;
+  } catch {
+    return fallback;
   }
 }

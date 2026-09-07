@@ -134,8 +134,16 @@ export function SidebarProvider({
   return (
     <SidebarContext.Provider value={contextValue}>
       <div
+        // A height rather than a minimum. `min-h-svh` upstream leaves this
+        // element's height auto, and auto propagates: every descendant that
+        // asks for `h-full` or `flex-1` measures against a parent that grows
+        // with its own content, so no `overflow-auto` below ever has a bounded
+        // box to scroll inside. A long note simply made the whole shell taller
+        // until `#root`'s `overflow: hidden` cut it off, with no scrollbar
+        // anywhere. The window is the one thing here with a fixed size, so it
+        // is where the measuring has to start.
         className={cn(
-          'group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar',
+          'group/sidebar-wrapper flex h-svh w-full has-data-[variant=inset]:bg-sidebar',
           className,
         )}
         data-slot="sidebar-wrapper"
@@ -606,7 +614,12 @@ export function SidebarMenuSubButton({
 }) {
   const defaultProps = {
     className: cn(
-      "flex h-8 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-lg px-2 text-sidebar-foreground outline-hidden ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 sm:h-7 [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
+      // w-full, like SidebarMenuButton above. Without it the row is as wide as
+      // its label and overflows the sidebar rather than truncating in it — the
+      // truncate on its last span never fires, because the span is not what
+      // runs out of room. Invisible until a file name is long enough, which a
+      // wider UI font is one way to arrange.
+      "flex h-8 w-full min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-lg px-2 text-sidebar-foreground outline-hidden ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 sm:h-7 [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
       'data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground',
       size === 'sm' && 'text-xs',
       size === 'md' && 'text-sm',

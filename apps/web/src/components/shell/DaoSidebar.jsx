@@ -11,6 +11,7 @@ import {
   IconMessageCircle,
   IconPlus,
   IconSearch,
+  IconSparkles,
   IconSettings,
   IconTrash,
 } from '@tabler/icons-react';
@@ -63,12 +64,14 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar.jsx';
+import { ChatHistory } from '@/features/chats/components/ChatHistory.jsx';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: IconHome },
+  { id: 'today', label: 'Today', icon: IconSparkles },
   { id: 'tasks', label: 'Tasks', icon: IconCircleCheck },
-  { id: 'chats', label: 'Chats', icon: IconMessageCircle, disabled: true },
+  { id: 'chats', label: 'Chats', icon: IconMessageCircle },
   { id: 'search', label: 'Search', icon: IconSearch },
 ];
 
@@ -358,8 +361,14 @@ function NoteRow({ active, nested = false, note, onOpen, onRename, onDelete }) {
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete “{noteFileName(note)}”?</AlertDialogTitle>
+            {/* Says where and says how final, because both are surprising. The
+                note is a file somebody can see in Finder, and deleting it here
+                really unlinks it rather than putting it in the Trash — so the
+                usual way back does not exist, and that has to be said before
+                the button is pressed rather than discovered after. */}
             <AlertDialogDescription>
-              The note file will be removed from this workspace. This cannot be undone.
+              This deletes the file from your workspace folder. It does not go to the Trash, so it
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -535,8 +544,13 @@ function ProjectFolder({
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete folder “{project.name}”?</AlertDialogTitle>
+            {/* Says what survives before what does not, because that is the
+                order the worry arrives in. Subfolders are named too: they move
+                as well, and somebody who has filed work two deep should not
+                have to guess that from a sentence about notes. */}
             <AlertDialogDescription>
-              Notes stay in the workspace root, but the folder itself will be removed.
+              Its notes and any folders inside it move to the workspace root. The folder itself is
+              removed from your workspace folder.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -745,87 +759,100 @@ export function DaoSidebar({ model, peeking = false, onOpenSettings, onPeekChang
           </div>
         </SidebarHeader>
 
+        {/* What the sidebar lists follows the view. Chats browses conversations
+            and has no use for the workspace tree; everything else browses the
+            workspace and has no use for the conversations. One place to browse
+            from, holding whatever the current view is made of. */}
         <SidebarContent>
-          {recentEntries.length > 0 && (
-            <SidebarGroup>
-              <SidebarGroupLabel>Recents</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {recentEntries.map(({ entity, recent }) => {
-                    const label = noteFileName(entity);
-                    return (
-                      <SidebarMenuItem key={recent.entityId}>
-                        <SidebarMenuButton tooltip={label} onClick={() => model.openEntity(entity)}>
-                          <IconFile aria-hidden="true" />
-                          <span>{label}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )}
+          {model.activeView === 'chats' ? (
+            <ChatHistory />
+          ) : (
+            <>
+              {recentEntries.length > 0 && (
+                <SidebarGroup>
+                  <SidebarGroupLabel>Recents</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {recentEntries.map(({ entity, recent }) => {
+                        const label = noteFileName(entity);
+                        return (
+                          <SidebarMenuItem key={recent.entityId}>
+                            <SidebarMenuButton
+                              tooltip={label}
+                              onClick={() => model.openEntity(entity)}
+                            >
+                              <IconFile aria-hidden="true" />
+                              <span>{label}</span>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              )}
 
-          <SidebarGroup>
-            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-            <SidebarGroupAction aria-label="New folder" onClick={() => setNewProjectOpen(true)}>
-              <IconFolderPlus aria-hidden="true" />
-            </SidebarGroupAction>
-            {/* Dropping on the group itself, rather than on any folder, is
+              <SidebarGroup>
+                <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+                <SidebarGroupAction aria-label="New folder" onClick={() => setNewProjectOpen(true)}>
+                  <IconFolderPlus aria-hidden="true" />
+                </SidebarGroupAction>
+                {/* Dropping on the group itself, rather than on any folder, is
                 what takes a note back out to the workspace root. */}
-            <WorkspaceDropRegion
-              onDropFolder={(folderId) => moveFolderById(folderId, null)}
-              onDropNote={(noteId) => moveNoteById(noteId, null)}
-            >
-              <SidebarMenu>
-                {folderTree.map((project, index) => (
-                  <ProjectFolder
-                    key={project.id}
-                    activeNoteId={activeNoteId}
-                    childFolders={project.children}
-                    defaultOpen={index === 0}
-                    notesByProject={notesByProject}
-                    project={project}
-                    projectNotes={notesByProject.get(project.id) ?? []}
-                    revealedProjectId={model.revealedProjectId}
-                    onCreateFolder={(name, parentId) => model.addProject({ name, parentId })}
-                    onCreateNote={(projectId) => model.addNote({ projectId })}
-                    onDelete={model.removeProject}
-                    onDeleteNote={model.removeNote}
-                    onDropFolder={moveFolderById}
-                    onDropNote={moveNoteById}
-                    onOpenNote={model.openEntity}
-                    onRename={model.renameProject}
-                    onRenameNote={model.renameNote}
-                  />
-                ))}
-                {rootNotes.map((note) => (
-                  <NoteRow
-                    key={note.id}
-                    active={activeNoteId === note.id}
-                    note={note}
-                    onDelete={model.removeNote}
-                    onOpen={model.openEntity}
-                    onRename={model.renameNote}
-                  />
-                ))}
-                {workspaceIsEmpty && (
-                  <SidebarMenuItem>
-                    <p className="px-2 py-1 text-muted-foreground text-xs">
-                      Nothing here yet. Notes are Markdown files in your workspace folder.
-                    </p>
-                  </SidebarMenuItem>
-                )}
-                <SidebarMenuItem>
-                  <SidebarMenuButton onClick={() => model.addNote()}>
-                    <IconPlus aria-hidden="true" />
-                    <span>New note</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </WorkspaceDropRegion>
-          </SidebarGroup>
+                <WorkspaceDropRegion
+                  onDropFolder={(folderId) => moveFolderById(folderId, null)}
+                  onDropNote={(noteId) => moveNoteById(noteId, null)}
+                >
+                  <SidebarMenu>
+                    {folderTree.map((project, index) => (
+                      <ProjectFolder
+                        key={project.id}
+                        activeNoteId={activeNoteId}
+                        childFolders={project.children}
+                        defaultOpen={index === 0}
+                        notesByProject={notesByProject}
+                        project={project}
+                        projectNotes={notesByProject.get(project.id) ?? []}
+                        revealedProjectId={model.revealedProjectId}
+                        onCreateFolder={(name, parentId) => model.addProject({ name, parentId })}
+                        onCreateNote={(projectId) => model.addNote({ projectId })}
+                        onDelete={model.removeProject}
+                        onDeleteNote={model.removeNote}
+                        onDropFolder={moveFolderById}
+                        onDropNote={moveNoteById}
+                        onOpenNote={model.openEntity}
+                        onRename={model.renameProject}
+                        onRenameNote={model.renameNote}
+                      />
+                    ))}
+                    {rootNotes.map((note) => (
+                      <NoteRow
+                        key={note.id}
+                        active={activeNoteId === note.id}
+                        note={note}
+                        onDelete={model.removeNote}
+                        onOpen={model.openEntity}
+                        onRename={model.renameNote}
+                      />
+                    ))}
+                    {workspaceIsEmpty && (
+                      <SidebarMenuItem>
+                        <p className="px-2 py-1 text-muted-foreground text-xs">
+                          Nothing here yet. Notes are Markdown files in your workspace folder.
+                        </p>
+                      </SidebarMenuItem>
+                    )}
+                    <SidebarMenuItem>
+                      <SidebarMenuButton onClick={() => model.addNote()}>
+                        <IconPlus aria-hidden="true" />
+                        <span>New note</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </WorkspaceDropRegion>
+              </SidebarGroup>
+            </>
+          )}
         </SidebarContent>
 
         <SidebarFooter>
