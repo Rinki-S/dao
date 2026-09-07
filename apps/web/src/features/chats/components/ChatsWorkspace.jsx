@@ -1001,7 +1001,21 @@ export function ChatsWorkspace({ model, showThinking = false, onOpenSettings }) 
               </div>
             ) : null}
 
-            <InputGroup className="rounded-[26px] before:rounded-[25px] **:[textarea]:min-h-14! **:[textarea]:max-h-40! **:[textarea]:overflow-y-auto!">
+            {/* The text is inset to line up with the icons under it, not with
+                the boxes they sit in.
+
+                A control's padding puts the addon's *buttons* 11px in, and the
+                paperclip inside its button is 6px further — a 16px glyph
+                centred in a 28px hit area. So the visible left edge of the row
+                below is 17px, and a textarea left at 11px starts six pixels
+                outside it. Nothing is misaligned by the measurements; it just
+                reads as crammed, because what an eye lines things up against
+                is the mark it can see rather than the box around it.
+
+                Vertical is a judgement rather than a calculation: the same
+                17px would crowd a box this short, so the top gets a little
+                more than the 11px it had and the bottom is left to the addon. */}
+            <InputGroup className="rounded-[26px] before:rounded-[25px] **:[textarea]:min-h-14! **:[textarea]:max-h-40! **:[textarea]:overflow-y-auto! **:[textarea]:px-[17px]! **:[textarea]:pt-[15px]!">
               <InputGroupTextarea
                 aria-label="Message"
                 disabled={!workspaceId}
