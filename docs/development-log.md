@@ -83,7 +83,9 @@ Notes:
 
 ## Milestone 2: Task Loop
 
-Status: complete
+Status: complete, and **superseded** — tasks are no longer rows in SQLite.
+Everything below describes the design as it was built and is kept as a record
+of it; see "Milestone: Tasks Are a File" for what replaced it and why.
 
 Branch:
 
@@ -791,6 +793,93 @@ Validation:
 
 - Go `test ./...` and `vet ./...` pass; renderer formatting, lint, 257 tests and production build pass; 92 desktop tests pass
 - each part verified against the running app and the real workspace folder, including the failure paths: a save refused with the text on disk while the file was left as the other program wrote it, a folder delete refused by the name of a stray PDF with nothing moved on either side, and a note whose file could not be removed left intact along with its file
+
+## Milestone: Tasks Are a File
+
+Status: complete.
+
+Branch: not recorded. The merge commit carried a written message instead of
+git's default one, so the branch name went with the branch when it was
+deleted. Every other milestone here names its branch; this is the one that
+cannot, which is a small argument for letting `git merge` keep its first line.
+
+Goal:
+
+```txt
+The task list is a Markdown file you edit like a note.
+```
+
+Written up after the fact, from the twenty commits behind `5a59135`. This ran
+alongside the AI branch and merged into main before it, and was never given a
+section here — which is how "Milestone 2: Task Loop" came to sit in this
+document describing `GET /api/tasks` and a `tasks` table as though that were
+still the design.
+
+### The argument
+
+The Workspace Folder milestone settled that a note is a file, and that the app
+is wrong when it thinks otherwise. Tasks were the part of the workspace that
+had not been asked the same question. They were rows behind a CRUD form:
+invisible in the folder, uneditable in any other program, and unreachable by
+every tool the note editor had already grown.
+
+So one `tasks.md` per workspace. A checkbox for done, indentation for
+subtasks, and the text of a task carrying its own annotations —
+`@due(2026-08-25)` and `!high` — because a due date that lives in a column is
+a due date that vanishes the moment the file is opened anywhere else.
+
+The name is fixed rather than derived from a title: there is exactly one per
+workspace, and the workspace already names it. A new file opens with a `#
+Tasks` heading so the editor is never a blank page and the file explains
+itself to whatever opens it next.
+
+### Decisions
+
+**The existing rows migrate before they are deleted.** At startup rather than
+as a goose migration, because the destination is a file and SQL cannot write
+one. It is safe on every start: a workspace whose rows have gone has nothing
+to move, and one whose file already has content is left alone rather than
+appended to. Data somebody typed is not something to drop because the storage
+model changed underneath it.
+
+**The API narrowed to two routes.** `GET /api/tasks` and `PUT /api/tasks` —
+the whole document in, the whole document out. There is no endpoint to create
+a task, because creating a task is typing a line, and an endpoint for it would
+be a second way to write the file that the editor would then have to stay in
+step with.
+
+**Anything that only affects reading is a view decoration and cannot rewrite
+the file.** The chips that draw a due date, the folds that hide subtasks, the
+divider above the finished ones: all of them render `@due(...)` and `!high`
+and indentation without touching the text they are drawn from. This is the
+rule the whole milestone rests on. A decoration that could edit is a
+decoration that will, and then the file says something nobody typed.
+
+**Finished tasks move to the end of the file, and that one _is_ an edit.**
+Deliberately, and it is the exception that shows where the line is: grouping
+is a property somebody wants to persist and to see in any other editor, so it
+is written down rather than drawn.
+
+### What this milestone is worth remembering for
+
+- **The same question, asked of the next thing.** "The file is the note" was
+  settled for notes and then left there. Tasks were the second half of the
+  same argument, and the reason it took a separate milestone is that nobody
+  had noticed the question applied twice.
+- **A log entry is part of the work.** This one was not written when the work
+  was done, and the cost showed up immediately: Milestone 2 spent months
+  describing a design that had been replaced, and anybody reading this
+  document in order would have believed it.
+
+### Validation
+
+- Go `test ./...` and `vet ./...` pass; renderer lint, formatting, tests and
+  production build pass
+- the row-to-file migration is exercised against a database that has tasks in
+  it, and against one that has already been migrated, which must do nothing
+- the annotation parser, the chip rendering, the folding and the batch
+  commands each have their own tests, because they are four ways to touch one
+  file and the file is the thing that must not be corrupted
 
 ## Milestone: Tools That Write
 
